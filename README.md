@@ -31,6 +31,13 @@ lässt sich so nicht.
 
 Tests: `npm test`
 
+## Prototyp ohne Server
+
+`npm run build:prototype` erzeugt in `dist-prototype/` einen klickbaren Prototyp.
+Die Übersichtsseite `prototype.html` zeigt Moderation, Beamer, drei Team-iPads und
+die Startseite nebeneinander. Die Spiellogik läuft dabei im Browser, alles bleibt in
+diesem einen Browser gespeichert. Moderator-Passwort im Prototyp: `demo`.
+
 ## Ablauf in Kürze
 
 1. Als Moderator anmelden, unter **Teams** die Teams anlegen (Standard: sechs).

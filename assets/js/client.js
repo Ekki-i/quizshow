@@ -1,6 +1,37 @@
 // Gemeinsame Client-Funktionen: WebSocket mit automatischer Wiederverbindung,
 // Aktionen mit eindeutiger ID (Idempotenz) und kleine DOM-Helfer.
 
+// Im Browser-Prototyp stellt die umgebende Seite einen lokalen Server bereit
+// (window.__quizServer). Dann laufen Verbindung und API-Aufrufe über ihn statt
+// über das Netzwerk.
+function findLocalServer() {
+  let w = window;
+  for (let i = 0; i < 5; i++) {
+    try {
+      if (w.__quizServer) return w.__quizServer;
+    } catch {
+      return null;
+    }
+    if (w.parent === w) return null;
+    w = w.parent;
+  }
+  return null;
+}
+
+export const localServer = findLocalServer();
+
+if (localServer) {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+    const m = url.pathname.match(/\/api\/(teams|login|logout)$/);
+    if (!m) return realFetch(input, init);
+    const body = init?.body ? JSON.parse(init.body) : {};
+    const [status, data] = localServer.api(m[1], body);
+    return Promise.resolve(new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }));
+  };
+}
+
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -16,6 +47,37 @@ export function h(tag, attrs = {}, ...children) {
     el.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
   return el;
+}
+
+// Bestätigungsdialog im Seiten-Design. Mit requireText muss ein Wort
+// abgetippt werden, bevor die Aktion freigegeben wird.
+export function ask(message, { confirmLabel = 'Ja', cancelLabel = 'Abbrechen', requireText = null, danger = false } = {}) {
+  return new Promise((resolve) => {
+    const input = requireText ? h('input', { id: 'ask-input', autocomplete: 'off', 'aria-label': `${requireText} eingeben` }) : null;
+    const ok = h('button', { class: `btn ${danger ? 'bad' : 'pink'}`, type: 'submit', disabled: !!requireText }, confirmLabel);
+    const close = (result) => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    };
+    const onKey = (ev) => ev.key === 'Escape' && close(false);
+    const overlay = h('div', { class: 'modal-backdrop' },
+      h('form', {
+        class: 'modal card', role: 'dialog', 'aria-modal': 'true',
+        onsubmit: (ev) => {
+          ev.preventDefault();
+          if (!requireText || input.value.trim() === requireText) close(true);
+        },
+      },
+      h('p', { class: 'modal-text' }, message),
+      requireText ? [h('label', { for: 'ask-input' }, `Zum Bestätigen „${requireText}“ eingeben`), input] : null,
+      h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '16px' } },
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => close(false) }, cancelLabel), ok)));
+    if (input) input.addEventListener('input', () => (ok.disabled = input.value.trim() !== requireText));
+    document.addEventListener('keydown', onKey);
+    document.body.append(overlay);
+    (input || ok).focus();
+  });
 }
 
 export function toast(message, kind = 'error') {
@@ -56,8 +118,12 @@ export function connect({ hello, onState, onAuthFailed, onKicked, quiet = false 
   }
 
   function open() {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    if (localServer) {
+      ws = localServer.connect();
+    } else {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws`);
+    }
     ws.onopen = () => {
       retry = 0;
       ws.send(JSON.stringify({ type: 'hello', ...hello() }));
@@ -94,7 +160,7 @@ export function connect({ hello, onState, onAuthFailed, onKicked, quiet = false 
   }
 
   function send(id, name, payload) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'action', id, name, payload }));
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'action', id, name, payload }));
   }
 
   // Aktion senden; wiederholt sich bei Verbindungsabbruch, bis eine Antwort kommt.
@@ -109,6 +175,12 @@ export function connect({ hello, onState, onAuthFailed, onKicked, quiet = false 
       }, 3000);
     });
   }
+
+  // Im Prototyp beim Verlassen der Seite abmelden, damit der Verbindungsstatus stimmt.
+  if (localServer) window.addEventListener('pagehide', () => {
+    stopped = true;
+    ws?.close();
+  });
 
   open();
   return { action };

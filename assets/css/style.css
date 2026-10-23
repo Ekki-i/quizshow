@@ -141,7 +141,7 @@ label { display: block; font-weight: 600; margin: 10px 0 6px; }
 @media (max-width: 900px) { .live-grid { grid-template-columns: 1fr; } }
 .list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .list li { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.list li .grow { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.list li .grow { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
 .list li.active { outline: 3px solid var(--accent-2); }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-2); vertical-align: top; }
@@ -196,3 +196,8 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 @keyframes pulse { 50% { transform: scale(1.06); } }
 @keyframes dance { from { transform: translate(-0.12em, 0.06em) rotate(-8deg); } to { transform: translate(0.12em, -0.08em) rotate(8deg); } }
 @keyframes spin { from { transform: rotateY(0) scale(0.4); } to { transform: rotateY(1440deg) scale(1); } }
+
+/* Bestätigungsdialog */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(10, 2, 24, 0.72); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 200; }
+.modal { width: min(460px, 100%); border-top: 6px solid var(--accent); }
+.modal-text { font-size: 1.15rem; font-weight: 700; margin: 0 0 8px; }

@@ -16,16 +16,17 @@
   </main>
 
   <script type="module">
-    import { h, connect, run, store } from './assets/js/client.js';
+    import { h, connect, run, store, ask, localServer } from './assets/js/client.js';
 
     const params = new URLSearchParams(location.search);
     const urlCode = params.get('code');
     if (urlCode) {
       store('quiz.teamCode', urlCode.trim().toUpperCase());
       // Code aus der Adresszeile entfernen, damit er nicht versehentlich geteilt wird.
-      history.replaceState(null, '', 'team.html');
+      // Im Prototyp laufen mehrere Teams in einem Browser, dort bleibt er in der Adresse.
+      if (!localServer) history.replaceState(null, '', 'team.html');
     }
-    const code = store('quiz.teamCode');
+    const code = urlCode?.trim().toUpperCase() || store('quiz.teamCode');
     const expect = params.get('expect');
     const main = document.getElementById('main');
     if (!code) location.href = 'index.html';
@@ -103,7 +104,7 @@
           ev.preventDefault();
           const text = document.getElementById('answer').value.trim();
           if (!text) return;
-          if (!confirm(`Antwort „${text}“ endgültig abgeben? Danach könnt ihr sie nicht mehr ändern.`)) return;
+          if (!(await ask(`Antwort „${text}“ endgültig abgeben? Danach könnt ihr sie nicht mehr ändern.`, { confirmLabel: 'Ja, abgeben' }))) return;
           const ok = await run(conn, 'g1.submit', { text });
           if (ok) store(draftKey, null);
         },

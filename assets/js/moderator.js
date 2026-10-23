@@ -1,6 +1,6 @@
-import { h, connect, run, store, toast } from './client.js';
+import { h, connect, run, store, toast, ask, localServer } from './client.js';
 
-const token = store('quiz.modToken');
+const token = store('quiz.modToken') || localServer?.demoToken;
 if (!token) location.href = 'index.html';
 
 let S = null; // letzter Zustand vom Server
@@ -84,8 +84,8 @@ const dot = (color) => h('span', { class: 'dot', style: { background: color } })
 const card = (title, ...body) => h('section', { class: 'card' }, h('h3', {}, title), ...body);
 const act = (name, payload) => run(conn, name, payload);
 
-function confirmAct(message, name, payload) {
-  if (confirm(message)) act(name, payload);
+async function confirmAct(message, name, payload) {
+  if (await ask(message)) act(name, payload);
 }
 
 // ---------- Live-Regie ----------
@@ -249,7 +249,7 @@ function buildTeams() {
           h('td', {}, h('input', { type: 'color', value: t.color, 'aria-label': `Farbe ${t.name}`, style: { width: '56px', padding: '2px' }, onchange: (ev) => act('team.update', { teamId: t.id, color: ev.target.value }) })),
           h('td', {}, h('input', { value: t.name, maxlength: '40', 'aria-label': 'Teamname', onchange: (ev) => act('team.update', { teamId: t.id, name: ev.target.value }) })),
           h('td', {}, h('div', { class: 'code' }, t.code),
-            h('button', { class: 'btn small ghost', onclick: () => navigator.clipboard?.writeText(base + t.code).then(() => toast('Link kopiert', 'info')) }, 'Link kopieren')),
+            h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(base + t.code)).then(() => toast('Link kopiert', 'info'), () => toast(`Kopieren nicht möglich. Link: ${base + t.code}`, 'info')) }, 'Link kopieren')),
           h('td', {}, h('div', { class: 'row' },
             h('button', { class: 'btn small ghost', onclick: () => confirmAct(`Neuen Code für ${t.name} erzeugen? Der alte Code und verbundene Geräte werden ungültig.`, 'team.regenCode', { teamId: t.id }) }, 'Neuer Code'),
             h('button', { class: 'btn small bad', onclick: () => confirmAct(`Team ${t.name} löschen?`, 'team.remove', { teamId: t.id }) }, 'Löschen'))))))) : h('p', { class: 'muted' }, 'Noch keine Teams.')),
@@ -364,9 +364,9 @@ function buildPoints() {
       card('Kontrollierter Neustart',
         h('p', { class: 'muted' }, 'Setzt Spielzustand, Münzen und alle Punkte zurück. Teams, Inhalte und Protokoll bleiben erhalten.'),
         h('button', {
-          class: 'btn bad', onclick: () => {
-            const v = prompt('Zum Bestätigen NEUSTART eingeben:');
-            if (v === 'NEUSTART') act('live.reset', { confirm: v });
+          class: 'btn bad', onclick: async () => {
+            const ok = await ask('Spielstand, Münzen und alle Punkte wirklich zurücksetzen?', { requireText: 'NEUSTART', confirmLabel: 'Zurücksetzen', danger: true });
+            if (ok) act('live.reset', { confirm: 'NEUSTART' });
           },
         }, 'Neustart …'))),
     card('Punktebuchungen',
