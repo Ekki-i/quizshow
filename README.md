@@ -65,11 +65,17 @@ Umgesetzt:
 - Beamer: Startbild, Intro mit Teams, Pyramide 4–2–2, Spieltitel-Animation, Spielansicht,
   Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
 - Show-Editor mit Autosave („Gespeichert“ / „Ungespeicherte Änderungen“).
+- **Spiele-Datenbank** mit allen acht Spielen und Beispielinhalten. Einträge lassen sich anlegen,
+  duplizieren, bearbeiten und löschen. Die Show wird frei aus der Datenbank zusammengestellt,
+  auch mehrfach mit demselben Spiel; jede Show bekommt eine eigene Kopie.
+- Showablauf als Brett mit acht Plätzen und Mülleimer in der Mitte (Ziehen oder Klicken).
+- Formular-Editor für die Inhalte aller acht Spiele, ohne Programmierung.
 - **Spiel 1 „Die leichten 5“** und **Spiel 5 „5 ist Trümpf“** vollständig spielbar.
 
 Noch offen (nächste Phasen laut Masterprompt):
 
-- Spiele 2, 3, 4, 6, 7, 8 und das Finale gegen die Moderation.
+- Spielablauf (Live-Steuerung) für die Spiele 2, 3, 4, 6, 7, 8 und das Finale gegen die Moderation.
+  Ihre Inhalte sind bereits in der Datenbank und im Editor bearbeitbar.
 - Mehrere Projekte, Duplizieren, Versionen, Archiv-Snapshots und Spielbibliothek.
 - QR-Codes, Co-Moderator-Rechte, Test-/Vorschaumodus ohne echte Punkte.
 - Medien-Uploads, Musik, editierbare Design-Tokens im Editor, Handschrift-Eingabe mit Stylus.

@@ -4,10 +4,11 @@
 // WebSockets, damit sie direkt getestet werden kann.
 
 const crypto = require('crypto');
-const { COIN_POSITIONS, TEAM_COLORS, defaultProject } = require('./defaults');
+const { TYPES, DEFAULT_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
 
 class QuizError extends Error {}
 
+const STATE_VERSION = 2;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BEAMER_VIEWS = ['start', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'blank'];
 const MAX_PROCESSED = 5000;
@@ -25,25 +26,63 @@ function newTeamCode() {
 
 function freshLive() {
   return {
-    activeGame: null,
+    activeGame: null, // ID der aktiven Spielinstanz in der Show
+    games: {}, // Spielzustand je Spielinstanz
     beamer: { view: 'start', data: {} },
-    g1: { qIndex: -1, rounds: {} },
-    g5: { termIndex: -1, rounds: {} },
     coins: [],
     warning: null,
     effect: { seq: 0, kind: null },
   };
 }
 
-function createState() {
+function clone(v) {
+  return JSON.parse(JSON.stringify(v));
+}
+
+function libraryEntry(type, now) {
+  return { id: newId('lib'), type, title: TYPES[type].title, content: clone(TYPES[type].example), version: 1, updatedAt: now };
+}
+
+// Eine Spielinstanz in der Show ist eine unabhängige Kopie eines Datenbank-Eintrags.
+function instanceFrom(entry) {
+  return { id: newId('game'), type: entry.type, title: entry.title, content: clone(entry.content), libraryId: entry.id, libraryVersion: entry.version, locked: false };
+}
+
+function createState(now = Date.now()) {
+  const library = DEFAULT_ORDER.map((type) => libraryEntry(type, now));
+  const games = library.map(instanceFrom);
+  games[0].locked = true; // „Die leichten 5“ als festes Eröffnungsspiel
   return {
-    version: 1,
-    project: defaultProject(newId('proj')),
+    version: STATE_VERSION,
+    library,
+    project: {
+      id: newId('proj'),
+      name: 'Quizshow',
+      subtitle: 'Die Live-Show mit acht Spielen',
+      host: 'Moderation',
+      coHost: '',
+      // Teams sehen standardmäßig keine fremden Punktestände (Abschnitt 4.1).
+      settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
+      teams: [],
+      games,
+    },
     live: freshLive(),
     ledger: [],
     log: [],
     processed: [],
   };
+}
+
+// Ältere Speicherstände (vor der Spiele-Datenbank) übernehmen Teams, Showdaten und Protokoll.
+function migrate(db) {
+  if (db.version === STATE_VERSION) return db;
+  const fresh = createState();
+  if (db.project) {
+    for (const k of ['name', 'subtitle', 'host', 'coHost', 'settings', 'teams']) if (k in db.project) fresh.project[k] = db.project[k];
+  }
+  fresh.log = db.log || [];
+  if (db.auth) fresh.auth = db.auth;
+  return fresh;
 }
 
 // ---------- Hilfsfunktionen ----------
@@ -58,15 +97,37 @@ function findTeam(db, teamId) {
   return team;
 }
 
-function activeGame(db) {
-  const i = db.live.activeGame;
-  return i === null ? null : db.project.games[i];
+function findGame(db, gameId) {
+  const game = db.project.games.find((g) => g.id === gameId);
+  if (!game) fail('Spiel nicht in der Show gefunden.');
+  return game;
 }
 
-function requireActive(db, key) {
+function findEntry(db, libraryId) {
+  const entry = db.library.find((e) => e.id === libraryId);
+  if (!entry) fail('Spiel nicht in der Datenbank gefunden.');
+  return entry;
+}
+
+function position(db, game) {
+  return db.project.games.indexOf(game) + 1;
+}
+
+function activeGame(db) {
+  const id = db.live.activeGame;
+  return id ? db.project.games.find((g) => g.id === id) || null : null;
+}
+
+function requireActive(db, type) {
   const g = activeGame(db);
-  if (!g || g.key !== key) fail('Dieses Spiel ist gerade nicht aktiv.');
+  if (!g || g.type !== type) fail('Dieses Spiel ist gerade nicht aktiv.');
   return g;
+}
+
+function gameState(db, game) {
+  const s = db.live.games;
+  if (!s[game.id]) s[game.id] = game.type === 'leichte5' ? { qIndex: -1, rounds: {} } : { termIndex: -1, rounds: {} };
+  return s[game.id];
 }
 
 function log(db, ctx, type, detail) {
@@ -117,16 +178,60 @@ function cleanColor(v) {
   return v;
 }
 
-function g1Round(db, qIndex) {
-  const r = db.live.g1.rounds;
-  if (!r[qIndex]) r[qIndex] = { open: false, solutionRevealed: false, answers: {} };
-  return r[qIndex];
+// Prüft Inhalte gegen das Schema des Spieltyps. Leere Felder sind beim
+// Vorbereiten erlaubt; nur Form, Anzahl und Länge werden erzwungen.
+function sanitizeFields(fields, value) {
+  const src = value && typeof value === 'object' ? value : {};
+  const out = {};
+  for (const f of fields) out[f.key] = sanitizeField(f, src[f.key]);
+  return out;
 }
 
-function g5Round(db, termIndex) {
-  const r = db.live.g5.rounds;
-  if (!r[termIndex]) r[termIndex] = { hintLevel: 0, buzzes: [], locked: [], resolved: false };
-  return r[termIndex];
+function sanitizeField(f, v) {
+  switch (f.type) {
+    case 'text':
+    case 'textarea':
+      if (v === undefined || v === null) return '';
+      if (typeof v !== 'string') fail(`„${f.label}“ ist ungültig.`);
+      if (v.length > f.max) fail(`„${f.label}“: maximal ${f.max} Zeichen.`);
+      return v;
+    case 'number': {
+      if (v === '' || v === null || v === undefined) return null;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < f.min || n > f.max) fail(`„${f.label}“ muss zwischen ${f.min} und ${f.max} liegen.`);
+      return n;
+    }
+    case 'select':
+      if (!f.options.includes(v)) return f.options[0];
+      return v;
+    case 'object':
+      return sanitizeFields(f.fields, v);
+    case 'list': {
+      const arr = Array.isArray(v) ? v : [];
+      if (arr.length < f.min || arr.length > f.max) {
+        fail(f.min === f.max ? `„${f.label}“ braucht genau ${f.min} Einträge.` : `„${f.label}“: ${f.min} bis ${f.max} Einträge.`);
+      }
+      return arr.map((item) => (f.of === 'text' ? sanitizeField({ type: 'text', label: f.label, max: f.maxLength || 300 }, item) : sanitizeFields(f.fields, item)));
+    }
+    default:
+      fail('Unbekanntes Feld.');
+  }
+  return null;
+}
+
+function sanitizeContent(type, content) {
+  if (!TYPES[type]) fail('Unbekannter Spieltyp.');
+  return sanitizeFields(TYPES[type].schema, content);
+}
+
+function g1Round(state, qIndex) {
+  if (!state.rounds[qIndex]) state.rounds[qIndex] = { open: false, solutionRevealed: false, answers: {} };
+  return state.rounds[qIndex];
+}
+
+function g5Round(state, termIndex) {
+  if (!state.rounds[termIndex]) state.rounds[termIndex] = { hintLevel: 0, buzzes: [], locked: [], resolved: false };
+  return state.rounds[termIndex];
 }
 
 function g5Current(round) {
@@ -145,26 +250,30 @@ function rankingSnapshot(db) {
     .sort((a, b) => b.points - a.points);
 }
 
+function requireEditable(db) {
+  if (db.live.activeGame !== null) fail('Während ein Spiel aktiv ist, bleibt der Showablauf fest. Zuerst das Spiel beenden.');
+}
+
 // ---------- Aktionen ----------
 
 const teamActions = {
   'g1.submit'(db, ctx, p) {
-    requireActive(db, 'leichte5');
-    const qIndex = db.live.g1.qIndex;
-    const round = g1Round(db, qIndex);
+    const game = requireActive(db, 'leichte5');
+    const state = gameState(db, game);
+    const round = g1Round(state, state.qIndex);
     if (!round.open) fail('Die Frage ist nicht freigegeben.');
     if (round.answers[ctx.teamId]) fail('Eure Antwort ist bereits abgegeben und gesperrt.');
     const text = cleanText(p.text, 200);
     if (!text) fail('Bitte zuerst eine Antwort eingeben.');
     round.answers[ctx.teamId] = { text, at: ctx.now, grade: null, onBeamer: false };
-    log(db, ctx, 'antwort', `${teamName(db, ctx.teamId)} hat Frage ${qIndex + 1} abgegeben`);
+    log(db, ctx, 'antwort', `${teamName(db, ctx.teamId)} hat Frage ${state.qIndex + 1} abgegeben`);
   },
 
   'g5.buzz'(db, ctx) {
-    requireActive(db, 'trumpf5');
-    const termIndex = db.live.g5.termIndex;
-    if (termIndex < 0) fail('Es läuft gerade kein Begriff.');
-    const round = g5Round(db, termIndex);
+    const game = requireActive(db, 'trumpf5');
+    const state = gameState(db, game);
+    if (state.termIndex < 0) fail('Es läuft gerade kein Begriff.');
+    const round = g5Round(state, state.termIndex);
     if (round.resolved) fail('Dieser Begriff ist bereits beendet.');
     if (round.hintLevel < 1) fail('Es wurde noch kein Hinweis freigegeben.');
     if (round.locked.includes(ctx.teamId)) fail('Ihr seid für diesen Begriff gesperrt.');
@@ -231,64 +340,109 @@ const moderatorActions = {
     return { kick: team.id };
   },
 
-  'game.updateContent'(db, ctx, p) {
-    const game = db.project.games[p.gameIndex];
-    if (!game) fail('Spiel nicht gefunden.');
-    if (game.key === 'leichte5') {
-      if (!Array.isArray(p.content?.questions) || p.content.questions.length !== 5) {
-        fail('„Die leichten 5“ braucht genau fünf Fragen.');
-      }
-      game.content = {
-        questions: p.content.questions.map((q) => ({
-          question: cleanText(q.question, 300),
-          solution: cleanText(q.solution, 200),
-        })),
-      };
-    } else if (game.key === 'trumpf5') {
-      if (!Array.isArray(p.content?.terms) || p.content.terms.length !== 5) {
-        fail('„5 ist Trümpf“ braucht genau fünf Begriffe.');
-      }
-      game.content = {
-        terms: p.content.terms.map((t) => {
-          if (!Array.isArray(t.hints) || t.hints.length !== 5) fail('Jeder Begriff braucht fünf Hinweise.');
-          return {
-            category: cleanText(t.category, 80),
-            term: cleanText(t.term, 120),
-            hints: t.hints.map((h) => cleanText(h, 200)),
-          };
-        }),
-      };
-    } else {
-      fail('Für dieses Spiel gibt es noch keinen Editor.');
+  // ----- Spiele-Datenbank -----
+
+  'library.add'(db, ctx, p) {
+    if (!TYPES[p.type]) fail('Unbekannter Spieltyp.');
+    if (db.library.length >= 200) fail('Die Datenbank ist voll (200 Spiele).');
+    const entry = libraryEntry(p.type, ctx.now);
+    entry.title = `${TYPES[p.type].title} (neu)`;
+    db.library.push(entry);
+    log(db, ctx, 'datenbank', `Neues Spiel „${entry.title}“ angelegt`);
+    return { created: entry.id };
+  },
+
+  'library.duplicate'(db, ctx, p) {
+    const src = findEntry(db, p.libraryId);
+    if (db.library.length >= 200) fail('Die Datenbank ist voll (200 Spiele).');
+    const entry = { ...clone(src), id: newId('lib'), title: `${src.title} (Kopie)`, version: 1, updatedAt: ctx.now };
+    db.library.splice(db.library.indexOf(src) + 1, 0, entry);
+    log(db, ctx, 'datenbank', `„${src.title}“ dupliziert`);
+    return { created: entry.id };
+  },
+
+  'library.update'(db, ctx, p) {
+    const entry = findEntry(db, p.libraryId);
+    if ('title' in p) entry.title = cleanText(p.title, 80) || TYPES[entry.type].title;
+    if ('content' in p) entry.content = sanitizeContent(entry.type, p.content);
+    entry.version += 1;
+    entry.updatedAt = ctx.now;
+    log(db, ctx, 'datenbank', `„${entry.title}“ gespeichert (Version ${entry.version})`);
+  },
+
+  'library.remove'(db, ctx, p) {
+    const entry = findEntry(db, p.libraryId);
+    db.library = db.library.filter((e) => e.id !== entry.id);
+    log(db, ctx, 'datenbank', `„${entry.title}“ aus der Datenbank gelöscht (Show-Kopien bleiben erhalten)`);
+  },
+
+  // Ein in der Show bearbeitetes Spiel als neuen Eintrag in die Datenbank übernehmen.
+  'library.saveFromShow'(db, ctx, p) {
+    const game = findGame(db, p.gameId);
+    const entry = { id: newId('lib'), type: game.type, title: game.title, content: clone(game.content), version: 1, updatedAt: ctx.now };
+    db.library.push(entry);
+    log(db, ctx, 'datenbank', `„${game.title}“ aus der Show in die Datenbank übernommen`);
+    return { created: entry.id };
+  },
+
+  // ----- Showablauf -----
+
+  'game.add'(db, ctx, p) {
+    requireEditable(db);
+    const entry = findEntry(db, p.libraryId);
+    const games = db.project.games;
+    if (games.length >= SHOW_SIZE) fail(`Die Show hat schon ${SHOW_SIZE} Spiele. Zuerst eines in den Mülleimer ziehen.`);
+    const game = instanceFrom(entry);
+    let index = Number.isInteger(p.index) ? Math.max(0, Math.min(p.index, games.length)) : games.length;
+    if (index === 0 && games[0]?.locked) index = 1;
+    games.splice(index, 0, game);
+    log(db, ctx, 'editor', `„${game.title}“ auf Position ${index + 1} eingefügt`);
+    return { created: game.id };
+  },
+
+  'game.remove'(db, ctx, p) {
+    requireEditable(db);
+    const game = findGame(db, p.gameId);
+    if (game.locked && p.override !== 'ENTFERNEN') fail('Das feste Eröffnungsspiel lässt sich nur über die Sonderaktion entfernen.');
+    db.project.games = db.project.games.filter((g) => g.id !== game.id);
+    log(db, ctx, 'editor', `„${game.title}“ aus der Show entfernt${game.locked ? ' (Sonderaktion Eröffnungsspiel)' : ''}`);
+  },
+
+  'game.moveTo'(db, ctx, p) {
+    requireEditable(db);
+    const games = db.project.games;
+    const game = findGame(db, p.gameId);
+    const from = games.indexOf(game);
+    const to = Math.max(0, Math.min(Number(p.index), games.length - 1));
+    if (!Number.isInteger(to)) fail('Ungültige Position.');
+    if (from === to) return;
+    if (game.locked || (games[0]?.locked && to === 0)) {
+      fail('„Die leichten 5“ ist das feste Eröffnungsspiel und bleibt auf Position 1.');
     }
+    games.splice(from, 1);
+    games.splice(to, 0, game);
+    log(db, ctx, 'editor', `„${game.title}“ auf Position ${to + 1} verschoben`);
+  },
+
+  'game.update'(db, ctx, p) {
+    const game = findGame(db, p.gameId);
+    if (db.live.activeGame === game.id && 'content' in p) fail('Inhalte eines laufenden Spiels bitte erst nach dem Beenden ändern.');
+    if ('title' in p) game.title = cleanText(p.title, 80) || TYPES[game.type].title;
+    if ('content' in p) game.content = sanitizeContent(game.type, p.content);
     log(db, ctx, 'editor', `Inhalte von „${game.title}“ gespeichert`);
   },
 
-  'game.move'(db, ctx, p) {
-    const games = db.project.games;
-    const from = p.gameIndex;
-    const to = from + (p.dir === 'up' ? -1 : 1);
-    if (!games[from] || !games[to]) fail('Verschieben nicht möglich.');
-    if (games[from].fixedOpener || games[to].fixedOpener) {
-      fail('„Die leichten 5“ ist das feste Eröffnungsspiel und bleibt auf Position 1.');
-    }
-    if (db.live.activeGame !== null) fail('Während ein Spiel aktiv ist, bleibt die Reihenfolge fest.');
-    [games[from], games[to]] = [games[to], games[from]];
-    games.forEach((g, i) => (g.position = i + 1));
-    log(db, ctx, 'editor', `„${games[to].title}“ auf Position ${to + 1} verschoben`);
-  },
-
   'show.activate'(db, ctx, p) {
-    if (p.gameIndex === null) {
+    if (p.gameId === null) {
       db.live.activeGame = null;
       log(db, ctx, 'ablauf', 'Kein Spiel aktiv');
       return;
     }
-    const game = db.project.games[p.gameIndex];
-    if (!game) fail('Spiel nicht gefunden.');
-    if (!game.implemented) fail(`„${game.title}“ ist noch nicht umgesetzt.`);
-    db.live.activeGame = p.gameIndex;
-    log(db, ctx, 'ablauf', `Spiel ${game.position} „${game.title}“ aktiviert`);
+    const game = findGame(db, p.gameId);
+    if (!TYPES[game.type].playable) fail(`„${game.title}“ ist noch nicht spielbar.`);
+    db.live.activeGame = game.id;
+    gameState(db, game);
+    log(db, ctx, 'ablauf', `Spiel ${position(db, game)} „${game.title}“ aktiviert`);
   },
 
   'beamer.show'(db, ctx, p) {
@@ -314,65 +468,66 @@ const moderatorActions = {
 
   'g1.open'(db, ctx, p) {
     const game = requireActive(db, 'leichte5');
+    const state = gameState(db, game);
     const qIndex = Number(p.qIndex);
     if (!game.content.questions[qIndex]) fail('Frage nicht gefunden.');
-    const prev = db.live.g1.qIndex;
-    if (prev >= 0 && prev !== qIndex) g1Round(db, prev).open = false;
-    db.live.g1.qIndex = qIndex;
-    const round = g1Round(db, qIndex);
+    if (state.qIndex >= 0 && state.qIndex !== qIndex) g1Round(state, state.qIndex).open = false;
+    state.qIndex = qIndex;
+    const round = g1Round(state, qIndex);
     if (!round.solutionRevealed) round.open = true;
     log(db, ctx, 'ablauf', `Frage ${qIndex + 1} freigegeben`);
   },
 
   'g1.showAnswer'(db, ctx, p) {
-    requireActive(db, 'leichte5');
-    const round = g1Round(db, db.live.g1.qIndex);
-    const ans = round.answers[p.teamId];
+    const game = requireActive(db, 'leichte5');
+    const state = gameState(db, game);
+    const ans = g1Round(state, state.qIndex).answers[p.teamId];
     if (!ans) fail('Dieses Team hat noch nicht abgegeben.');
     ans.onBeamer = !!p.visible;
     log(db, ctx, 'beamer', `Antwort von ${teamName(db, p.teamId)} ${ans.onBeamer ? 'gezeigt' : 'ausgeblendet'}`);
   },
 
   'g1.grade'(db, ctx, p) {
-    requireActive(db, 'leichte5');
-    const qIndex = db.live.g1.qIndex;
-    const round = g1Round(db, qIndex);
-    const ans = round.answers[p.teamId];
+    const game = requireActive(db, 'leichte5');
+    const state = gameState(db, game);
+    const qIndex = state.qIndex;
+    const ans = g1Round(state, qIndex).answers[p.teamId];
     if (!ans) fail('Dieses Team hat noch nicht abgegeben.');
     const correct = !!p.correct;
     const changed = ans.grade !== null && ans.grade !== correct;
     ans.grade = correct;
-    bookTarget(db, ctx, `g1:${qIndex}:${p.teamId}`, p.teamId, correct ? 1 : 0,
-      `Die leichten 5, Frage ${qIndex + 1}${changed ? ', Bewertung korrigiert' : ''}`);
+    bookTarget(db, ctx, `g1:${game.id}:${qIndex}:${p.teamId}`, p.teamId, correct ? 1 : 0,
+      `${game.title}, Frage ${qIndex + 1}${changed ? ', Bewertung korrigiert' : ''}`);
     log(db, ctx, 'bewertung', `${teamName(db, p.teamId)} Frage ${qIndex + 1}: ${correct ? 'richtig' : 'falsch'}`);
     if (ans.onBeamer) effect(db, correct ? 'correct' : 'wrong');
   },
 
   'g1.revealSolution'(db, ctx) {
-    requireActive(db, 'leichte5');
-    const qIndex = db.live.g1.qIndex;
-    const round = g1Round(db, qIndex);
+    const game = requireActive(db, 'leichte5');
+    const state = gameState(db, game);
+    const round = g1Round(state, state.qIndex);
     const ungraded = Object.values(round.answers).filter((a) => a.grade === null).length;
     if (ungraded > 0) fail(`Erst alle abgegebenen Antworten bewerten (${ungraded} offen).`);
     round.open = false;
     round.solutionRevealed = true;
-    log(db, ctx, 'ablauf', `Lösung zu Frage ${qIndex + 1} gezeigt, Abgabe geschlossen`);
+    log(db, ctx, 'ablauf', `Lösung zu Frage ${state.qIndex + 1} gezeigt, Abgabe geschlossen`);
   },
 
   'g5.start'(db, ctx, p) {
     const game = requireActive(db, 'trumpf5');
+    const state = gameState(db, game);
     const termIndex = Number(p.termIndex);
     if (!game.content.terms[termIndex]) fail('Begriff nicht gefunden.');
-    db.live.g5.termIndex = termIndex;
-    g5Round(db, termIndex);
+    state.termIndex = termIndex;
+    g5Round(state, termIndex);
     log(db, ctx, 'ablauf', `Begriff ${termIndex + 1} gestartet`);
   },
 
   'g5.nextHint'(db, ctx) {
-    requireActive(db, 'trumpf5');
-    const termIndex = db.live.g5.termIndex;
-    if (termIndex < 0) fail('Zuerst einen Begriff starten.');
-    const round = g5Round(db, termIndex);
+    const game = requireActive(db, 'trumpf5');
+    const state = gameState(db, game);
+    if (state.termIndex < 0) fail('Zuerst einen Begriff starten.');
+    const round = g5Round(state, state.termIndex);
     if (round.resolved) fail('Dieser Begriff ist bereits beendet.');
     if (g5Current(round)) fail('Erst die Antwort des buzzernden Teams bewerten.');
     if (round.hintLevel >= 5) fail('Alle fünf Hinweise sind freigegeben.');
@@ -381,16 +536,16 @@ const moderatorActions = {
   },
 
   'g5.judge'(db, ctx, p) {
-    requireActive(db, 'trumpf5');
-    const termIndex = db.live.g5.termIndex;
-    const round = g5Round(db, termIndex);
+    const game = requireActive(db, 'trumpf5');
+    const state = gameState(db, game);
+    const termIndex = state.termIndex;
+    const round = g5Round(state, termIndex);
     const buzz = g5Current(round);
     if (!buzz) fail('Kein Team hat gerade das Antwortrecht.');
     if (p.correct) {
       buzz.status = 'correct';
       round.resolved = true;
-      const pts = trumpfPoints(buzz.hint);
-      bookTarget(db, ctx, `g5:${termIndex}`, buzz.teamId, pts, `5 ist Trümpf, Begriff ${termIndex + 1}, Hinweis ${buzz.hint}`);
+      bookTarget(db, ctx, `g5:${game.id}:${termIndex}`, buzz.teamId, trumpfPoints(buzz.hint), `${game.title}, Begriff ${termIndex + 1}, Hinweis ${buzz.hint}`);
       effect(db, 'correct');
     } else {
       buzz.status = 'wrong';
@@ -401,11 +556,12 @@ const moderatorActions = {
   },
 
   'g5.close'(db, ctx) {
-    requireActive(db, 'trumpf5');
-    const round = g5Round(db, db.live.g5.termIndex);
+    const game = requireActive(db, 'trumpf5');
+    const state = gameState(db, game);
+    const round = g5Round(state, state.termIndex);
     if (g5Current(round)) fail('Erst die Antwort des buzzernden Teams bewerten.');
     round.resolved = true;
-    log(db, ctx, 'ablauf', `Begriff ${db.live.g5.termIndex + 1} ohne Punkte beendet`);
+    log(db, ctx, 'ablauf', `Begriff ${state.termIndex + 1} ohne Punkte beendet`);
   },
 
   'points.adjust'(db, ctx, p) {
@@ -431,20 +587,20 @@ const moderatorActions = {
 
   // Münzvergabe nach den aktiven Positionen 4, 6 und 8 auf Basis des kumulierten Stands.
   'coin.determine'(db, ctx, p) {
-    const position = Number(p.position);
-    if (!COIN_POSITIONS.includes(position)) fail('Münzen gibt es nur nach Position 4, 6 und 8.');
-    if (db.live.coins.some((c) => c.position === position)) fail('Für diese Position wurde die Münze bereits vergeben.');
+    const pos = Number(p.position);
+    if (!COIN_POSITIONS.includes(pos)) fail('Münzen gibt es nur nach Position 4, 6 und 8.');
+    if (db.live.coins.some((c) => c.position === pos)) fail('Für diese Position wurde die Münze bereits vergeben.');
     const ranking = rankingSnapshot(db);
     if (!ranking.length) fail('Keine Teams vorhanden.');
     const top = ranking.filter((r) => r.points === ranking[0].points);
     if (top.length > 1) {
-      db.live.warning = { kind: 'coinTie', position, teamIds: top.map((t) => t.teamId), points: top[0].points };
-      log(db, ctx, 'muenze', `Gleichstand um Münze ${position}: ${top.map((t) => t.name).join(', ')} – Schätzfrage nötig`);
+      db.live.warning = { kind: 'coinTie', position: pos, teamIds: top.map((t) => t.teamId), points: top[0].points };
+      log(db, ctx, 'muenze', `Gleichstand um Münze ${pos}: ${top.map((t) => t.name).join(', ')} – Schätzfrage nötig`);
       return;
     }
-    db.live.coins.push({ position, teamId: top[0].teamId, at: ctx.now, method: 'Punkte', points: top[0].points });
+    db.live.coins.push({ position: pos, teamId: top[0].teamId, at: ctx.now, method: 'Punkte', points: top[0].points });
     db.live.warning = null;
-    log(db, ctx, 'muenze', `Münze nach Position ${position} an ${top[0].name} (${top[0].points} Punkte)`);
+    log(db, ctx, 'muenze', `Münze nach Position ${pos} an ${top[0].name} (${top[0].points} Punkte)`);
   },
 
   // Nach einer Schätzfrage vergibt die Moderation die Münze ausdrücklich und protokolliert.
@@ -490,7 +646,7 @@ function findTeamByCode(db, code) {
 
 function gameHeader(db) {
   const g = activeGame(db);
-  return g ? { key: g.key, title: g.title, position: g.position } : null;
+  return g ? { type: g.type, title: g.title, position: position(db, g) } : null;
 }
 
 function teamView(db, teamId) {
@@ -504,25 +660,25 @@ function teamView(db, teamId) {
   };
   if (db.project.settings.publicScores) view.ranking = rankingSnapshot(db).map(({ name, color, points }) => ({ name, color, points }));
   const g = activeGame(db);
-  if (g?.key === 'leichte5' && db.live.g1.qIndex >= 0) {
-    const qIndex = db.live.g1.qIndex;
-    const round = g1Round(db, qIndex);
+  const state = g ? db.live.games[g.id] : null;
+  if (g?.type === 'leichte5' && state && state.qIndex >= 0) {
+    const round = g1Round(state, state.qIndex);
     const own = round.answers[teamId];
     view.g1 = {
-      qIndex,
-      question: round.open || round.solutionRevealed ? g.content.questions[qIndex].question : null,
+      qIndex: state.qIndex,
+      count: g.content.questions.length,
+      question: round.open || round.solutionRevealed ? g.content.questions[state.qIndex].question : null,
       open: round.open,
       answer: own ? { text: own.text, grade: own.grade } : null,
     };
   }
-  if (g?.key === 'trumpf5' && db.live.g5.termIndex >= 0) {
-    const termIndex = db.live.g5.termIndex;
-    const round = g5Round(db, termIndex);
-    const term = g.content.terms[termIndex];
+  if (g?.type === 'trumpf5' && state && state.termIndex >= 0) {
+    const round = g5Round(state, state.termIndex);
+    const term = g.content.terms[state.termIndex];
     const own = round.buzzes.find((b) => b.teamId === teamId);
     const current = g5Current(round);
     view.g5 = {
-      termIndex,
+      termIndex: state.termIndex,
       category: term.category,
       hints: term.hints.slice(0, round.hintLevel),
       resolved: round.resolved,
@@ -543,13 +699,14 @@ function publicTeams(db) {
 function beamerGameView(db) {
   const g = activeGame(db);
   if (!g) return null;
-  if (g.key === 'leichte5') {
-    const qIndex = db.live.g1.qIndex;
-    if (qIndex < 0) return { key: g.key, waiting: true };
-    const round = g1Round(db, qIndex);
+  const state = db.live.games[g.id];
+  if (g.type === 'leichte5') {
+    if (!state || state.qIndex < 0) return { type: g.type, waiting: true };
+    const qIndex = state.qIndex;
+    const round = g1Round(state, qIndex);
     const visible = round.open || round.solutionRevealed;
     return {
-      key: g.key,
+      type: g.type,
       qIndex,
       question: visible ? g.content.questions[qIndex].question : null,
       submittedCount: Object.keys(round.answers).length,
@@ -560,15 +717,15 @@ function beamerGameView(db) {
       solution: round.solutionRevealed ? g.content.questions[qIndex].solution : null,
     };
   }
-  if (g.key === 'trumpf5') {
-    const termIndex = db.live.g5.termIndex;
-    if (termIndex < 0) return { key: g.key, waiting: true };
-    const round = g5Round(db, termIndex);
+  if (g.type === 'trumpf5') {
+    if (!state || state.termIndex < 0) return { type: g.type, waiting: true };
+    const termIndex = state.termIndex;
+    const round = g5Round(state, termIndex);
     const term = g.content.terms[termIndex];
     const current = g5Current(round);
     const winner = round.buzzes.find((b) => b.status === 'correct');
     return {
-      key: g.key,
+      type: g.type,
       termIndex,
       category: term.category,
       hints: term.hints.slice(0, round.hintLevel),
@@ -580,7 +737,7 @@ function beamerGameView(db) {
       winner: winner ? winner.teamId : null,
     };
   }
-  return { key: g.key };
+  return { type: g.type };
 }
 
 // Der Beamer bekommt ausschließlich öffentliche, freigegebene Daten.
@@ -600,7 +757,7 @@ function beamerView(db) {
   if (b.view === 'ranking') view.ranking = b.data.ranking;
   if (b.view === 'coin') view.coin = b.data;
   if (b.view === 'pyramid' || b.view === 'intro') {
-    view.games = pr.games.map((g) => ({ title: g.title, position: g.position }));
+    view.games = pr.games.map((g, i) => ({ title: g.title, position: i + 1 }));
   }
   return view;
 }
@@ -609,6 +766,9 @@ function moderatorView(db, connections) {
   return {
     role: 'moderator',
     project: db.project,
+    library: db.library,
+    types: publicTypes(),
+    showSize: SHOW_SIZE,
     live: db.live,
     totals: totals(db),
     ledger: db.ledger.slice(-100),
@@ -622,8 +782,10 @@ function moderatorView(db, connections) {
 module.exports = {
   QuizError,
   createState,
+  migrate,
   applyAction,
   findTeamByCode,
+  sanitizeContent,
   teamView,
   beamerView,
   moderatorView,

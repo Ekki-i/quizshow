@@ -14,11 +14,11 @@ function setup(teamCount = 3) {
   return { db, ids: db.project.teams.map((t) => t.id) };
 }
 
-const idx = (db, key) => db.project.games.findIndex((g) => g.key === key);
+const gid = (db, type) => db.project.games.find((g) => g.type === type).id;
 
 test('Spiel 1: Abgabe ist gesperrt und richtige Bewertung gibt genau einen Punkt', () => {
   const { db, ids } = setup();
-  game.applyAction(db, mod(), 'show.activate', { gameIndex: idx(db, 'leichte5') });
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
   assert.throws(() => game.applyAction(db, team(ids[0]), 'g1.submit', { text: 'x' }), /nicht freigegeben/);
   game.applyAction(db, mod(), 'g1.open', { qIndex: 0 });
   game.applyAction(db, team(ids[0]), 'g1.submit', { text: '1440' });
@@ -36,7 +36,7 @@ test('Spiel 1: Abgabe ist gesperrt und richtige Bewertung gibt genau einen Punkt
 
 test('Spiel 1: Lösung erst nach Bewertung aller Abgaben', () => {
   const { db, ids } = setup();
-  game.applyAction(db, mod(), 'show.activate', { gameIndex: 0 });
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
   game.applyAction(db, mod(), 'g1.open', { qIndex: 1 });
   game.applyAction(db, team(ids[1]), 'g1.submit', { text: 'Grün' });
   assert.throws(() => game.applyAction(db, mod(), 'g1.revealSolution'), /bewerten/);
@@ -50,7 +50,7 @@ test('Spiel 1: Lösung erst nach Bewertung aller Abgaben', () => {
 
 test('Doppelte Aktions-ID wird nur einmal verarbeitet', () => {
   const { db, ids } = setup();
-  game.applyAction(db, mod(), 'show.activate', { gameIndex: 0 });
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
   game.applyAction(db, mod(), 'g1.open', { qIndex: 0 });
   game.applyAction(db, team(ids[0]), 'g1.submit', { text: 'a' });
   game.applyAction(db, mod(), 'points.adjust', { teamId: ids[0], points: 2, reason: 'Test' }, 'evt-1');
@@ -61,7 +61,7 @@ test('Doppelte Aktions-ID wird nur einmal verarbeitet', () => {
 
 test('Privatsphäre: Teams sehen keine fremden Antworten, Beamer nur freigegebene', () => {
   const { db, ids } = setup();
-  game.applyAction(db, mod(), 'show.activate', { gameIndex: 0 });
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
   game.applyAction(db, mod(), 'g1.open', { qIndex: 0 });
   game.applyAction(db, team(ids[0]), 'g1.submit', { text: 'GEHEIM-A' });
   game.applyAction(db, mod(), 'beamer.show', { view: 'game' });
@@ -87,7 +87,7 @@ test('Teams dürfen keine Moderationsaktionen ausführen', () => {
 
 test('Spiel 5: Punktwert hängt vom Hinweis beim Buzzern ab, falsches Team bleibt gesperrt', () => {
   const { db, ids } = setup();
-  game.applyAction(db, mod(), 'show.activate', { gameIndex: idx(db, 'trumpf5') });
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'trumpf5') });
   game.applyAction(db, mod(), 'g5.start', { termIndex: 0 });
   assert.throws(() => game.applyAction(db, team(ids[0]), 'g5.buzz'), /kein Hinweis/);
   game.applyAction(db, mod(), 'g5.nextHint');
@@ -145,12 +145,84 @@ test('Münze geht an das Team mit den meisten kumulierten Punkten, Gleichstand b
   assert.equal(db.live.coins[1].method, 'Schätzfrage');
 });
 
-test('„Die leichten 5“ bleibt auf Position 1', () => {
+test('„Die leichten 5“ bleibt auf Position 1, außer per Sonderaktion', () => {
   const { db } = setup();
-  assert.throws(() => game.applyAction(db, mod(), 'game.move', { gameIndex: 1, dir: 'up' }), /Eröffnungsspiel/);
-  game.applyAction(db, mod(), 'game.move', { gameIndex: 1, dir: 'down' });
-  assert.equal(db.project.games[2].key, 'dummes');
-  assert.equal(db.project.games[2].position, 3);
+  const games = db.project.games;
+  assert.throws(() => game.applyAction(db, mod(), 'game.moveTo', { gameId: games[1].id, index: 0 }), /Eröffnungsspiel/);
+  assert.throws(() => game.applyAction(db, mod(), 'game.remove', { gameId: games[0].id }), /Sonderaktion/);
+  const second = games[1].id;
+  game.applyAction(db, mod(), 'game.moveTo', { gameId: second, index: 3 });
+  assert.equal(db.project.games[3].id, second);
+  game.applyAction(db, mod(), 'game.remove', { gameId: db.project.games[0].id, override: 'ENTFERNEN' });
+  assert.equal(db.project.games.length, 7);
+});
+
+test('Spiele-Datenbank: alle acht Spiele vorhanden, Show frei zusammenstellbar, auch doppelt', () => {
+  const { db } = setup();
+  assert.deepEqual(db.library.map((e) => e.type), ['leichte5', 'dummes', 'land', 'kassenschlager', 'trumpf5', 'musik', 'jauch', 'nerd']);
+  const trumpf = db.library.find((e) => e.type === 'trumpf5');
+  assert.throws(() => game.applyAction(db, mod(), 'game.add', { libraryId: trumpf.id }), /schon 8 Spiele/);
+
+  // Zwei Spiele entfernen und zweimal „5 ist Trümpf“ einsetzen.
+  for (const type of ['dummes', 'land']) game.applyAction(db, mod(), 'game.remove', { gameId: gid(db, type) });
+  game.applyAction(db, mod(), 'game.add', { libraryId: trumpf.id, index: 1 });
+  game.applyAction(db, mod(), 'game.add', { libraryId: trumpf.id });
+  const copies = db.project.games.filter((g) => g.type === 'trumpf5');
+  assert.equal(copies.length, 3);
+  assert.equal(db.project.games[1].type, 'trumpf5');
+
+  // Kopien sind unabhängig voneinander und von der Datenbank.
+  const content = structuredClone(copies[0].content);
+  content.terms[0].hints[0] = 'Neuer Hinweis';
+  game.applyAction(db, mod(), 'game.update', { gameId: copies[0].id, content, title: 'Trümpf Tiere' });
+  assert.equal(copies[0].content.terms[0].hints[0], 'Neuer Hinweis');
+  assert.notEqual(copies[1].content.terms[0].hints[0], 'Neuer Hinweis');
+  assert.notEqual(trumpf.content.terms[0].hints[0], 'Neuer Hinweis');
+  assert.equal(copies[0].title, 'Trümpf Tiere');
+});
+
+test('Zwei Instanzen desselben Spiels haben getrennte Punkte und Zustände', () => {
+  const { db, ids } = setup();
+  const trumpf = db.library.find((e) => e.type === 'trumpf5');
+  game.applyAction(db, mod(), 'game.remove', { gameId: gid(db, 'dummes') });
+  game.applyAction(db, mod(), 'game.add', { libraryId: trumpf.id });
+  const [a, b] = db.project.games.filter((g) => g.type === 'trumpf5');
+  for (const g of [a, b]) {
+    game.applyAction(db, mod(), 'show.activate', { gameId: g.id });
+    game.applyAction(db, mod(), 'g5.start', { termIndex: 0 });
+    game.applyAction(db, mod(), 'g5.nextHint');
+    game.applyAction(db, team(ids[0]), 'g5.buzz');
+    game.applyAction(db, mod(), 'g5.judge', { correct: true });
+  }
+  assert.equal(game.totals(db)[ids[0]], 10);
+});
+
+test('Datenbank: anlegen, duplizieren, bearbeiten, löschen und Inhalte prüfen', () => {
+  const { db } = setup();
+  const r = game.applyAction(db, mod(), 'library.add', { type: 'jauch' });
+  const entry = db.library.find((e) => e.id === r.created);
+  assert.equal(entry.content.questions.length, 8);
+  const bad = structuredClone(entry.content);
+  bad.questions.pop();
+  assert.throws(() => game.applyAction(db, mod(), 'library.update', { libraryId: entry.id, content: bad }), /genau 8/);
+  const good = structuredClone(entry.content);
+  good.questions[1].question = 'Wie hoch ist die Zugspitze?';
+  good.questions[1].correct = 'Z';
+  game.applyAction(db, mod(), 'library.update', { libraryId: entry.id, content: good });
+  assert.equal(entry.content.questions[1].question, 'Wie hoch ist die Zugspitze?');
+  assert.equal(entry.content.questions[1].correct, 'A'); // ungültige Auswahl fällt auf die erste Option zurück
+  assert.equal(entry.version, 2);
+  const d = game.applyAction(db, mod(), 'library.duplicate', { libraryId: entry.id });
+  game.applyAction(db, mod(), 'library.remove', { libraryId: entry.id });
+  assert.ok(db.library.find((e) => e.id === d.created));
+  assert.ok(!db.library.find((e) => e.id === entry.id));
+});
+
+test('Showablauf ist gesperrt, solange ein Spiel läuft', () => {
+  const { db } = setup();
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'trumpf5') });
+  assert.throws(() => game.applyAction(db, mod(), 'game.remove', { gameId: gid(db, 'nerd') }), /Zuerst das Spiel beenden/);
+  assert.throws(() => game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'nerd') }), /noch nicht spielbar/);
 });
 
 test('Neuer Zugangscode macht den alten ungültig', () => {

@@ -16,6 +16,7 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 // ---------- Speicher und Moderator-Zugang ----------
 
 const store = createStore(DATA_FILE, () => ({ ...game.createState(), auth: { sessions: {} } }));
+store.data = game.migrate(store.data);
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');

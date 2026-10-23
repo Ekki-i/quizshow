@@ -132,7 +132,7 @@
       if (!v) return start(s);
       const head = h('div', { class: 'sub', style: { marginTop: 0, marginBottom: '3vh' } }, `Spiel ${s.game.position} · ${s.game.title}`);
       if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title)];
-      if (v.key === 'leichte5') {
+      if (v.type === 'leichte5') {
         const out = [head, h('div', { class: 'sub', style: { marginTop: 0 } }, `Frage ${v.qIndex + 1}`)];
         out.push(h('div', { class: 'q' }, v.question || '…'));
         if (!v.answers.length && v.question && !v.solution) out.push(h('div', { class: 'sub' }, `${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`));
@@ -144,7 +144,7 @@
         if (v.solution) out.push(h('div', { class: 'solution' }, `Lösung: ${v.solution}`));
         return out;
       }
-      if (v.key === 'trumpf5') {
+      if (v.type === 'trumpf5') {
         const out = [head,
           h('div', { class: 'sub', style: { marginTop: 0 } }, `Begriff ${v.termIndex + 1} · Kategorie`),
           h('div', { class: 'q' }, v.category)];

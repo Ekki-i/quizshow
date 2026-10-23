@@ -87,7 +87,7 @@
     }
 
     function renderG1(g) {
-      const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von 5`)];
+      const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von ${g.count}`)];
       if (!g.question) return [h('div', { class: 'wait' }, h('p', { class: 'big' }, `Frage ${g.qIndex + 1} kommt gleich …`))];
       out.push(h('p', { class: 'question' }, g.question));
       if (g.answer) {
