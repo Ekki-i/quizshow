@@ -1,0 +1,134 @@
+<title>Quizshow Prototyp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Leitstand: alle Bildschirme der Show nebeneinander, jeder in echter Größe skaliert. */
+  :root {
+    --bg: #12052a;
+    --panel: #22094d;
+    --line: #3a1880;
+    --fg: #ffffff;
+    --muted: #c9b8f0;
+    --pink: #ff2e88;
+    --yellow: #ffd400;
+    --cyan: #00d1ff;
+    --font: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --font-display: "Arial Black", "Segoe UI Black", Impact, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; }
+  .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; max-width: 1600px; margin: 0 auto; }
+  header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+  h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; }
+  h1 span { color: var(--pink); }
+  .lead { color: var(--muted); max-width: 70ch; margin: 6px 0 0; line-height: 1.5; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .fact { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 0.9rem; }
+  .fact b { color: var(--yellow); font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.06em; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 16px; }
+  .tabs button, .reset { font: 700 0.95rem var(--font); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; cursor: pointer; min-height: 40px; }
+  .tabs button[aria-selected="true"] { background: var(--pink); border-color: var(--pink); }
+  .tabs button:focus-visible, .reset:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+  .reset { background: transparent; }
+  .stage { display: grid; gap: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
+  .screen { grid-column: span 4; min-width: 0; }
+  .screen.mod { grid-column: span 7; }
+  .screen.beamer { grid-column: span 5; }
+  .screen.start { grid-column: span 3; }
+  .screen.team { grid-column: span 3; }
+  @media (max-width: 900px) { .screen, .screen.mod, .screen.beamer, .screen.start, .screen.team { grid-column: span 12; } }
+  .stage[data-focus] .screen { display: none; }
+  .stage[data-focus] .screen.focused { display: block; grid-column: span 12; }
+  .label { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 6px; font-size: 0.9rem; }
+  .label .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--cyan)); }
+  .label .size { color: var(--muted); font-weight: 400; margin-left: auto; font-size: 0.8rem; }
+  .device { position: relative; overflow: hidden; border-radius: 12px; border: 2px solid var(--line); background: #000; }
+  .device iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: var(--bg); }
+  .note { color: var(--muted); font-size: 0.85rem; margin-top: 18px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Quizshow <span>Prototyp</span></h1>
+      <p class="lead">Alle Bildschirme der Show laufen hier gleichzeitig und sind live verbunden. Gib als Team eine Antwort ab und bewerte sie in der Moderation – Beamer und iPads ändern sich sofort.</p>
+      <div class="facts">
+        <span class="fact">Moderator-Passwort <b>demo</b></span>
+        <span class="fact" id="codes">Teamcodes</span>
+      </div>
+    </div>
+    <button class="reset" id="reset" type="button">Demo zurücksetzen</button>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Ansicht wählen" id="tabs"></nav>
+  <section class="stage" id="stage"></section>
+  <p class="note">Prototyp ohne Server: Alles läuft in diesem Browser und bleibt nur hier gespeichert. Für die echte Show mit iPads und Beamer startet der Node-Server aus dem Repository. Ton gibt es auf dem Beamer nach Klick auf „Ton aktivieren“.</p>
+</div>
+
+<script type="module">
+  import { createLocalServer } from './demo/local-server.js';
+
+  const server = createLocalServer();
+  window.__quizServer = server;
+
+  const teamColors = ['#ff2e88', '#ffd400', '#00d1ff'];
+  const screens = [
+    { id: 'moderation', label: 'Moderation', cls: 'mod', src: 'moderator.html', w: 1280, h: 900, color: '#00d1ff' },
+    { id: 'beamer', label: 'Beamer', cls: 'beamer', src: 'beamer.html', w: 1280, h: 720, color: '#ffffff' },
+    ...server.demoTeams.map((t, i) => ({ id: `team${i + 1}`, label: `iPad ${t.name}`, cls: 'team', src: `team.html?code=${t.code}`, w: 820, h: 1100, color: teamColors[i] })),
+    { id: 'start', label: 'Startseite', cls: 'start', src: 'start.html', w: 1100, h: 1100, color: '#c9b8f0' },
+  ];
+
+  document.getElementById('codes').innerHTML = server.demoTeams.map((t) => `${t.name} <b>${t.code}</b>`).join(' · ');
+
+  const stage = document.getElementById('stage');
+  const tabs = document.getElementById('tabs');
+  const frames = [];
+
+  for (const s of screens) {
+    const el = document.createElement('div');
+    el.className = `screen ${s.cls}`;
+    el.dataset.id = s.id;
+    el.innerHTML = `<div class="label"><span class="dot" style="--c:${s.color}"></span>${s.label}<span class="size">${s.w} × ${s.h}</span></div><div class="device"><iframe title="${s.label}" width="${s.w}" height="${s.h}"></iframe></div>`;
+    stage.append(el);
+    const iframe = el.querySelector('iframe');
+    iframe.src = s.src;
+    frames.push({ s, el, iframe, device: el.querySelector('.device') });
+  }
+
+  // Jeden Bildschirm in seiner echten Größe rendern und auf die Spaltenbreite skalieren.
+  function fit() {
+    for (const f of frames) {
+      const width = f.device.clientWidth;
+      if (!width) continue;
+      const scale = Math.min(1, width / f.s.w);
+      f.iframe.style.transform = `scale(${scale})`;
+      f.device.style.height = `${Math.round(f.s.h * scale)}px`;
+    }
+  }
+  new ResizeObserver(fit).observe(stage);
+
+  const views = [{ id: 'all', label: 'Alles im Blick' }, ...screens.map((s) => ({ id: s.id, label: s.label }))];
+  function select(id) {
+    if (id === 'all') delete stage.dataset.focus;
+    else stage.dataset.focus = id;
+    for (const f of frames) f.el.classList.toggle('focused', f.s.id === id);
+    for (const b of tabs.children) b.setAttribute('aria-selected', String(b.dataset.id === id));
+    requestAnimationFrame(fit);
+  }
+  for (const v of views) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.role = 'tab';
+    b.dataset.id = v.id;
+    b.textContent = v.label;
+    b.onclick = () => select(v.id);
+    tabs.append(b);
+  }
+  const initial = views.some((v) => v.id === location.hash.slice(1)) ? location.hash.slice(1) : 'all';
+  select(initial);
+
+  document.getElementById('reset').onclick = () => {
+    server.reset();
+    for (const f of frames) f.iframe.src = f.s.src;
+  };
+</script>

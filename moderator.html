@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quizshow – Show-Regie</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <header class="mod-top">
+    <div class="logo"><span class="logo-mark" style="width:36px;height:36px"><i class="a"></i><i class="b"></i></span><span class="logo-text" id="show-name">Show-Regie</span></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="live" aria-selected="true">Live-Regie</button>
+      <button role="tab" data-tab="teams" aria-selected="false">Teams</button>
+      <button role="tab" data-tab="editor" aria-selected="false">Show-Editor</button>
+      <button role="tab" data-tab="points" aria-selected="false">Punkte &amp; Protokoll</button>
+    </nav>
+    <div class="row">
+      <a class="btn small ghost" href="beamer.html" target="_blank" rel="noopener">Beamer öffnen ↗</a>
+      <button class="btn small ghost" id="logout">Abmelden</button>
+    </div>
+  </header>
+  <main class="mod-main">
+    <div id="warning"></div>
+    <section id="tab-live" role="tabpanel">
+      <div class="live-grid">
+        <div id="live-left" class="grid" style="align-content:start"></div>
+        <div class="grid" style="align-content:start">
+          <section class="card">
+            <h3>Beamer</h3>
+            <div id="beamer-controls"></div>
+            <iframe class="preview" src="beamer.html?preview" title="Beamer-Vorschau" style="margin-top:12px"></iframe>
+          </section>
+          <div id="live-right" class="grid"></div>
+        </div>
+      </div>
+    </section>
+    <section id="tab-teams" role="tabpanel" class="hidden"></section>
+    <section id="tab-editor" role="tabpanel" class="hidden"></section>
+    <section id="tab-points" role="tabpanel" class="hidden"></section>
+  </main>
+
+  <script type="module" src="assets/js/moderator.js"></script>
+</body>
+</html>
