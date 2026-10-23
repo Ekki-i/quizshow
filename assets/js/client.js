@@ -51,9 +51,18 @@ export function h(tag, attrs = {}, ...children) {
 
 // Bestätigungsdialog im Seiten-Design. Mit requireText muss ein Wort
 // abgetippt werden, bevor die Aktion freigegeben wird.
-export function ask(message, { confirmLabel = 'Ja', cancelLabel = 'Abbrechen', requireText = null, danger = false } = {}) {
+// Mit fields (z. B. [{ name: 'name', label: 'Name', value: '' }]) fragt der Dialog
+// Werte ab und liefert sie als Objekt statt true.
+export function ask(message, { confirmLabel = 'Ja', cancelLabel = 'Abbrechen', requireText = null, danger = false, fields = null } = {}) {
   return new Promise((resolve) => {
     const input = requireText ? h('input', { id: 'ask-input', autocomplete: 'off', 'aria-label': `${requireText} eingeben` }) : null;
+    const inputs = (fields || []).map((f, i) => {
+      const attrs = { id: `ask-f${i}`, name: f.name, autocomplete: 'off', type: f.type || 'text', value: f.value ?? '' };
+      if (f.type === 'checkbox') Object.assign(attrs, { value: null, checked: !!f.value, style: { width: 'auto', marginRight: '8px' } });
+      if (f.maxlength) attrs.maxlength = String(f.maxlength);
+      const el = h('input', attrs);
+      return { f, el, node: f.type === 'checkbox' ? h('label', { style: { fontWeight: 400, display: 'block', marginTop: '10px' } }, el, f.label) : [h('label', { for: attrs.id }, f.label), el] };
+    });
     const ok = h('button', { class: `btn ${danger ? 'bad' : 'pink'}`, type: 'submit', disabled: !!requireText }, confirmLabel);
     const close = (result) => {
       overlay.remove();
@@ -66,17 +75,22 @@ export function ask(message, { confirmLabel = 'Ja', cancelLabel = 'Abbrechen', r
         class: 'modal card', role: 'dialog', 'aria-modal': 'true',
         onsubmit: (ev) => {
           ev.preventDefault();
-          if (!requireText || input.value.trim() === requireText) close(true);
+          if (requireText && input.value.trim() !== requireText) return;
+          if (!fields) return close(true);
+          const values = {};
+          for (const { f, el } of inputs) values[f.name] = f.type === 'checkbox' ? el.checked : el.value.trim();
+          close(values);
         },
       },
       h('p', { class: 'modal-text' }, message),
       requireText ? [h('label', { for: 'ask-input' }, `Zum Bestätigen „${requireText}“ eingeben`), input] : null,
+      inputs.flatMap((x) => x.node),
       h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '16px' } },
         h('button', { class: 'btn ghost', type: 'button', onclick: () => close(false) }, cancelLabel), ok)));
     if (input) input.addEventListener('input', () => (ok.disabled = input.value.trim() !== requireText));
     document.addEventListener('keydown', onKey);
     document.body.append(overlay);
-    (input || ok).focus();
+    (input || inputs[0]?.el || ok).focus();
   });
 }
 

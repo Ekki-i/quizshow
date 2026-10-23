@@ -16,7 +16,8 @@
   </main>
 
   <script type="module">
-    import { h, connect, run, store, ask, localServer } from './assets/js/client.js';
+    import { h, connect, store, localServer } from './assets/js/client.js';
+    import { renderPlay } from './assets/js/team-play.js';
 
     const params = new URLSearchParams(location.search);
     const urlCode = params.get('code');
@@ -35,9 +36,13 @@
     let draftKey = null;
     let lastRenderKey = null;
 
+    let clockOffset = 0;
     const conn = connect({
       hello: () => ({ role: 'team', code }),
-      onState: render,
+      onState: (s, serverTime) => {
+        if (serverTime) clockOffset = serverTime - Date.now();
+        render(s);
+      },
       onAuthFailed: (m) => leave(m),
       onKicked: (m) => leave(m),
     });
@@ -60,8 +65,17 @@
       if (expect && expect !== s.team.id) {
         parts.push(h('p', { class: 'notice warn', role: 'alert' }, `Achtung: Dieser Code gehört zu „${s.team.name}“.`));
       }
-      if (s.g1) parts.push(...renderG1(s.g1));
-      else if (s.g5) parts.push(...renderG5(s.g5));
+      const teamOf = (id) => s.teams.find((t) => t.id === id);
+      const ui = {
+        conn,
+        team: s.team,
+        teamName: (id) => teamOf(id)?.name || '?',
+        teamColor: (id) => teamOf(id)?.color || '#888',
+        setDraft: (k) => (draftKey = k),
+        clearDraft: () => store(draftKey, null),
+      };
+      draftKey = null;
+      if (s.play) parts.push(...renderPlay(s.play, ui).filter(Boolean));
       else parts.push(h('div', { class: 'wait' },
         h('p', { class: 'big' }, 'Gleich geht’s los!'),
         h('p', { class: 'muted' }, 'Wartet auf die Moderation. Dieses Gerät bleibt mit eurem Team verbunden.')));
@@ -71,7 +85,7 @@
       }
 
       // Ein offenes Eingabefeld nicht bei jedem Update neu aufbauen (Fokus/Tastatur bleiben).
-      const key = JSON.stringify([s.team, s.game, s.g1 || s.g5 || null, s.ranking || null]);
+      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.ranking || null]);
       if (key === lastRenderKey) return;
       lastRenderKey = key;
       main.replaceChildren(...parts);
@@ -82,59 +96,13 @@
       }
     }
 
-    function stateBox(kind, sym, text) {
-      return h('div', { class: `state ${kind}`, role: 'status' }, h('span', { class: 'sym', 'aria-hidden': 'true' }, sym), text);
-    }
-
-    function renderG1(g) {
-      const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von 5`)];
-      if (!g.question) return [h('div', { class: 'wait' }, h('p', { class: 'big' }, `Frage ${g.qIndex + 1} kommt gleich …`))];
-      out.push(h('p', { class: 'question' }, g.question));
-      if (g.answer) {
-        out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('p', { style: { fontSize: '1.6rem', margin: 0 } }, g.answer.text)));
-        if (g.answer.grade === true) out.push(stateBox('ok', '✓', 'Richtig! +1 Punkt'));
-        else if (g.answer.grade === false) out.push(stateBox('bad', '✗', 'Leider falsch'));
-        else out.push(stateBox('', '🔒', 'Abgegeben und gesperrt – wartet auf die Bewertung'));
-        return out;
+    // Countdowns (z. B. 10-Sekunden-Fenster) laufen nach der Server-Uhr.
+    setInterval(() => {
+      for (const el of document.querySelectorAll('[data-deadline]')) {
+        const left = Math.max(0, Math.ceil((Number(el.dataset.deadline) - (Date.now() + clockOffset)) / 1000));
+        el.textContent = `${left} s`;
       }
-      if (!g.open) return [...out, stateBox('', '🔒', 'Gesperrt – keine Abgabe mehr möglich')];
-      draftKey = `quiz.draft.g1.${g.qIndex}`;
-      const form = h('form', {
-        onsubmit: async (ev) => {
-          ev.preventDefault();
-          const text = document.getElementById('answer').value.trim();
-          if (!text) return;
-          if (!(await ask(`Antwort „${text}“ endgültig abgeben? Danach könnt ihr sie nicht mehr ändern.`, { confirmLabel: 'Ja, abgeben' }))) return;
-          const ok = await run(conn, 'g1.submit', { text });
-          if (ok) store(draftKey, null);
-        },
-      },
-      h('label', { for: 'answer' }, 'Antwort eingeben'),
-      h('textarea', { id: 'answer', class: 'answer-box', maxlength: '200', autocomplete: 'off', placeholder: 'Eure Antwort …' }),
-      h('p', {}, h('button', { class: 'btn pink huge', type: 'submit', style: { width: '100%' } }, 'Abgeben')));
-      out.push(form);
-      return out;
-    }
-
-    function renderG5(g) {
-      const out = [
-        h('p', { class: 'muted' }, `Begriff ${g.termIndex + 1} von 5 · Kategorie`),
-        h('p', { class: 'question' }, g.category),
-        g.hints.length
-          ? h('ol', { class: 'hint-list' }, g.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}. `), t)))
-          : h('p', { class: 'muted' }, 'Noch kein Hinweis freigegeben.'),
-      ];
-      out.push(h('button', {
-        class: 'buzzer', disabled: !g.canBuzz, 'aria-label': 'Buzzer',
-        onclick: () => run(conn, 'g5.buzz'),
-      }, 'BUZZ'));
-      if (g.ownStatus === 'correct') out.push(stateBox('ok', '✓', 'Richtig!'));
-      else if (g.locked) out.push(stateBox('bad', '✗', 'Falsch – für diesen Begriff gesperrt'));
-      else if (g.answering) out.push(stateBox('', '🎤', 'Ihr seid dran – antwortet laut!'));
-      else if (g.buzzed) out.push(stateBox('', '⏳', 'Gebuzzert – ihr seid in der Warteschlange'));
-      else if (g.resolved) out.push(stateBox('', '■', 'Begriff beendet'));
-      return out;
-    }
+    }, 250);
   </script>
 </body>
 </html>

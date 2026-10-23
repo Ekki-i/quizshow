@@ -25,8 +25,11 @@ fs.writeFileSync(modJs, rename(fs.readFileSync(modJs, 'utf8')));
 fs.copyFileSync(path.join(ROOT, 'prototype', 'index.html'), path.join(OUT, 'prototype.html'));
 fs.copyFileSync(path.join(ROOT, 'prototype', 'local-server.js'), path.join(OUT, 'demo', 'local-server.js'));
 
-// CommonJS-Module der Spiellogik in ein ES-Modul verpacken.
-const modules = ['defaults', 'game']
+// CommonJS-Module der Spiellogik in ein ES-Modul verpacken (alles aus server/
+// außer dem HTTP-Server und der Dateispeicherung).
+const modules = fs.readdirSync(path.join(ROOT, 'server'))
+  .filter((f) => f.endsWith('.js') && !['server.js', 'store.js'].includes(f))
+  .map((f) => f.slice(0, -3))
   .map((name) => {
     const src = fs.readFileSync(path.join(ROOT, 'server', `${name}.js`), 'utf8');
     return `  './${name}': function (module, exports, require) {\n${src}\n  },`;
