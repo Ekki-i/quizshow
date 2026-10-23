@@ -13,6 +13,7 @@
 
   <script type="module">
     import { h, connect } from './assets/js/client.js';
+    import { renderGame } from './assets/js/beamer-play.js';
 
     const stage = document.getElementById('stage');
     const embedded = new URLSearchParams(location.search).has('preview');
@@ -20,6 +21,13 @@
     let lastKey = null;
     let titleTimer = null;
     let audio = null;
+    let clockOffset = 0;
+
+    setInterval(() => {
+      for (const el of document.querySelectorAll('[data-deadline]')) {
+        el.textContent = `${Math.max(0, Math.ceil((Number(el.dataset.deadline) - (Date.now() + clockOffset)) / 1000))} s`;
+      }
+    }, 250);
 
     // Eigene, synthetisch erzeugte Effekte – keine fremde Musik.
     document.getElementById('sound-on').onclick = (ev) => {
@@ -56,7 +64,10 @@
     connect({
       hello: () => ({ role: 'beamer', preview: embedded }),
       quiet: embedded,
-      onState: render,
+      onState: (s, serverTime) => {
+        if (serverTime) clockOffset = serverTime - Date.now();
+        render(s);
+      },
     });
 
     function teamOf(s, id) {
@@ -130,36 +141,8 @@
     function game(s) {
       const v = s.gameView;
       if (!v) return start(s);
-      const head = h('div', { class: 'sub', style: { marginTop: 0, marginBottom: '3vh' } }, `Spiel ${s.game.position} · ${s.game.title}`);
-      if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title)];
-      if (v.type === 'leichte5') {
-        const out = [head, h('div', { class: 'sub', style: { marginTop: 0 } }, `Frage ${v.qIndex + 1}`)];
-        out.push(h('div', { class: 'q' }, v.question || '…'));
-        if (!v.answers.length && v.question && !v.solution) out.push(h('div', { class: 'sub' }, `${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`));
-        out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
-          const t = teamOf(s, a.teamId);
-          const mark = a.grade === true ? h('span', { class: 'mark ok', 'aria-label': 'richtig' }, '✓') : a.grade === false ? h('span', { class: 'mark bad', 'aria-label': 'falsch' }, '✗') : null;
-          return h('div', { class: 'answer', '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), a.text), mark);
-        })));
-        if (v.solution) out.push(h('div', { class: 'solution' }, `Lösung: ${v.solution}`));
-        return out;
-      }
-      if (v.type === 'trumpf5') {
-        const out = [head,
-          h('div', { class: 'sub', style: { marginTop: 0 } }, `Begriff ${v.termIndex + 1} · Kategorie`),
-          h('div', { class: 'q' }, v.category)];
-        out.push(h('ol', { class: 'hints' }, v.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}`), t))));
-        if (!v.resolved && v.hints.length) out.push(h('div', { class: 'sub' }, `Jetzt noch ${v.value} ${v.value === 1 ? 'Punkt' : 'Punkte'}`));
-        if (v.buzzOrder.length) out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh' } }, v.buzzOrder.map((b) => {
-          const t = teamOf(s, b.teamId);
-          const cls = `chip ${b.teamId === v.answering ? 'answering' : ''} ${b.status === 'wrong' ? 'wrong' : ''}`;
-          const sym = b.status === 'correct' ? '✓' : b.status === 'wrong' ? '✗' : '';
-          return h('span', { class: cls }, h('span', { class: 'dot', style: { background: t.color } }), t.name, sym);
-        })));
-        if (v.term) out.push(h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(s, v.winner).name}` : ''}`));
-        return out;
-      }
-      return [h('div', { class: 'mega' }, s.game.title)];
+      if (v.waiting && v.type !== 'land') return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title)];
+      return renderGame(v, s, (id) => teamOf(s, id));
     }
 
     // Rangliste von unten nach oben aufbauen: der letzte Platz erscheint zuerst.

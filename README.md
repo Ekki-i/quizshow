@@ -70,12 +70,27 @@ Umgesetzt:
   auch mehrfach mit demselben Spiel; jede Show bekommt eine eigene Kopie.
 - Showablauf als Brett mit acht Plätzen und Mülleimer in der Mitte (Ziehen oder Klicken).
 - Formular-Editor für die Inhalte aller acht Spiele, ohne Programmierung.
-- **Spiel 1 „Die leichten 5“** und **Spiel 5 „5 ist Trümpf“** vollständig spielbar.
+- **Alle acht Spiele live spielbar** mit Team-iPad, Beamer und Moderation:
+  - *Die leichten 5*: Freitext, Bewertung pro Antwort.
+  - *Dumm ist der, der Dummes kriegt*: A–D, Buzzer nach dem Sperren, 10-Sekunden-Fenster
+    (serverseitig), Nachabgabe durch die Moderation, ein Antworttausch im ganzen Spiel.
+  - *Ich sehe ein Land, das du nicht siehst*: Karte (Welt, Europa, Deutschland) zum Antippen,
+    erst Tipps, dann Zielort enthüllen, Entfernung in km, manuelle Korrektur.
+  - *Das ist ein echter Kassenschlager*: private Paywall mit zehn Hinweisen, 20 $ Start,
+    höchstens vier Käufe pro Film, Züge in bis zu vier Zyklen, +5 $ bei richtig, Ausscheiden
+    mit 0 $, einmalige Umrechnung ⌈Guthaben ÷ 2⌉.
+  - *5 ist Trümpf*: Hinweise nacheinander, Buzzer, Punkte nach Hinweisstufe.
+  - *Musikquiz*: Brett mit fünf Kategorien × 1/2/3 Punkte, Buzzer, „Song Song Song“-Hinweis.
+  - *Ein Hauch von Günther Jauch*: acht Fragen, Leiter, Sicherheitsstufe bei Frage 4,
+    Aussteigen, 50:50- und Telefonjoker (ein Joker pro Frage für alle Teams).
+  - *Wer nix werd, werd Nerd*: geheime Gebote, Stichentscheid bei Gleichstand, erster Versuch
+    (3 Fehler), zweiter Versuch (2 Fehler, Verlust höchstens 3 Punkte).
+- Spiellogik je Spiel in `server/play-*.js`, gemeinsame Bausteine in `server/core.js`.
+  Kartenumrisse: Natural Earth (gemeinfrei), erzeugt mit `scripts/build-maps.mjs`.
 
 Noch offen (nächste Phasen laut Masterprompt):
 
-- Spielablauf (Live-Steuerung) für die Spiele 2, 3, 4, 6, 7, 8 und das Finale gegen die Moderation.
-  Ihre Inhalte sind bereits in der Datenbank und im Editor bearbeitbar.
+- Das Finale gegen die Moderation.
 - Mehrere Projekte, Duplizieren, Versionen, Archiv-Snapshots und Spielbibliothek.
 - QR-Codes, Co-Moderator-Rechte, Test-/Vorschaumodus ohne echte Punkte.
 - Medien-Uploads, Musik, editierbare Design-Tokens im Editor, Handschrift-Eingabe mit Stylus.

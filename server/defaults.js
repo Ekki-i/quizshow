@@ -43,7 +43,7 @@ const TYPES = {
 
   dummes: {
     title: 'Dumm ist der, der Dummes kriegt',
-    playable: false,
+    playable: true,
     summary: 'Multiple Choice A–D mit Buzzer und einem Antworttausch.',
     schema: [
       { key: 'questions', label: 'Fragen', type: 'list', min: 1, max: 20, itemLabel: (i) => `Frage ${i + 1}`, addLabel: 'Frage hinzufügen',
@@ -60,7 +60,7 @@ const TYPES = {
 
   land: {
     title: 'Ich sehe ein Land, das du nicht siehst',
-    playable: false,
+    playable: true,
     summary: 'Teams setzen einen Punkt auf der Karte, der nächste gewinnt 1 Punkt.',
     schema: [
       { key: 'map', label: 'Kartenansicht', type: 'select', options: ['Welt', 'Europa', 'Deutschland'] },
@@ -83,7 +83,7 @@ const TYPES = {
 
   kassenschlager: {
     title: 'Das ist ein echter Kassenschlager',
-    playable: false,
+    playable: true,
     summary: 'Vier Filme, je zehn kaufbare Hinweise, 20 $ Startguthaben.',
     schema: [
       { key: 'movies', label: 'Filme und Serien', type: 'list', min: 4, max: 4, itemLabel: (i) => `Film ${i + 1}`,
@@ -128,7 +128,7 @@ const TYPES = {
 
   musik: {
     title: 'Musikquiz im Jeopardy-Stil',
-    playable: false,
+    playable: true,
     summary: 'Fünf Kategorien mit je drei Feldern (1, 2, 3 Punkte), Buzzer.',
     schema: [
       { key: 'categories', label: 'Kategorien', type: 'list', min: 5, max: 5, itemLabel: (i) => `Kategorie ${i + 1}`,
@@ -141,15 +141,19 @@ const TYPES = {
     ],
     example: {
       categories: [
-        ['Rückwärts abgespielt', 'Normal'], ['Musik der 80er', 'Normal'], ['Songtexte vervollständigen', 'Normal'],
-        ['Film- und Serienmusik', 'Normal'], ['Song Song Song', 'Song Song Song (beide Titel nötig, keine Teilpunkte)'],
-      ].map(([name, mode]) => ({ name, mode, fields: [1, 2, 3].map(() => ({ task: '', answer: '', audio: '' })) })),
+        ['Rückwärts abgespielt', 'Normal', 'Welches Lied läuft hier rückwärts?', [['Alle meine Entchen'], ['Happy Birthday'], ['Jingle Bells']]],
+        ['Musik der 80er', 'Normal', 'Welcher Song ist das? (Titel reicht)', [['Take On Me – a-ha'], ['Billie Jean – Michael Jackson'], ['Major Tom – Peter Schilling']]],
+        ['Songtexte vervollständigen', 'Normal', '', [['Nacht', '„Atemlos durch die …“'], ['Horizont', '„99 Luftballons auf ihrem Weg zum …“'], ['Sonne', '„Ein bisschen Frieden, ein bisschen …“']]],
+        ['Film- und Serienmusik', 'Normal', 'Aus welchem Film stammt diese Musik?', [['Star Wars'], ['Fluch der Karibik'], ['Der Pate']]],
+        ['Song Song Song', 'Song Song Song (beide Titel nötig, keine Teilpunkte)', 'Welche zwei Songs stecken in diesem Mash-up?', [['(beide Titel im Editor eintragen)'], ['(beide Titel im Editor eintragen)'], ['(beide Titel im Editor eintragen)']]],
+      ].map(([name, mode, task, fields]) => ({ name, mode, fields: fields.map(([answer, own]) => ({ task: own || task, answer, audio: '' })) })),
     },
+
   },
 
   jauch: {
     title: 'Ein Hauch von Günther Jauch',
-    playable: false,
+    playable: true,
     summary: 'Acht Fragen A–D mit steigendem Wert, Sicherheitsstufe bei Frage 4, zwei Joker.',
     schema: [
       { key: 'questions', label: 'Fragen', type: 'list', min: 8, max: 8,
@@ -157,13 +161,23 @@ const TYPES = {
         fields: [area('question', 'Frage', 300), optionsField, correctField] },
     ],
     example: {
-      questions: JAUCH_LADDER.map((_, i) => ({ question: i === 0 ? 'Was trinkt man traditionell zum Frühstück in England?' : '', options: i === 0 ? { A: 'Tee', B: 'Cola', C: 'Milch', D: 'Saft' } : { A: '', B: '', C: '', D: '' }, correct: 'A' })),
+      questions: [
+        ['Was trinkt man traditionell zum Frühstück in England?', ['Tee', 'Cola', 'Milch', 'Saft'], 'A'],
+        ['Wie viele Spieler einer Fußballmannschaft stehen auf dem Platz?', ['9', '10', '11', '12'], 'C'],
+        ['Welcher Planet ist der Sonne am nächsten?', ['Venus', 'Merkur', 'Mars', 'Erde'], 'B'],
+        ['In welchem Jahr fiel die Berliner Mauer?', ['1987', '1989', '1990', '1991'], 'B'],
+        ['Wie heißt die Hauptstadt von Australien?', ['Sydney', 'Melbourne', 'Canberra', 'Perth'], 'C'],
+        ['Welches chemische Element hat das Symbol „Fe“?', ['Eisen', 'Fluor', 'Francium', 'Fermium'], 'A'],
+        ['Wer malte „Das Mädchen mit dem Perlenohrring“?', ['Rembrandt', 'Rubens', 'Van Gogh', 'Vermeer'], 'D'],
+        ['Wie viele Knochen hat ein erwachsener Mensch ungefähr?', ['156', '206', '256', '306'], 'B'],
+      ].map(([question, o, correct]) => ({ question, options: { A: o[0], B: o[1], C: o[2], D: o[3] }, correct })),
     },
+
   },
 
   nerd: {
     title: 'Wer nix werd, werd Nerd',
-    playable: false,
+    playable: true,
     summary: 'Geheime Gebote, wie viele Antworten ein Team zu einer Kategorie nennen kann.',
     schema: [
       { key: 'tieRule', label: 'Gleich hohe Höchstgebote', type: 'select', options: ['Moderation entscheidet per Stichentscheid, wer beginnt', 'Gleich hohes Gebot gilt als zweithöchstes Team'] },
@@ -176,8 +190,8 @@ const TYPES = {
         { name: 'Figuren aus Super Mario', answers: 'Mario\nLuigi\nPeach / Prinzessin Peach\nToad\nYoshi\nBowser\nWario\nWaluigi\nDaisy\nDonkey Kong' },
         { name: 'Länder, die auf „-stan“ enden', answers: 'Afghanistan\nPakistan\nKasachstan\nUsbekistan\nTurkmenistan\nKirgisistan / Kirgistan\nTadschikistan' },
         { name: 'Europäische Hauptstädte', answers: 'Berlin\nParis\nRom\nMadrid\nWien\nLissabon\nAmsterdam\nBrüssel\nPrag\nWarschau' },
-        { name: '', answers: '' },
-        { name: '', answers: '' },
+        { name: 'Planeten unseres Sonnensystems', answers: 'Merkur\nVenus\nErde\nMars\nJupiter\nSaturn\nUranus\nNeptun' },
+        { name: 'Deutsche Bundesländer', answers: 'Baden-Württemberg\nBayern\nBerlin\nBrandenburg\nBremen\nHamburg\nHessen\nMecklenburg-Vorpommern\nNiedersachsen\nNordrhein-Westfalen / NRW\nRheinland-Pfalz\nSaarland\nSachsen\nSachsen-Anhalt\nSchleswig-Holstein\nThüringen' },
       ],
     },
   },

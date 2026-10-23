@@ -1,0 +1,341 @@
+// Spielsteuerung der Moderation für alle acht Spiele. Die Moderation sieht den
+// vollständigen Spielzustand (Antworten, Gebote, Guthaben), Teams und Beamer nicht.
+
+import { h } from './client.js';
+import { mapView } from './map.js';
+
+const MOVIE_HINTS = [
+  ['Erscheinungsjahr', 1], ['Genre', 2], ['Regie', 2], ['Hauptdarsteller/in', 4], ['Nebenfigur', 2],
+  ['Schauplatz / Ort', 1], ['Filmzitat', 3], ['IMDb-Bewertung', 1], ['Standbild', 3], ['Filmskizze', 2],
+];
+const JAUCH_LADDER = [1, 2, 4, 5, 6, 8, 10, 15];
+
+export function buildPlay(ui, g, st, pos) {
+  const builders = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd };
+  const title = `Spiel ${pos} · ${g.title}`;
+  return ui.card(title, ...(builders[g.type] || (() => [h('p', {}, 'Unbekannter Spieltyp.')]))(ui, g, st));
+}
+
+const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
+const badge = (kind, text) => h('span', { class: `badge ${kind}` }, text);
+const row = (...c) => h('div', { class: 'row', style: { marginTop: '12px' } }, ...c);
+const btn = (cls, label, onclick, disabled = false) => h('button', { class: `btn ${cls}`, onclick, disabled }, label);
+
+function tabs(items, current, onPick, done) {
+  return h('div', { class: 'row' }, items.map((label, i) =>
+    h('button', { class: `btn small ${i === current ? 'pink' : 'ghost'}`, onclick: () => onPick(i) }, `${label}${done(i) ? ' ✓' : ''}`)));
+}
+
+function teamLine(ui, teamId, ...rest) {
+  return h('li', {}, ui.dot(ui.teamColor(teamId)), h('span', { class: 'grow' }, h('b', {}, ui.teamName(teamId)), ...rest.slice(0, 1)), ...rest.slice(1));
+}
+
+function optionsList(q, marks = {}) {
+  return h('ul', { class: 'list' }, ['A', 'B', 'C', 'D'].map((l) => h('li', { class: l === q.correct ? 'active' : '' },
+    h('b', {}, `${l}:`), h('span', { class: 'grow' }, q.options[l] || '–'), l === q.correct ? badge('ok', 'richtig') : null, marks[l] || null)));
+}
+
+function buzzList(ui, round, judgeLabel, onJudge) {
+  const pending = round.buzzes.find((b) => b.status === 'pending');
+  const first = round.buzzes[0]?.at;
+  if (!round.buzzes.length) return h('p', { class: 'muted' }, 'Noch kein Buzzer.');
+  return h('ol', { class: 'list' }, round.buzzes.map((b) => h('li', { class: b === pending ? 'active' : '' },
+    ui.dot(ui.teamColor(b.teamId)), h('span', { class: 'grow' }, h('b', {}, ui.teamName(b.teamId)), h('span', { class: 'muted' }, ` · +${b.at - first} ms${b.hint ? ` · Hinweis ${b.hint}` : ''}`)),
+    b.status === 'correct' ? badge('ok', '✓ richtig') : b.status === 'wrong' ? badge('bad', '✗ falsch') : null,
+    b === pending ? [
+      btn('small ok', judgeLabel(b), () => onJudge(true)),
+      btn('small bad', '✗ Falsch', () => onJudge(false)),
+    ] : null)));
+}
+
+// ---------- 1 · Die leichten 5 ----------
+
+function leichte5(ui, g, st) {
+  const qIndex = st.qIndex ?? -1;
+  const rounds = st.rounds || {};
+  const round = rounds[qIndex];
+  const out = [tabs(g.content.questions.map((_, i) => `Frage ${i + 1}`), qIndex, (i) => ui.act('play.open', { qIndex: i }), (i) => rounds[i]?.solutionRevealed)];
+  if (qIndex < 0 || !round) return [...out, h('p', { class: 'muted' }, 'Frage freigeben, damit sie auf den Team-iPads erscheint.')];
+  const q = g.content.questions[qIndex];
+  out.push(h('p', { class: 'question', style: { fontSize: '1.4rem' } }, q.question));
+  out.push(h('p', {}, h('span', { class: 'muted' }, 'Musterlösung (nur für dich): '), h('b', {}, q.solution)));
+  out.push(h('p', {}, round.open ? badge('ok', '● Abgabe offen') : badge('', '🔒 Abgabe geschlossen')));
+  out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
+    const a = round.answers[t.id];
+    if (!a) return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, t.name, h('span', { class: 'muted' }, ' – noch nicht abgegeben')));
+    const grade = a.grade === true ? badge('ok', '✓ richtig') : a.grade === false ? badge('bad', '✗ falsch') : badge('warn', 'offen');
+    return h('li', {}, ui.dot(t.color),
+      h('span', { class: 'grow' }, h('b', {}, t.name), ': ', a.text),
+      grade,
+      btn(`small ${a.onBeamer ? 'cyan' : 'ghost'}`, a.onBeamer ? 'Auf Beamer ✓' : 'Auf Beamer zeigen', () => ui.act('play.showAnswer', { teamId: t.id, visible: !a.onBeamer })),
+      btn('small ok', '✓ Richtig', () => ui.act('play.grade', { teamId: t.id, correct: true })),
+      btn('small bad', '✗ Falsch', () => ui.act('play.grade', { teamId: t.id, correct: false })));
+  })));
+  out.push(h('p', { style: { marginTop: '14px' } },
+    round.solutionRevealed
+      ? badge('ok', 'Lösung wird gezeigt')
+      : btn('', 'Lösung auf Beamer zeigen', () => ui.confirmAct('Lösung zeigen und Abgabe für diese Frage schließen?', 'play.revealSolution'))));
+  return out;
+}
+
+// ---------- 2 · Dumm ist der, der Dummes kriegt ----------
+
+function dummes(ui, g, st) {
+  const qIndex = st.qIndex ?? -1;
+  const rounds = st.rounds || {};
+  const r = rounds[qIndex];
+  const out = [
+    tabs(g.content.questions.map((_, i) => `Frage ${i + 1}`), qIndex, (i) => ui.act('play.open', { qIndex: i }), (i) => rounds[i]?.evaluated),
+    h('p', { class: 'muted' }, st.swapUsed ? 'Der eine Antworttausch dieses Spiels ist verbraucht.' : 'Der Antworttausch ist in diesem Spiel noch frei.'),
+  ];
+  if (qIndex < 0 || !r) return [...out, h('p', { class: 'muted' }, 'Frage freigeben: alle Teams wählen A–D und sperren.')];
+  const q = g.content.questions[qIndex];
+  out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, q.question), optionsList(q));
+  const running = r.windowEnds && r.windowEnds > Date.now() && !r.evaluated;
+  if (r.buzz) out.push(h('p', {}, '🔔 Schnellstes Team: ', h('b', {}, ui.teamName(r.buzz.teamId)), running ? [' · noch ', h('b', { 'data-deadline': r.windowEnds }, ''), ' für die anderen'] : ''));
+  const finals = {};
+  for (const [id, a] of Object.entries(r.answers)) finals[id] = a.choice;
+  if (r.swap) {
+    finals[r.swap.by] = r.answers[r.swap.with].choice;
+    finals[r.swap.with] = r.answers[r.swap.by].choice;
+    out.push(h('p', {}, '🔁 ', h('b', {}, ui.teamName(r.swap.by)), ' tauscht mit ', h('b', {}, ui.teamName(r.swap.with))));
+  }
+  out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
+    const a = r.answers[t.id];
+    if (!a) {
+      const late = r.late.includes(t.id);
+      return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, t.name, h('span', { class: 'muted' }, late ? ' – darf nachträglich abgeben' : ' – noch nicht abgegeben')),
+        r.windowEnds && !late && !r.evaluated ? btn('small', 'Noch abgeben lassen', () => ui.act('play.allowLate', { teamId: t.id })) : null);
+    }
+    const fin = finals[t.id];
+    return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, h('b', {}, t.name), `: ${a.choice}`, fin !== a.choice ? ` → nach Tausch ${fin}` : ''),
+      r.evaluated ? [
+        fin === q.correct ? badge('ok', '✓ 1 Punkt') : badge('bad', '✗ 0'),
+        btn('small ghost', 'Korrigieren', () => ui.confirmAct(`Bewertung für ${t.name} auf ${fin === q.correct ? 'falsch' : 'richtig'} ändern?`, 'play.grade', { teamId: t.id, correct: fin !== q.correct })),
+      ] : null);
+  })));
+  out.push(row(r.evaluated ? badge('ok', 'Ausgewertet') : btn('', 'Frage auswerten', () => ui.confirmAct(r.buzz && !r.swap ? 'Das schnellste Team hat noch nicht getauscht. Trotzdem auswerten? Der Tausch verfällt dann für diese Frage.' : 'Frage jetzt auswerten und Punkte vergeben?', 'play.evaluate'))));
+  return out;
+}
+
+// ---------- 3 · Ich sehe ein Land, das du nicht siehst ----------
+
+function land(ui, g, st) {
+  const t = st.taskIndex ?? -1;
+  const rounds = st.rounds || {};
+  const r = rounds[t];
+  const out = [
+    tabs(g.content.tasks.map((_, i) => `Aufgabe ${i + 1}`), t, (i) => ui.act('play.open', { taskIndex: i }), (i) => rounds[i]?.showTarget),
+    h('p', { class: 'muted' }, `Karte: ${g.content.map}`),
+  ];
+  if (t < 0 || !r) return [...out, h('p', { class: 'muted' }, 'Aufgabe freigeben: Teams setzen einen Punkt auf ihrer Karte.')];
+  const task = g.content.tasks[t];
+  out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, task.question));
+  out.push(h('p', {}, h('span', { class: 'muted' }, 'Ziel (nur für dich): '), h('b', {}, task.target || '–'), h('span', { class: 'muted' }, ` · ${task.lat}, ${task.lng}`)));
+  const dist = (gs) => Math.round(haversine(gs, task));
+  const list = Object.entries(r.guesses).map(([id, gs]) => ({ id, km: dist(gs), ...gs })).sort((a, b) => a.km - b.km);
+  out.push(h('div', { class: 'map-box' }, mapView(g.content.map, {
+    markers: [...list.map((x) => ({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.id), label: ui.teamName(x.id), showLabel: true })), { lat: task.lat, lng: task.lng, kind: 'target', label: task.target }],
+  })));
+  out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((tm) => {
+    const x = list.find((y) => y.id === tm.id);
+    const win = r.winners.includes(tm.id);
+    return h('li', {}, ui.dot(tm.color), h('span', { class: 'grow' }, h('b', {}, tm.name), x ? ` · ${x.km.toLocaleString('de-DE')} km` : h('span', { class: 'muted' }, ' – noch kein Punkt')),
+      win ? badge('ok', '✓ 1 Punkt') : null,
+      r.showTarget && !win ? btn('small ghost', 'Punkt geben', () => ui.confirmAct(`Korrektur: Den Punkt dieser Aufgabe an ${tm.name} geben (statt bisher)?`, 'play.setWinner', { teamId: tm.id })) : null);
+  })));
+  out.push(row(
+    btn('', '1. Tipps der Teams zeigen', () => ui.confirmAct('Abgabe schließen und alle Teampunkte gleichzeitig zeigen?', 'play.revealGuesses'), r.showGuesses),
+    btn('pink', '2. Zielort enthüllen', () => ui.act('play.revealTarget'), !r.showGuesses || r.showTarget),
+    r.open ? badge('ok', '● Abgabe offen') : null));
+  return out;
+}
+
+function haversine(a, b) {
+  const rad = Math.PI / 180;
+  const x = Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lng - a.lng) * rad) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+// ---------- 4 · Das ist ein echter Kassenschlager ----------
+
+const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+function kassenschlager(ui, g, st) {
+  const i = st.movieIndex ?? -1;
+  const movies = st.movies || {};
+  const m = movies[i];
+  const out = [h('div', { class: 'row' }, g.content.movies.map((mv, k) =>
+    h('button', {
+      class: `btn small ${k === i ? 'pink' : 'ghost'}`,
+      disabled: !!movies[k] || (m && !m.finished),
+      onclick: () => ui.confirmAct(`Film ${k + 1} „${mv.title}“ starten?`, 'play.startMovie', { movieIndex: k }),
+    }, `Film ${k + 1}${movies[k]?.finished ? ' ✓' : ''}`)))];
+  out.push(h('h4', {}, 'Guthaben (privat)'));
+  out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
+    const money = st.wallet?.[t.id] ?? 20;
+    const tm = m?.teams[t.id];
+    return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, h('b', {}, t.name), tm ? h('span', { class: 'muted' }, ` · ${tm.bought.length} Hinweise gekauft`) : null),
+      st.out?.includes(t.id) ? badge('bad', 'ausgeschieden') : tm?.solved ? badge('ok', '✓ gelöst') : null,
+      h('b', {}, `${money} $`), st.converted?.[t.id] ? badge('ok', `= ${pts(st.converted[t.id].points)}`) : null);
+  })));
+  if (!m) return [...out, h('p', { class: 'muted' }, 'Film starten: Teams kaufen reihum Hinweise und raten den Titel.')];
+  const movie = g.content.movies[i];
+  out.push(h('p', {}, h('span', { class: 'muted' }, 'Lösung: '), h('b', {}, movie.title), movie.aliases ? h('span', { class: 'muted' }, ` (auch: ${movie.aliases})`) : null));
+  if (m.turn) {
+    const tm = m.teams[m.turn.teamId] || { bought: [], answers: [] };
+    const phase = { buy: 'kauft einen Hinweis …', answer: 'schreibt eine Antwort …', grading: 'hat geantwortet' }[m.turn.phase];
+    out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, `Zyklus ${m.cycle} von 4 · `, h('span', { style: { color: ui.teamColor(m.turn.teamId) } }, ui.teamName(m.turn.teamId)), ` ${phase}`));
+    if (tm.bought.length) out.push(h('p', { class: 'muted' }, 'Gekauft: ', tm.bought.map((b) => MOVIE_HINTS[b][0]).join(', ')));
+    if (m.turn.phase === 'grading') {
+      const a = tm.answers[tm.answers.length - 1];
+      const forms = [movie.title, ...movie.aliases.split(',')].map(norm).filter(Boolean);
+      const suggest = forms.includes(norm(a.text));
+      out.push(h('div', { class: 'card', style: { background: 'rgba(255,255,255,.05)' } },
+        h('p', { style: { fontSize: '1.4rem', margin: 0 } }, `„${a.text}“`),
+        h('p', { class: 'muted' }, suggest ? 'Vorschlag: stimmt mit Titel/Alias überein' : 'Vorschlag: kein exakter Treffer – bitte selbst prüfen'),
+        row(btn('ok', '✓ Richtig (+5 $)', () => ui.act('play.grade', { correct: true })), btn('bad', '✗ Falsch', () => ui.act('play.grade', { correct: false })))));
+    } else {
+      out.push(row(btn('small ghost', 'Zug überspringen', () => ui.confirmAct(`Zug von ${ui.teamName(m.turn.teamId)} überspringen?`, 'play.skip'))));
+    }
+  }
+  out.push(row(
+    m.finished ? badge('ok', 'Film beendet') : btn('ghost', 'Film beenden', () => ui.confirmAct('Film jetzt beenden? Teams mit 0 $, die nicht gelöst haben, scheiden aus.', 'play.endMovie')),
+    st.converted ? badge('ok', 'Guthaben umgerechnet') : btn('pink', 'Guthaben in Punkte umrechnen', () => ui.confirmAct('Guthaben jetzt einmalig in Hauptpunkte umrechnen (aufgerundet ÷ 2)?', 'play.convert'), !m.finished)));
+  return out;
+}
+
+// ---------- 5 · 5 ist Trümpf ----------
+
+function trumpf5(ui, g, st) {
+  const termIndex = st.termIndex ?? -1;
+  const rounds = st.rounds || {};
+  const round = rounds[termIndex];
+  const out = [tabs(g.content.terms.map((_, i) => `Begriff ${i + 1}`), termIndex, (i) => ui.act('play.start', { termIndex: i }), (i) => rounds[i]?.resolved)];
+  if (termIndex < 0 || !round) return [...out, h('p', { class: 'muted' }, 'Begriff starten: Teams sehen zuerst nur die Kategorie.')];
+  const term = g.content.terms[termIndex];
+  out.push(h('p', {}, h('span', { class: 'muted' }, 'Kategorie: '), h('b', {}, term.category), h('span', { class: 'muted' }, ' · Lösung: '), h('b', {}, term.term)));
+  out.push(h('ol', { class: 'list' }, term.hints.map((hint, i) => h('li', { style: { opacity: i < round.hintLevel ? 1 : 0.5 } },
+    h('b', {}, `${i + 1}.`), h('span', { class: 'grow' }, hint), i < round.hintLevel ? badge('ok', 'freigegeben') : badge('', `${5 - i} P.`)))));
+  const pending = round.buzzes.find((b) => b.status === 'pending');
+  out.push(row(
+    btn('', `Hinweis ${Math.min(round.hintLevel + 1, 5)} freigeben`, () => ui.act('play.nextHint'), round.resolved || round.hintLevel >= 5 || !!pending),
+    btn('small ghost', 'Ohne Punkte beenden', () => ui.confirmAct('Begriff ohne Punkte beenden?', 'play.close'), round.resolved || !!pending),
+    round.resolved ? badge('ok', 'Begriff beendet') : null));
+  out.push(h('h4', {}, 'Buzzer-Reihenfolge (Server-Zeit)'));
+  out.push(buzzList(ui, round, (b) => `✓ Richtig (+${6 - b.hint})`, (correct) => ui.act('play.judge', { correct })));
+  return out;
+}
+
+// ---------- 6 · Musikquiz ----------
+
+function musik(ui, g, st) {
+  const played = st.played || {};
+  const cur = st.current;
+  const round = cur ? st.rounds[cur] : null;
+  const busy = round && !round.resolved;
+  const board = h('div', { class: 'jeopardy' }, g.content.categories.map((cat, c) => h('div', { class: 'col' },
+    h('div', { class: 'cat' }, cat.name || `Kategorie ${c + 1}`),
+    cat.fields.map((_, f) => {
+      const k = `${c}-${f}`;
+      const p = played[k];
+      return h('button', {
+        class: `cell ${p ? 'played' : ''} ${k === cur ? 'current' : ''}`,
+        style: p?.winner ? { borderColor: ui.teamColor(p.winner) } : null,
+        disabled: !!p || busy,
+        onclick: () => ui.act('play.pick', { cat: c, field: f }),
+      }, p ? (p.winner ? ui.teamName(p.winner) : '–') : String(f + 1));
+    }))));
+  const out = [board];
+  if (!cur) return [...out, h('p', { class: 'muted' }, 'Ein Team wählt ein Feld – tippe es hier an.')];
+  const [c, f] = cur.split('-').map(Number);
+  const cat = g.content.categories[c];
+  const field = cat.fields[f];
+  out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, `${cat.name} · ${pts(f + 1)}`));
+  if (/^Song Song Song/.test(cat.mode)) out.push(h('p', {}, badge('warn', 'Song Song Song: beide Titel nötig, keine Teilpunkte')));
+  out.push(h('p', {}, field.task || h('span', { class: 'muted' }, '(keine Aufgabe eingetragen)')));
+  out.push(h('p', {}, h('span', { class: 'muted' }, 'Lösung: '), h('b', {}, field.answer || '–'), field.audio ? h('span', { class: 'muted' }, ` · Clip: ${field.audio}`) : null));
+  out.push(row(
+    round.started ? badge('ok', '● Buzzer frei') : btn('pink', '▶ Aufgabe starten, Buzzer frei', () => ui.act('play.start'), round.resolved),
+    btn('small ghost', 'Ohne Punkte beenden', () => ui.confirmAct('Feld ohne Punkte beenden?', 'play.close'), round.resolved || round.buzzes.some((b) => b.status === 'pending')),
+    round.resolved ? badge('ok', 'Feld beendet') : null));
+  out.push(h('h4', {}, 'Buzzer-Reihenfolge (Server-Zeit)'));
+  out.push(buzzList(ui, round, () => `✓ Richtig (+${f + 1})`, (correct) => ui.act('play.judge', { correct })));
+  return out;
+}
+
+// ---------- 7 · Ein Hauch von Günther Jauch ----------
+
+function jauch(ui, g, st) {
+  const q = st.qIndex ?? -1;
+  const r = q >= 0 ? st.rounds[q] : null;
+  const teams = ui.S.project.teams;
+  const out = [h('div', { class: 'ladder' }, JAUCH_LADDER.map((v, i) => h('span', { class: `step ${i === q ? 'current' : ''} ${i === 3 ? 'safe' : ''}` }, `${i + 1}: ${v}`)))];
+  const canNext = q < JAUCH_LADDER.length - 1 && (q < 0 || r?.revealed);
+  if (!r) return [...out, row(btn('pink', 'Frage 1 freigeben', () => ui.act('play.next'), !canNext))];
+  const question = g.content.questions[q];
+  out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, `Frage ${q + 1} · ${pts(JAUCH_LADDER[q])}: ${question.question}`), optionsList(question));
+  if (r.joker) out.push(h('p', {}, '🃏 ', h('b', {}, ui.teamName(r.joker.teamId)), r.joker.kind === 'fifty' ? ` nutzt 50:50 (weg: ${r.joker.removed.join(', ')})` : ' nutzt den Telefonjoker – erst wenn alle anderen gesperrt haben, telefonieren lassen.'));
+  out.push(h('ul', { class: 'list' }, teams.map((t) => {
+    const ts = st.teams[t.id] || { status: 'active', secured: 0 };
+    const a = r.answers[t.id];
+    const status = { active: null, quit: badge('', `ausgestiegen nach ${ts.outAt}`), out: badge('bad', `raus bei Frage ${ts.outAt}`), done: badge('ok', 'alle 8 geschafft') }[ts.status];
+    const jokers = [ts.jokers?.fifty ? null : '50:50', ts.jokers?.phone ? null : 'Telefon'].filter(Boolean).join(', ');
+    return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, h('b', {}, t.name), a ? `: ${a.choice}` : ts.status === 'active' && !r.revealed ? h('span', { class: 'muted' }, ' – wählt noch') : '', h('span', { class: 'muted' }, ` · Joker übrig: ${jokers || 'keine'}`)),
+      status, r.revealed && a ? (a.choice === question.correct ? badge('ok', '✓') : badge('bad', '✗')) : null, h('b', {}, pts(ts.secured)));
+  })));
+  const missing = teams.filter((t) => (st.teams[t.id]?.status || 'active') === 'active' && !r.answers[t.id]);
+  out.push(row(
+    r.revealed ? badge('ok', 'Aufgelöst') : btn('', 'Antworten auflösen', () => (missing.length
+      ? ui.confirmAct(`Noch nicht gesperrt: ${missing.map((t) => t.name).join(', ')}. Trotzdem auflösen? Diese Teams scheiden aus.`, 'play.reveal', { force: true })
+      : ui.act('play.reveal'))),
+    canNext ? btn('pink', `Frage ${q + 2} freigeben`, () => ui.act('play.next')) : null));
+  return out;
+}
+
+// ---------- 8 · Wer nix werd, werd Nerd ----------
+
+function nerd(ui, g, st) {
+  const c = st.catIndex ?? -1;
+  const rounds = st.rounds || {};
+  const r = rounds[c];
+  const out = [
+    tabs(g.content.categories.map((cat, i) => (i === 4 ? 'Kategorie 5 ★' : `Kategorie ${i + 1}`)), c, (i) => ui.act('play.open', { catIndex: i }), (i) => rounds[i]?.phase === 'done'),
+    h('p', { class: 'muted' }, `Gleichstand-Regel: ${g.content.tieRule}`),
+  ];
+  if (c < 0 || !r) return [...out, h('p', { class: 'muted' }, 'Kategorie öffnen: Teams geben geheim ihr Gebot ab.')];
+  const cat = g.content.categories[c];
+  out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, cat.name || `Kategorie ${c + 1}`));
+  out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
+    const bid = r.bids[t.id];
+    const res = r.results.find((x) => x.teamId === t.id);
+    return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, h('b', {}, t.name), bid === undefined ? h('span', { class: 'muted' }, ' – noch kein Gebot') : `: Gebot ${bid}`),
+      res ? badge(res.success ? 'ok' : 'bad', `${res.points > 0 ? '+' : ''}${res.points}`) : null);
+  })));
+  if (r.phase === 'bidding') {
+    const missing = ui.S.project.teams.filter((t) => r.bids[t.id] === undefined);
+    out.push(row(btn('pink', 'Gebote gleichzeitig aufdecken', () => (missing.length
+      ? ui.confirmAct(`Noch kein Gebot von ${missing.map((t) => t.name).join(', ')}. Trotzdem aufdecken?`, 'play.revealBids', { force: true })
+      : ui.act('play.revealBids')))));
+    return out;
+  }
+  if (r.phase === 'choose') {
+    out.push(h('div', { class: 'notice warn' }, `Gleichstand um den ${r.choose.which === 'first' ? 'ersten' : 'zweiten'} Versuch. Stichentscheid: Wer beginnt?`));
+    out.push(row(...r.choose.teamIds.map((id) => btn('', ui.teamName(id), () => ui.confirmAct(`${ui.teamName(id)} bekommt den Versuch? Der Stichentscheid wird protokolliert.`, 'play.choose', { teamId: id })))));
+    return out;
+  }
+  const a = r.attempt;
+  if (a) {
+    const valid = cat.answers.split('\n').map((l) => l.trim()).filter(Boolean);
+    const named = a.given.filter((x) => x.ok).map((x) => x.text);
+    out.push(h('p', {}, h('b', { style: { color: ui.teamColor(a.teamId) } }, ui.teamName(a.teamId)), ` · ${a.which === 'first' ? 'erster' : 'zweiter'} Versuch · Ziel ${a.target} · `,
+      h('b', {}, `${a.correct} richtig`), ` · ${a.errors} von ${a.maxErrors} Fehlern`, a.done ? ` · ${a.done === 'success' ? 'geschafft ✓' : 'gescheitert ✗'}` : ''));
+    if (!a.done) {
+      out.push(h('p', { class: 'muted' }, 'Genannte Antwort antippen. Bereits genannte zählen als Fehler.'));
+      out.push(h('div', { class: 'row' }, valid.map((v) => btn(`small ${named.includes(v) ? 'cyan' : 'ghost'}`, named.includes(v) ? `✓ ${v}` : v, () => ui.act('play.mark', { answer: v })))));
+      out.push(row(btn('bad', '✗ Falsche Antwort', () => ui.act('play.mark', { text: 'Falsche Antwort' })), btn('small ghost', '↶ Letzte Wertung zurück', () => ui.act('play.unmark'), !a.given.length)));
+    }
+  }
+  if (r.phase === 'done') out.push(row(badge('ok', 'Kategorie beendet')));
+  return out;
+}

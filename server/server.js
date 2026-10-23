@@ -189,6 +189,15 @@ function broadcast() {
   }
 }
 
+// Zeitabhängige Spielregeln (z. B. 10-Sekunden-Fenster) ändern die Sichten
+// ohne neue Aktion: zum richtigen Zeitpunkt noch einmal senden.
+let wakeTimer = null;
+function scheduleWake() {
+  clearTimeout(wakeTimer);
+  const at = game.nextWake(store.data);
+  if (at) wakeTimer = setTimeout(broadcast, at - Date.now() + 50);
+}
+
 function kickTeam(teamId) {
   for (const c of clients) {
     if (c.role === 'team' && c.teamId === teamId) {
@@ -236,6 +245,7 @@ function handleAction(c, msg) {
     send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate });
     if (result.kick) kickTeam(result.kick);
     broadcast();
+    scheduleWake();
   } catch (err) {
     const message = err instanceof game.QuizError ? err.message : 'Interner Fehler.';
     if (!(err instanceof game.QuizError)) console.error(err);

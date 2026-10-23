@@ -1,4 +1,5 @@
 import { h, connect, run, store, toast, ask, localServer } from './client.js';
+import { buildPlay } from './mod-play.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
 if (!token) location.href = 'index.html';
@@ -84,6 +85,11 @@ const dot = (color) => h('span', { class: 'dot', style: { background: color } })
 const card = (title, ...body) => h('section', { class: 'card' }, h('h3', {}, title), ...body);
 const act = (name, payload) => run(conn, name, payload);
 
+// Countdowns (10-Sekunden-Fenster) live mitzählen.
+setInterval(() => {
+  for (const el of document.querySelectorAll('[data-deadline]')) el.textContent = `${Math.max(0, Math.ceil((Number(el.dataset.deadline) - Date.now()) / 1000))} s`;
+}, 250);
+
 async function confirmAct(message, name, payload) {
   if (await ask(message)) act(name, payload);
 }
@@ -125,74 +131,7 @@ function buildGameControl() {
   if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Oben ein Spiel aktivieren.'));
   const st = S.live.games[g.id] || {};
   const pos = S.project.games.indexOf(g) + 1;
-  if (g.type === 'leichte5') return buildG1(g, st, pos);
-  if (g.type === 'trumpf5') return buildG5(g, st, pos);
-  return card(g.title, h('p', {}, 'Noch nicht spielbar.'));
-}
-
-function buildG1(g, st, pos) {
-  const qIndex = st.qIndex ?? -1;
-  const rounds = st.rounds || {};
-  const round = rounds[qIndex];
-  const title = `Spiel ${pos} · ${g.title}`;
-  const out = [h('div', { class: 'row' }, g.content.questions.map((q, i) => {
-    const label = `Frage ${i + 1}${rounds[i]?.solutionRevealed ? ' ✓' : ''}`;
-    return h('button', { class: `btn small ${i === qIndex ? 'pink' : 'ghost'}`, onclick: () => act('g1.open', { qIndex: i }) }, label);
-  }))];
-  if (qIndex < 0 || !round) {
-    out.push(h('p', { class: 'muted' }, 'Frage freigeben, damit sie auf den Team-iPads erscheint.'));
-    return card(title, ...out);
-  }
-  const q = g.content.questions[qIndex];
-  out.push(h('p', { class: 'question', style: { fontSize: '1.4rem' } }, q.question));
-  out.push(h('p', {}, h('span', { class: 'muted' }, 'Musterlösung (nur für dich): '), h('b', {}, q.solution)));
-  out.push(h('p', {}, round.open ? h('span', { class: 'badge ok' }, '● Abgabe offen') : h('span', { class: 'badge' }, '🔒 Abgabe geschlossen')));
-  out.push(h('ul', { class: 'list' }, S.project.teams.map((t) => {
-    const a = round.answers[t.id];
-    if (!a) return h('li', {}, dot(t.color), h('span', { class: 'grow' }, t.name, h('span', { class: 'muted' }, ' – noch nicht abgegeben')));
-    const grade = a.grade === true ? h('span', { class: 'badge ok' }, '✓ richtig') : a.grade === false ? h('span', { class: 'badge bad' }, '✗ falsch') : h('span', { class: 'badge warn' }, 'offen');
-    return h('li', {}, dot(t.color),
-      h('span', { class: 'grow' }, h('b', {}, t.name), ': ', a.text),
-      grade,
-      h('button', { class: `btn small ${a.onBeamer ? 'cyan' : 'ghost'}`, onclick: () => act('g1.showAnswer', { teamId: t.id, visible: !a.onBeamer }) }, a.onBeamer ? 'Auf Beamer ✓' : 'Auf Beamer zeigen'),
-      h('button', { class: 'btn small ok', onclick: () => act('g1.grade', { teamId: t.id, correct: true }) }, '✓ Richtig'),
-      h('button', { class: 'btn small bad', onclick: () => act('g1.grade', { teamId: t.id, correct: false }) }, '✗ Falsch'));
-  })));
-  out.push(h('p', { style: { marginTop: '14px' } },
-    round.solutionRevealed
-      ? h('span', { class: 'badge ok' }, 'Lösung wird gezeigt')
-      : h('button', { class: 'btn', onclick: () => confirmAct('Lösung zeigen und Abgabe für diese Frage schließen?', 'g1.revealSolution') }, 'Lösung auf Beamer zeigen')));
-  return card(title, ...out);
-}
-
-function buildG5(g, st, pos) {
-  const termIndex = st.termIndex ?? -1;
-  const rounds = st.rounds || {};
-  const round = rounds[termIndex];
-  const out = [h('div', { class: 'row' }, g.content.terms.map((t, i) => {
-    const r = rounds[i];
-    return h('button', { class: `btn small ${i === termIndex ? 'pink' : 'ghost'}`, onclick: () => act('g5.start', { termIndex: i }) }, `Begriff ${i + 1}${r?.resolved ? ' ✓' : ''}`);
-  }))];
-  if (termIndex < 0 || !round) return card(`Spiel ${pos} · ${g.title}`, ...out, h('p', { class: 'muted' }, 'Begriff starten: Teams sehen zuerst nur die Kategorie.'));
-  const term = g.content.terms[termIndex];
-  out.push(h('p', {}, h('span', { class: 'muted' }, 'Kategorie: '), h('b', {}, term.category), h('span', { class: 'muted' }, ' · Lösung: '), h('b', {}, term.term)));
-  out.push(h('ol', { class: 'list' }, term.hints.map((hint, i) => h('li', { style: { opacity: i < round.hintLevel ? 1 : 0.5 } },
-    h('b', {}, `${i + 1}.`), h('span', { class: 'grow' }, hint), i < round.hintLevel ? h('span', { class: 'badge ok' }, 'freigegeben') : h('span', { class: 'badge' }, `${5 - i} P.`)))));
-  const pending = round.buzzes.find((b) => b.status === 'pending');
-  out.push(h('div', { class: 'row', style: { marginTop: '12px' } },
-    h('button', { class: 'btn', disabled: round.resolved || round.hintLevel >= 5 || !!pending, onclick: () => act('g5.nextHint') }, `Hinweis ${Math.min(round.hintLevel + 1, 5)} freigeben`),
-    h('button', { class: 'btn small ghost', disabled: round.resolved || !!pending, onclick: () => confirmAct('Begriff ohne Punkte beenden?', 'g5.close') }, 'Ohne Punkte beenden'),
-    round.resolved ? h('span', { class: 'badge ok' }, 'Begriff beendet') : null));
-  const first = round.buzzes[0]?.at;
-  out.push(h('h4', {}, 'Buzzer-Reihenfolge (Server-Zeit)'));
-  out.push(round.buzzes.length ? h('ol', { class: 'list' }, round.buzzes.map((b) => h('li', { class: b === pending ? 'active' : '' },
-    dot(teamColor(b.teamId)), h('span', { class: 'grow' }, h('b', {}, teamName(b.teamId)), h('span', { class: 'muted' }, ` · Hinweis ${b.hint} · +${b.at - first} ms`)),
-    b.status === 'correct' ? h('span', { class: 'badge ok' }, '✓ richtig') : b.status === 'wrong' ? h('span', { class: 'badge bad' }, '✗ falsch') : null,
-    b === pending ? [
-      h('button', { class: 'btn small ok', onclick: () => act('g5.judge', { correct: true }) }, `✓ Richtig (+${6 - b.hint})`),
-      h('button', { class: 'btn small bad', onclick: () => act('g5.judge', { correct: false }) }, '✗ Falsch'),
-    ] : null))) : h('p', { class: 'muted' }, 'Noch kein Buzzer.'));
-  return card(`Spiel ${pos} · ${g.title}`, ...out);
+  return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor }, g, st, pos);
 }
 
 function buildBeamerControls() {
