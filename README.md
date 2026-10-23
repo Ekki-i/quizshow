@@ -64,6 +64,8 @@ Umgesetzt:
   Münzen nach Position 4, 6 und 8 inkl. Gleichstandswarnung und Schätzfrage-Entscheid.
 - Beamer: Startbild, Intro mit Teams, Pyramide 4–2–2, Spieltitel-Animation, Spielansicht,
   Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
+- **Mehrere Shows**: anlegen (optional mit den Teams der geöffneten Show), umbenennen,
+  mit Datum versehen, öffnen, duplizieren und löschen. Jede Show hat eigene Spiele, Teams und Punkte.
 - Show-Editor mit Autosave („Gespeichert“ / „Ungespeicherte Änderungen“).
 - **Spiele-Datenbank** mit allen acht Spielen und Beispielinhalten. Einträge lassen sich anlegen,
   duplizieren, bearbeiten und löschen. Die Show wird frei aus der Datenbank zusammengestellt,
@@ -91,6 +93,6 @@ Umgesetzt:
 Noch offen (nächste Phasen laut Masterprompt):
 
 - Das Finale gegen die Moderation.
-- Mehrere Projekte, Duplizieren, Versionen, Archiv-Snapshots und Spielbibliothek.
+- Versionen und Archiv-Snapshots von Shows.
 - QR-Codes, Co-Moderator-Rechte, Test-/Vorschaumodus ohne echte Punkte.
 - Medien-Uploads, Musik, editierbare Design-Tokens im Editor, Handschrift-Eingabe mit Stylus.

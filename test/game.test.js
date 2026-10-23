@@ -470,3 +470,38 @@ test('Spielaktionen gehen nur an das aktive Spiel', () => {
   assert.throws(() => game.applyAction(db, team(ids[0]), 'play.open', { qIndex: 0 }), /passt nicht/);
   assert.throws(() => game.applyAction(db, { role: 'beamer', now: 1 }, 'play.open', { qIndex: 0 }), /nicht erlaubt/);
 });
+
+test('Mehrere Shows: anlegen, umbenennen, wechseln, duplizieren, löschen', () => {
+  const { db, ids } = setup(2);
+  const first = db.project.id;
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[0], points: 3, reason: 'Test' });
+  game.applyAction(db, mod(), 'shows.rename', { showId: first, name: 'Show 12.11.', date: '2026-11-12' });
+  const r = game.applyAction(db, mod(), 'shows.create', { name: 'Show 03.12.', copyTeams: true });
+  assert.equal(db.project.id, r.created);
+  assert.equal(db.project.teams.length, 2);
+  assert.equal(game.totals(db)[ids[0]], 0);
+  assert.equal(db.project.games.length, 8);
+  // Teams mit gleichem Code bleiben in der neuen Show angemeldet.
+  assert.equal(game.teamView(db, ids[0]).team.id, ids[0]);
+  const list = game.moderatorView(db).shows;
+  assert.deepEqual(list.map((x) => x.name), ['Show 12.11.', 'Show 03.12.']);
+  assert.equal(list.find((x) => x.current).id, r.created);
+
+  game.applyAction(db, mod(), 'shows.switch', { showId: first });
+  assert.equal(db.project.name, 'Show 12.11.');
+  assert.equal(game.totals(db)[ids[0]], 3);
+
+  game.applyAction(db, mod(), 'show.activate', { gameId: db.project.games[0].id });
+  assert.throws(() => game.applyAction(db, mod(), 'shows.switch', { showId: r.created }), /Spiel beenden/);
+  game.applyAction(db, mod(), 'show.activate', { gameId: null });
+
+  const d = game.applyAction(db, mod(), 'shows.duplicate', { showId: first });
+  const copy = db.shows.find((x) => x.project.id === d.created);
+  assert.equal(copy.project.name, 'Show 12.11. (Kopie)');
+  assert.notEqual(copy.project.games[0].id, db.project.games[0].id);
+  assert.equal(copy.ledger.length, 0);
+  assert.throws(() => game.applyAction(db, mod(), 'shows.remove', { showId: first }), /geöffnete Show/);
+  game.applyAction(db, mod(), 'shows.remove', { showId: d.created });
+  assert.equal(db.shows.length, 1);
+  assert.throws(() => game.applyAction(db, mod(), 'shows.rename', { showId: first, date: '12.11.2026' }), /Datum/);
+});

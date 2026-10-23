@@ -329,3 +329,4 @@ button.cell:disabled { cursor: default; }
 .modal-text { white-space: pre-line; }
 .beamer .q.compact { font-size: clamp(1.5rem, 3.2vw, 3.2rem); margin-bottom: 2.5vh; }
 .beamer .options.compact .opt { padding: 1.2vh 2vw; font-size: clamp(1.1rem, 2.2vw, 2.4rem); }
+.grid > .card + .card { margin-top: 0; }

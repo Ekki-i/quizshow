@@ -56,26 +56,34 @@ function instanceFrom(entry) {
   return { id: newId('game'), type: entry.type, title: entry.title, content: clone(entry.content), libraryId: entry.id, libraryVersion: entry.version, locked: false };
 }
 
+// Eine neue Show mit der Standardreihenfolge, je Spieltyp der erste Eintrag der Datenbank.
+function newProject(library, name = 'Quizshow') {
+  const games = DEFAULT_ORDER.map((type) => library.find((e) => e.type === type)).filter(Boolean).map(instanceFrom);
+  if (games[0]?.type === 'leichte5') games[0].locked = true; // „Die leichten 5“ als festes Eröffnungsspiel
+  return {
+    id: newId('proj'),
+    name,
+    date: '',
+    subtitle: 'Die Live-Show mit acht Spielen',
+    host: 'Moderation',
+    coHost: '',
+    // Teams sehen standardmäßig keine fremden Punktestände (Abschnitt 4.1).
+    settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
+    teams: [],
+    games,
+  };
+}
+
 function createState(now = Date.now()) {
   const library = DEFAULT_ORDER.map((type) => libraryEntry(type, now));
-  const games = library.map(instanceFrom);
-  games[0].locked = true; // „Die leichten 5“ als festes Eröffnungsspiel
   return {
     version: STATE_VERSION,
     library,
-    project: {
-      id: newId('proj'),
-      name: 'Quizshow',
-      subtitle: 'Die Live-Show mit acht Spielen',
-      host: 'Moderation',
-      coHost: '',
-      // Teams sehen standardmäßig keine fremden Punktestände (Abschnitt 4.1).
-      settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
-      teams: [],
-      games,
-    },
+    project: newProject(library),
     live: freshLive(),
     ledger: [],
+    // Weitere, gerade nicht geöffnete Shows mit eigenem Spielstand und Punktebuch.
+    shows: [],
     log: [],
     processed: [],
   };
@@ -83,7 +91,11 @@ function createState(now = Date.now()) {
 
 // Ältere Speicherstände (vor der Spiele-Datenbank) übernehmen Teams, Showdaten und Protokoll.
 function migrate(db) {
-  if (db.version === STATE_VERSION) return db;
+  if (db.version === STATE_VERSION) {
+    if (!db.shows) db.shows = [];
+    if (db.project.date === undefined) db.project.date = '';
+    return db;
+  }
   const fresh = createState();
   if (db.project) {
     for (const k of ['name', 'subtitle', 'host', 'coHost', 'settings', 'teams']) if (k in db.project) fresh.project[k] = db.project[k];
@@ -197,6 +209,34 @@ function rankingSnapshot(db) {
     .sort((a, b) => b.points - a.points);
 }
 
+function findStashed(db, showId) {
+  const s = db.shows.find((x) => x.project.id === showId);
+  if (!s) fail('Show nicht gefunden.');
+  return s;
+}
+
+function stashCurrent(db) {
+  db.shows.push({ project: db.project, live: db.live, ledger: db.ledger });
+}
+
+function openShow(db, show) {
+  db.project = show.project;
+  db.live = show.live;
+  db.ledger = show.ledger;
+}
+
+function cleanDate(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) fail('Ungültiges Datum.');
+  return v;
+}
+
+function showList(db) {
+  const summary = (pr, current) => ({ id: pr.id, name: pr.name, date: pr.date || '', teams: pr.teams.length, games: pr.games.length, current });
+  return [summary(db.project, true), ...db.shows.map((s) => summary(s.project, false))]
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.name.localeCompare(b.name, 'de'));
+}
+
 function requireEditable(db) {
   if (db.live.activeGame !== null) fail('Während ein Spiel aktiv ist, bleibt der Showablauf fest. Zuerst das Spiel beenden.');
 }
@@ -210,6 +250,7 @@ const moderatorActions = {
     if ('subtitle' in p) pr.subtitle = cleanText(p.subtitle, 160);
     if ('host' in p) pr.host = cleanText(p.host, 80);
     if ('coHost' in p) pr.coHost = cleanText(p.coHost, 80);
+    if ('date' in p) pr.date = cleanDate(p.date);
     if (p.settings && typeof p.settings === 'object') {
       for (const k of ['publicScores', 'reducedMotion', 'sound']) {
         if (k in p.settings) pr.settings[k] = !!p.settings[k];
@@ -432,6 +473,58 @@ const moderatorActions = {
     log(db, ctx, 'muenze', `Münze nach Position ${w.position} per Schätzfrage an ${teamName(db, p.teamId)}`);
   },
 
+  // ----- Mehrere Shows -----
+  // Geöffnet ist immer genau eine Show (db.project mit Spielstand und Punkten),
+  // die anderen liegen vollständig in db.shows.
+
+  'shows.create'(db, ctx, p) {
+    requireEditable(db);
+    if (db.shows.length >= 50) fail('Maximal 50 Shows.');
+    const name = cleanText(p.name || '', 80) || 'Neue Show';
+    const project = newProject(db.library, name);
+    project.date = cleanDate(p.date);
+    if (p.copyTeams) project.teams = clone(db.project.teams);
+    stashCurrent(db);
+    openShow(db, { project, live: freshLive(), ledger: [] });
+    log(db, ctx, 'show', `Neue Show „${name}“ angelegt und geöffnet`);
+    return { created: project.id };
+  },
+
+  'shows.switch'(db, ctx, p) {
+    requireEditable(db);
+    const i = db.shows.findIndex((x) => x.project.id === p.showId);
+    if (i < 0) fail('Show nicht gefunden.');
+    const [next] = db.shows.splice(i, 1);
+    stashCurrent(db);
+    openShow(db, next);
+    log(db, ctx, 'show', `Show „${next.project.name}“ geöffnet`);
+  },
+
+  'shows.duplicate'(db, ctx, p) {
+    if (db.shows.length >= 50) fail('Maximal 50 Shows.');
+    const src = p.showId === db.project.id ? db.project : findStashed(db, p.showId).project;
+    const project = { ...clone(src), id: newId('proj'), name: `${src.name} (Kopie)`.slice(0, 80) };
+    for (const g of project.games) g.id = newId('game');
+    db.shows.push({ project, live: freshLive(), ledger: [] });
+    log(db, ctx, 'show', `Show „${src.name}“ dupliziert`);
+    return { created: project.id };
+  },
+
+  'shows.rename'(db, ctx, p) {
+    const project = p.showId === db.project.id ? db.project : findStashed(db, p.showId).project;
+    const old = project.name;
+    if ('name' in p) project.name = cleanText(p.name, 80) || old;
+    if ('date' in p) project.date = cleanDate(p.date);
+    log(db, ctx, 'show', `Show „${old}“ umbenannt in „${project.name}“`);
+  },
+
+  'shows.remove'(db, ctx, p) {
+    if (p.showId === db.project.id) fail('Die geöffnete Show kann nicht gelöscht werden. Zuerst eine andere öffnen.');
+    const s = findStashed(db, p.showId);
+    db.shows = db.shows.filter((x) => x !== s);
+    log(db, ctx, 'show', `Show „${s.project.name}“ gelöscht`);
+  },
+
   'live.reset'(db, ctx, p) {
     if (p.confirm !== 'NEUSTART') fail('Neustart nicht bestätigt.');
     db.live = freshLive();
@@ -534,6 +627,7 @@ function moderatorView(db, connections) {
   return {
     role: 'moderator',
     project: db.project,
+    shows: showList(db),
     library: db.library,
     types: publicTypes(),
     showSize: SHOW_SIZE,

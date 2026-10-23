@@ -64,7 +64,7 @@ function renderPanel(id, build, force) {
     return;
   }
   const scroll = window.scrollY;
-  panel.replaceChildren(...build());
+  panel.replaceChildren(...build().filter(Boolean));
   window.scrollTo(0, scroll);
 }
 
@@ -250,8 +250,8 @@ const drafts = new Map();
 
 function buildEditor() {
   const p = S.project;
-  const field = (label, key, max) => h('div', {}, h('label', { for: `show-${key}` }, label),
-    h('input', { id: `show-${key}`, value: p[key], maxlength: String(max), oninput: (ev) => autosave(`project.${key}`, () => act('project.update', { [key]: ev.target.value })) }));
+  const field = (label, key, max) => h('div', {}, h('label', { for: `proj-${key}` }, label),
+    h('input', { id: `proj-${key}`, value: p[key], maxlength: String(max), oninput: (ev) => autosave(`project.${key}`, () => act('project.update', { [key]: ev.target.value })) }));
   const check = (label, key) => h('label', { style: { fontWeight: 400 } },
     h('input', { type: 'checkbox', checked: p.settings[key], style: { width: 'auto', marginRight: '8px' }, onchange: (ev) => act('project.update', { settings: { [key]: ev.target.checked } }) }), label);
 
@@ -260,10 +260,14 @@ function buildEditor() {
 
   return [
     h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '12px' } }, h('h2', { style: { margin: 0 } }, 'Show-Editor'), saveIndicator()),
+    buildShows(),
     buildBoard(),
     sel ? buildGameEditor('game', sel) : null,
     h('div', { class: 'grid two', style: { marginTop: '16px' } },
-      card('Show', field('Showname', 'name', 80), field('Untertitel', 'subtitle', 160), field('Moderation', 'host', 80), field('Co-Moderation (optional)', 'coHost', 80)),
+      card('Show', field('Showname', 'name', 80),
+        h('div', {}, h('label', { for: 'show-date' }, 'Datum der Show'),
+          h('input', { id: 'show-date', type: 'date', value: p.date || '', onchange: (ev) => act('project.update', { date: ev.target.value }) })),
+        field('Untertitel', 'subtitle', 160), field('Moderation', 'host', 80), field('Co-Moderation (optional)', 'coHost', 80)),
       card('Darstellung',
         check('Animationen reduzieren', 'reducedMotion'),
         check('Soundeffekte auf dem Beamer', 'sound'),
@@ -271,6 +275,48 @@ function buildEditor() {
         h('label', { for: 'show-title-dur' }, 'Dauer der Spieltitel-Animation (Sekunden)'),
         h('input', { id: 'show-title-dur', type: 'number', min: '3', max: '20', value: p.settings.titleDurationSec, onchange: (ev) => act('project.update', { settings: { titleDurationSec: Number(ev.target.value) } }) }))),
   ];
+}
+
+// Mehrere Shows: geöffnet ist immer eine, die anderen behalten Teams, Spiele und Punkte.
+const fmtDate = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '');
+
+async function renameShow(s) {
+  const v = await ask(`Show „${s.name}“ umbenennen`, {
+    confirmLabel: 'Speichern',
+    fields: [{ name: 'name', label: 'Name der Show', value: s.name, maxlength: 80 }, { name: 'date', label: 'Datum der Show (optional)', type: 'date', value: s.date }],
+  });
+  if (v) act('shows.rename', { showId: s.id, name: v.name, date: v.date });
+}
+
+async function createShow() {
+  const v = await ask('Neue Show anlegen', {
+    confirmLabel: 'Anlegen und öffnen',
+    fields: [
+      { name: 'name', label: 'Name der Show', value: '', maxlength: 80 },
+      { name: 'date', label: 'Datum der Show (optional)', type: 'date', value: '' },
+      { name: 'copyTeams', label: 'Teams aus der geöffneten Show übernehmen (gleiche Zugangscodes)', type: 'checkbox', value: true },
+    ],
+  });
+  if (!v) return;
+  act('shows.create', { name: v.name, date: v.date, copyTeams: v.copyTeams });
+}
+
+function buildShows() {
+  const running = S.live.activeGame !== null;
+  return card('Meine Shows',
+    h('p', { class: 'muted', style: { marginTop: 0 } }, 'Jede Show hat eigene Spiele, Teams und Punkte. Bearbeitet und gespielt wird immer die geöffnete Show.'),
+    h('ul', { class: 'list' }, S.shows.map((s) => h('li', { class: s.current ? 'active' : '' },
+      h('span', { class: 'grow' }, h('b', {}, s.name), s.date ? h('span', { class: 'muted' }, ` · ${fmtDate(s.date)}`) : null,
+        h('span', { class: 'muted' }, ` · ${s.games} Spiele · ${s.teams} Teams`)),
+      s.current ? h('span', { class: 'badge ok' }, 'geöffnet')
+        : h('button', { class: 'btn small', disabled: running, title: running ? 'Zuerst das laufende Spiel beenden.' : '', onclick: () => act('shows.switch', { showId: s.id }) }, 'Öffnen'),
+      h('button', { class: 'btn small ghost', onclick: () => renameShow(s) }, 'Umbenennen'),
+      h('button', { class: 'btn small ghost', onclick: () => act('shows.duplicate', { showId: s.id }).then((r) => r && toast(`„${s.name}“ dupliziert`, 'info')) }, 'Duplizieren'),
+      s.current ? null : h('button', {
+        class: 'btn small ghost icon', 'aria-label': `${s.name} löschen`,
+        onclick: async () => { if (await ask(`Show „${s.name}“ mit allen Teams und Punkten löschen?`, { confirmLabel: 'Löschen', danger: true })) act('shows.remove', { showId: s.id }); },
+      }, trashIcon())))),
+    h('p', { style: { marginBottom: 0 } }, h('button', { class: 'btn', disabled: running, onclick: createShow }, '+ Neue Show')));
 }
 
 const trashIcon = () => {
@@ -390,11 +436,10 @@ function buildLibrary() {
   const groups = Object.entries(S.types).map(([type, t]) => {
     const entries = S.library.filter((e) => e.type === type);
     return h('section', { class: 'card lib-group' },
-      h('div', { class: 'row', style: { justifyContent: 'space-between' } },
-        h('h3', { style: { margin: 0 } }, t.title),
-        h('div', { class: 'row', style: { gap: '6px' } },
-          t.playable ? h('span', { class: 'badge ok' }, 'spielbar') : h('span', { class: 'badge' }, 'Inhalte bearbeitbar, Spielablauf folgt'),
-          h('button', { class: 'btn small', onclick: async () => { const r = await act('library.add', { type }); if (r) { selectedEntry = null; } } }, '+ Neu'))),
+      h('h3', { style: { margin: 0 } }, t.title),
+      h('div', { class: 'row', style: { gap: '6px', marginTop: '10px' } },
+        t.playable ? h('span', { class: 'badge ok' }, 'spielbar') : h('span', { class: 'badge' }, 'Inhalte bearbeitbar, Spielablauf folgt'),
+        h('button', { class: 'btn small', onclick: async () => { const r = await act('library.add', { type }); if (r) { selectedEntry = null; } } }, '+ Neu')),
       h('p', { class: 'muted' }, t.summary),
       entries.length ? h('ul', { class: 'list' }, entries.map((e) => h('li', { class: e.id === selectedEntry ? 'active' : '' },
         h('span', { class: 'grow' }, h('b', {}, e.title), h('span', { class: 'muted' }, ` · Version ${e.version}`)),
