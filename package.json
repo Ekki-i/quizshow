@@ -1,0 +1,17 @@
+{
+  "name": "quizshow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modulare Live-Quizshow mit Team-, Moderations- und Beameransicht",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

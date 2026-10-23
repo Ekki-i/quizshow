@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quizshow – Beamer</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <div class="shapes" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+  <main class="beamer"><div class="stage" id="stage"></div></main>
+  <button id="sound-on" class="btn small ghost" style="position:fixed;left:12px;bottom:12px">🔊 Ton aktivieren</button>
+
+  <script type="module">
+    import { h, connect } from './assets/js/client.js';
+
+    const stage = document.getElementById('stage');
+    const embedded = new URLSearchParams(location.search).has('preview');
+    let lastEffect = null;
+    let lastKey = null;
+    let titleTimer = null;
+    let audio = null;
+
+    // Eigene, synthetisch erzeugte Effekte – keine fremde Musik.
+    document.getElementById('sound-on').onclick = (ev) => {
+      audio = new AudioContext();
+      ev.currentTarget.remove();
+    };
+    if (embedded) document.getElementById('sound-on').remove();
+
+    function tone(freqs, dur = 0.18, type = 'square') {
+      if (!audio) return;
+      let t = audio.currentTime;
+      for (const f of freqs) {
+        const o = audio.createOscillator();
+        const g = audio.createGain();
+        o.type = type;
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.18, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.connect(g).connect(audio.destination);
+        o.start(t);
+        o.stop(t + dur);
+        t += dur * 0.8;
+      }
+    }
+    const SOUNDS = {
+      correct: () => tone([660, 880, 1320], 0.16, 'triangle'),
+      wrong: () => tone([220, 160], 0.3, 'sawtooth'),
+      buzz: () => tone([520], 0.35, 'square'),
+      reveal: () => tone([392, 494, 587, 784], 0.2, 'triangle'),
+      coin: () => tone([523, 659, 784, 1047, 1319], 0.22, 'triangle'),
+      title: () => tone([392, 392, 523, 659, 523, 784], 0.2, 'square'),
+    };
+
+    connect({
+      hello: () => ({ role: 'beamer', preview: embedded }),
+      quiet: embedded,
+      onState: render,
+    });
+
+    function teamOf(s, id) {
+      return s.teams.find((t) => t.id === id) || { name: '?', color: '#888' };
+    }
+
+    function render(s) {
+      document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
+      document.title = `${s.show.name} – Beamer`;
+      const fresh = lastEffect !== null && s.effect.seq !== lastEffect;
+      if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
+      lastEffect = s.effect.seq;
+
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games]);
+      const replayTitle = fresh && s.effect.kind === 'title';
+      if (key === lastKey && !replayTitle) return;
+      lastKey = key;
+      clearTimeout(titleTimer);
+
+      const views = { start, intro, pyramid, title, game, ranking, coin, blank: () => [] };
+      stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
+    }
+
+    function start(s) {
+      return [
+        h('div', { class: 'logo', 'aria-hidden': 'true' }, h('span', { class: 'logo-mark', style: { width: '14vh', height: '14vh' } }, h('i', { class: 'a' }), h('i', { class: 'b' }))),
+        h('div', { class: 'mega' }, s.show.name),
+        h('div', { class: 'sub' }, s.show.subtitle),
+      ];
+    }
+
+    function intro(s) {
+      return [
+        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, `Willkommen bei ${s.show.name}!`),
+        h('div', { class: 'sub' }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
+        h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '5vh', gap: '1.5vw' } },
+          s.teams.map((t, i) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}`, animation: `pop .5s ${i * 0.25}s both` } }, h('span', { class: 'dot', style: { background: t.color } }), t.name))),
+      ];
+    }
+
+    function pyramid(s) {
+      const g = s.games || [];
+      const tier = (from, to, label, delay) => h('div', { class: 'tier' },
+        g.slice(from, to).map((x, i) => h('div', { style: { animationDelay: `${delay + i * 0.15}s` } }, `${x.position}. ${x.title}`)),
+        h('div', { class: 'coin-label', style: { animationDelay: `${delay + 0.6}s` } }, label));
+      return [
+        h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, '4 – 2 – 2'),
+        h('div', { class: 'sub' }, 'Drei Preisstufen, drei Münzen'),
+        h('div', { class: 'pyramid' }, tier(0, 4, '🪙 Münze 1', 0), tier(4, 6, '🪙 Münze 2', 0.8), tier(6, 8, '🪙 Münze 3', 1.4)),
+      ];
+    }
+
+    // Titelanimation: Buchstaben tanzen, dann Titelkarte, dann Ausblenden.
+    function title(s, replay) {
+      const total = (s.settings.titleDurationSec || 7) * 1000;
+      const card = () => h('div', { class: 'title-card' },
+        h('div', { class: 'num' }, s.game.position),
+        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title));
+      if (!replay || s.settings.reducedMotion) return [card()];
+      const letters = h('div', { class: 'letters' }, [...s.game.title].map((ch, i) =>
+        h('span', { style: { animationDelay: `${(i % 7) * -0.1}s` } }, ch === ' ' ? ' ' : ch)));
+      const wrap = h('div', { class: 'title-anim' }, letters);
+      titleTimer = setTimeout(() => {
+        wrap.classList.add('phase-card');
+        wrap.replaceChildren(card());
+        titleTimer = setTimeout(() => wrap.replaceWith(card()), total * 0.4);
+      }, total * 0.6);
+      return [wrap];
+    }
+
+    function game(s) {
+      const v = s.gameView;
+      if (!v) return start(s);
+      const head = h('div', { class: 'sub', style: { marginTop: 0, marginBottom: '3vh' } }, `Spiel ${s.game.position} · ${s.game.title}`);
+      if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title)];
+      if (v.key === 'leichte5') {
+        const out = [head, h('div', { class: 'sub', style: { marginTop: 0 } }, `Frage ${v.qIndex + 1}`)];
+        out.push(h('div', { class: 'q' }, v.question || '…'));
+        if (!v.answers.length && v.question && !v.solution) out.push(h('div', { class: 'sub' }, `${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`));
+        out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
+          const t = teamOf(s, a.teamId);
+          const mark = a.grade === true ? h('span', { class: 'mark ok', 'aria-label': 'richtig' }, '✓') : a.grade === false ? h('span', { class: 'mark bad', 'aria-label': 'falsch' }, '✗') : null;
+          return h('div', { class: 'answer', '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), a.text), mark);
+        })));
+        if (v.solution) out.push(h('div', { class: 'solution' }, `Lösung: ${v.solution}`));
+        return out;
+      }
+      if (v.key === 'trumpf5') {
+        const out = [head,
+          h('div', { class: 'sub', style: { marginTop: 0 } }, `Begriff ${v.termIndex + 1} · Kategorie`),
+          h('div', { class: 'q' }, v.category)];
+        out.push(h('ol', { class: 'hints' }, v.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}`), t))));
+        if (!v.resolved && v.hints.length) out.push(h('div', { class: 'sub' }, `Jetzt noch ${v.value} ${v.value === 1 ? 'Punkt' : 'Punkte'}`));
+        if (v.buzzOrder.length) out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh' } }, v.buzzOrder.map((b) => {
+          const t = teamOf(s, b.teamId);
+          const cls = `chip ${b.teamId === v.answering ? 'answering' : ''} ${b.status === 'wrong' ? 'wrong' : ''}`;
+          const sym = b.status === 'correct' ? '✓' : b.status === 'wrong' ? '✗' : '';
+          return h('span', { class: cls }, h('span', { class: 'dot', style: { background: t.color } }), t.name, sym);
+        })));
+        if (v.term) out.push(h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(s, v.winner).name}` : ''}`));
+        return out;
+      }
+      return [h('div', { class: 'mega' }, s.game.title)];
+    }
+
+    // Rangliste von unten nach oben aufbauen: der letzte Platz erscheint zuerst.
+    function ranking(s) {
+      const list = s.ranking || [];
+      return [
+        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)', marginBottom: '4vh' } }, 'Zwischenstand'),
+        h('ol', { class: 'rank' }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
+          h('span', {}, `${i + 1}.`), h('span', {}, r.name), h('span', { class: 'pts' }, r.points)))),
+      ];
+    }
+
+    function coin(s) {
+      const t = teamOf(s, s.coin.teamId);
+      return [
+        h('div', { class: 'coin-stage' }, h('div', { class: 'coin' }, '★')),
+        h('div', { class: 'sub', style: { marginTop: 0 } }, `Münze nach Spiel ${s.coin.position}`),
+        h('div', { class: 'mega', style: { color: t.color, marginTop: '3vh', animation: 'pop .6s 2.6s both' } }, t.name),
+      ];
+    }
+  </script>
+</body>
+</html>

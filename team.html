@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Quizshow – Team</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <header class="team-head" id="head">
+    <span class="name" id="team-name">Team</span>
+    <span class="muted" id="game-name"></span>
+  </header>
+  <main class="team-main" id="main">
+    <div class="wait"><p class="big">Verbinde …</p></div>
+  </main>
+
+  <script type="module">
+    import { h, connect, run, store } from './assets/js/client.js';
+
+    const params = new URLSearchParams(location.search);
+    const urlCode = params.get('code');
+    if (urlCode) {
+      store('quiz.teamCode', urlCode.trim().toUpperCase());
+      // Code aus der Adresszeile entfernen, damit er nicht versehentlich geteilt wird.
+      history.replaceState(null, '', 'team.html');
+    }
+    const code = store('quiz.teamCode');
+    const expect = params.get('expect');
+    const main = document.getElementById('main');
+    if (!code) location.href = 'index.html';
+
+    // Entwurf der Freitextantwort lokal halten, damit Neuladen nichts löscht.
+    let draftKey = null;
+    let lastRenderKey = null;
+
+    const conn = connect({
+      hello: () => ({ role: 'team', code }),
+      onState: render,
+      onAuthFailed: (m) => leave(m),
+      onKicked: (m) => leave(m),
+    });
+
+    function leave(message) {
+      store('quiz.teamCode', null);
+      main.replaceChildren(h('div', { class: 'wait' },
+        h('p', { class: 'big' }, message || 'Abgemeldet'),
+        h('p', {}, h('a', { class: 'btn', href: 'index.html' }, 'Zur Startseite'))));
+    }
+
+    function render(s) {
+      document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
+      document.title = `${s.team.name} – ${s.show.name}`;
+      document.getElementById('team-name').textContent = s.team.name;
+      document.getElementById('head').style.setProperty('--team', s.team.color);
+      document.getElementById('game-name').textContent = s.game ? `Spiel ${s.game.position}: ${s.game.title}` : s.show.name;
+
+      const parts = [];
+      if (expect && expect !== s.team.id) {
+        parts.push(h('p', { class: 'notice warn', role: 'alert' }, `Achtung: Dieser Code gehört zu „${s.team.name}“.`));
+      }
+      if (s.g1) parts.push(...renderG1(s.g1));
+      else if (s.g5) parts.push(...renderG5(s.g5));
+      else parts.push(h('div', { class: 'wait' },
+        h('p', { class: 'big' }, 'Gleich geht’s los!'),
+        h('p', { class: 'muted' }, 'Wartet auf die Moderation. Dieses Gerät bleibt mit eurem Team verbunden.')));
+      if (s.ranking) {
+        parts.push(h('section', { class: 'card', style: { marginTop: '24px' } }, h('h3', {}, 'Punktestand'),
+          h('ul', { class: 'list' }, s.ranking.map((r) => h('li', {}, h('span', { class: 'dot', style: { background: r.color } }), h('span', { class: 'grow' }, r.name), h('b', {}, r.points))))));
+      }
+
+      // Ein offenes Eingabefeld nicht bei jedem Update neu aufbauen (Fokus/Tastatur bleiben).
+      const key = JSON.stringify([s.team, s.game, s.g1 || s.g5 || null, s.ranking || null]);
+      if (key === lastRenderKey) return;
+      lastRenderKey = key;
+      main.replaceChildren(...parts);
+      const box = document.getElementById('answer');
+      if (box) {
+        box.value = store(draftKey) || '';
+        box.addEventListener('input', () => store(draftKey, box.value));
+      }
+    }
+
+    function stateBox(kind, sym, text) {
+      return h('div', { class: `state ${kind}`, role: 'status' }, h('span', { class: 'sym', 'aria-hidden': 'true' }, sym), text);
+    }
+
+    function renderG1(g) {
+      const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von 5`)];
+      if (!g.question) return [h('div', { class: 'wait' }, h('p', { class: 'big' }, `Frage ${g.qIndex + 1} kommt gleich …`))];
+      out.push(h('p', { class: 'question' }, g.question));
+      if (g.answer) {
+        out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('p', { style: { fontSize: '1.6rem', margin: 0 } }, g.answer.text)));
+        if (g.answer.grade === true) out.push(stateBox('ok', '✓', 'Richtig! +1 Punkt'));
+        else if (g.answer.grade === false) out.push(stateBox('bad', '✗', 'Leider falsch'));
+        else out.push(stateBox('', '🔒', 'Abgegeben und gesperrt – wartet auf die Bewertung'));
+        return out;
+      }
+      if (!g.open) return [...out, stateBox('', '🔒', 'Gesperrt – keine Abgabe mehr möglich')];
+      draftKey = `quiz.draft.g1.${g.qIndex}`;
+      const form = h('form', {
+        onsubmit: async (ev) => {
+          ev.preventDefault();
+          const text = document.getElementById('answer').value.trim();
+          if (!text) return;
+          if (!confirm(`Antwort „${text}“ endgültig abgeben? Danach könnt ihr sie nicht mehr ändern.`)) return;
+          const ok = await run(conn, 'g1.submit', { text });
+          if (ok) store(draftKey, null);
+        },
+      },
+      h('label', { for: 'answer' }, 'Antwort eingeben'),
+      h('textarea', { id: 'answer', class: 'answer-box', maxlength: '200', autocomplete: 'off', placeholder: 'Eure Antwort …' }),
+      h('p', {}, h('button', { class: 'btn pink huge', type: 'submit', style: { width: '100%' } }, 'Abgeben')));
+      out.push(form);
+      return out;
+    }
+
+    function renderG5(g) {
+      const out = [
+        h('p', { class: 'muted' }, `Begriff ${g.termIndex + 1} von 5 · Kategorie`),
+        h('p', { class: 'question' }, g.category),
+        g.hints.length
+          ? h('ol', { class: 'hint-list' }, g.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}. `), t)))
+          : h('p', { class: 'muted' }, 'Noch kein Hinweis freigegeben.'),
+      ];
+      out.push(h('button', {
+        class: 'buzzer', disabled: !g.canBuzz, 'aria-label': 'Buzzer',
+        onclick: () => run(conn, 'g5.buzz'),
+      }, 'BUZZ'));
+      if (g.ownStatus === 'correct') out.push(stateBox('ok', '✓', 'Richtig!'));
+      else if (g.locked) out.push(stateBox('bad', '✗', 'Falsch – für diesen Begriff gesperrt'));
+      else if (g.answering) out.push(stateBox('', '🎤', 'Ihr seid dran – antwortet laut!'));
+      else if (g.buzzed) out.push(stateBox('', '⏳', 'Gebuzzert – ihr seid in der Warteschlange'));
+      else if (g.resolved) out.push(stateBox('', '■', 'Begriff beendet'));
+      return out;
+    }
+  </script>
+</body>
+</html>
