@@ -28,7 +28,6 @@ function textForm(ui, { draftKey, label, placeholder, max, button, confirm, acti
       ev.preventDefault();
       const text = document.getElementById('answer').value.trim();
       if (!text) return;
-      if (!(await ask(confirm(text), { confirmLabel: 'Ja, abgeben' }))) return;
       if (await run(ui.conn, action, payload(text))) ui.clearDraft();
     },
   },
@@ -38,9 +37,9 @@ function textForm(ui, { draftKey, label, placeholder, max, button, confirm, acti
 }
 
 // Großes Schreibfeld für den Apple Pencil statt Tastatur.
-function inkForm(ui, { draftKey, label, button, confirm, action }) {
+function inkForm(ui, { draftKey, label, button, action }) {
   return inkPad({
-    draftKey, label, button, confirm, ask, toast,
+    draftKey, label, button, ask, toast,
     onSubmit: (ink) => run(ui.conn, action, { ink }),
   });
 }
@@ -80,8 +79,7 @@ function leichte5(g, ui) {
   }
   if (!g.open) return [...out, stateBox('', '🔒', 'Gesperrt – keine Abgabe mehr möglich')];
   out.push(inkForm(ui, {
-    draftKey: `g1.${g.qIndex}`, label: 'Eure Antwort', button: 'Abgeben',
-    confirm: 'Antwort endgültig abgeben? Danach könnt ihr sie nicht mehr ändern.', action: 'play.submit',
+    draftKey: `g1.${g.qIndex}`, label: 'Eure Antwort', button: 'Abgeben', action: 'play.submit',
   }));
   return out;
 }
@@ -102,7 +100,7 @@ function dummes(g, ui) {
     selected: g.choice,
     disabled: !canAnswer,
     onPick: canAnswer ? async (l) => {
-      if (await ask(`Antwort ${l} „${g.options[l]}“ sperren?`, { confirmLabel: 'Ja, sperren' })) run(ui.conn, 'play.answer', { choice: l });
+      run(ui.conn, 'play.answer', { choice: l }); // sofort absenden, ohne Rückfrage
     } : null,
   }));
   if (!g.choice) {
@@ -159,7 +157,6 @@ function land(g, ui) {
     class: 'btn pink huge', style: { width: '100%' }, disabled: !landPending,
     onclick: async () => {
       if (!landPending) return;
-      if (!(await ask('Punkt an dieser Stelle setzen und sperren?', { confirmLabel: 'Ja, sperren' }))) return;
       if (await run(ui.conn, 'play.guess', { lat: landPending.lat, lng: landPending.lng })) landPending = null;
     },
   }, 'Punkt sperren');
@@ -212,8 +209,7 @@ function kassenschlager(g, ui) {
   else {
     out.push(stateBox('ok', '✍', 'Ihr seid dran: Schreibt den Filmtitel.'));
     out.push(inkForm(ui, {
-      draftKey: `kassen.${g.movieIndex}.${g.cycle}`, label: 'Filmtitel', button: 'Antwort abgeben',
-      confirm: 'Diesen Filmtitel als Antwort abgeben?', action: 'play.answer',
+      draftKey: `kassen.${g.movieIndex}.${g.cycle}`, label: 'Filmtitel', button: 'Antwort abgeben', action: 'play.answer',
     }));
   }
   return out;
@@ -274,7 +270,7 @@ function jauch(g, ui) {
   out.push(choiceButtons(g.options, {
     selected: g.choice, correct: g.correct, removed: g.removed, disabled: !canAnswer,
     onPick: canAnswer ? async (l) => {
-      if (await ask(`Antwort ${l} „${g.options[l]}“ endgültig sperren?`, { confirmLabel: 'Ja, sperren' })) run(ui.conn, 'play.answer', { choice: l });
+      run(ui.conn, 'play.answer', { choice: l }); // sofort absenden, ohne Rückfrage
     } : null,
   }));
   if (g.revealed) {
@@ -319,7 +315,7 @@ function nerd(g, ui) {
         ev.preventDefault();
         const bid = Number(input.value);
         if (!Number.isInteger(bid) || bid < 1) return;
-        if (await ask(`Gebot ${bid} geheim abgeben und sperren?`, { confirmLabel: 'Ja, bieten' })) run(ui.conn, 'play.bid', { bid });
+        run(ui.conn, 'play.bid', { bid }); // sofort absenden, ohne Rückfrage
       },
     }, input, h('button', { class: 'btn pink huge', type: 'submit' }, 'Gebot abgeben')));
     return out;

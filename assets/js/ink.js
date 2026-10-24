@@ -71,9 +71,9 @@ function drawStrokes(ctx, strokes, w, hgt, color = '#111', weight = 1) {
   }
 }
 
-// Großes Schreibfeld. onSubmit(dataUrl) wird nach Bestätigung aufgerufen und
+// Großes Schreibfeld. onSubmit(dataUrl) wird beim Abgeben sofort aufgerufen und
 // gibt true zurück, wenn die Abgabe geklappt hat.
-export function inkPad({ draftKey, label, button, confirm, onSubmit, ask, toast }) {
+export function inkPad({ draftKey, label, button, onSubmit, ask, toast }) {
   const strokes = loadDraft(draftKey);
   const canvas = h('canvas', { class: 'ink-canvas', 'aria-label': `${label} – mit dem Stift hineinschreiben`, role: 'img' });
   const hint = h('p', { class: 'ink-hint' }, 'Mit dem Apple Pencil in das weiße Feld schreiben');
@@ -174,8 +174,12 @@ export function inkPad({ draftKey, label, button, confirm, onSubmit, ask, toast 
 
   const submit = h('button', { type: 'button', class: 'btn pink huge', style: { width: '100%' }, onclick: async () => {
     if (!strokes.length) return toast('Bitte zuerst eure Antwort in das Feld schreiben.');
-    if (!(await ask(confirm, { confirmLabel: 'Ja, abgeben' }))) return;
-    if (await onSubmit(exportPng())) clearInkDraft(draftKey);
+    submit.disabled = true; // Doppeltipp verhindern
+    try {
+      if (await onSubmit(exportPng())) clearInkDraft(draftKey);
+    } finally {
+      submit.disabled = false;
+    }
   } }, button);
 
   return h('div', { class: 'ink' },
