@@ -6,8 +6,8 @@
   <title>Wer stiehlt uns die Show – Beamer</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
-  <div class="shapes" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+<body class="beamer-page">
+  <div class="studio-bg" id="studio-bg" aria-hidden="true"></div>
   <main class="beamer"><div class="stage" id="stage"></div></main>
   <button id="sound-on" class="btn small ghost" style="position:fixed;left:12px;bottom:12px">🔊 Ton aktivieren</button>
 
@@ -91,57 +91,178 @@
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
 
+    // ---- Neon-Studiobühne als Hintergrund (SVG, skaliert mit dem Bildschirm) ----
+    (function studio() {
+      const W = 1600, H = 900;
+      const tri = (x, y, size, dim) => `<polygon class="tri${dim ? ' dim' : ''}" points="${x},${y - size * 0.58} ${x + size / 2},${y + size * 0.29} ${x - size / 2},${y + size * 0.29}"/>`;
+      let tris = '';
+      const rows = [[150, 6], [250, 6], [350, 5], [450, 3], [550, 1]];
+      rows.forEach(([y, n], r) => {
+        for (let i = 0; i < n; i++) {
+          const x = 120 + i * 92 + r * 18;
+          const size = 58 - r * 2;
+          tris += tri(x, y, size, (i + r) % 3 === 2) + tri(W - x, y, size, (i + r) % 3 === 1);
+        }
+      });
+      const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="neon" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <linearGradient id="spot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fe8ff" stop-opacity="0.55"/><stop offset="1" stop-color="#1fd6f2" stop-opacity="0"/></linearGradient>
+          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff2d8a" stop-opacity="0"/><stop offset="0.5" stop-color="#ff2d8a" stop-opacity="0.18"/><stop offset="1" stop-color="#1fd6f2" stop-opacity="0.12"/></linearGradient>
+        </defs>
+        <polygon class="spot" points="330,0 370,0 560,700 140,700"/>
+        <polygon class="spot" points="${W - 370},0 ${W - 330},0 ${W - 140},700 ${W - 560},700"/>
+        <polygon class="spot" points="640,0 660,0 760,560 540,560" opacity="0.5"/>
+        <polygon class="spot" points="${W - 660},0 ${W - 640},0 ${W - 540},560 ${W - 760},560" opacity="0.5"/>
+        <g>${tris}</g>
+        <polygon class="beam-pink" points="0,40 34,40 300,640 262,640"/>
+        <polygon class="beam-cyan" points="0,250 24,250 220,700 194,700" opacity="0.9"/>
+        <polygon class="beam-pink" points="${W},40 ${W - 34},40 ${W - 300},640 ${W - 262},640"/>
+        <polygon class="beam-cyan" points="${W},250 ${W - 24},250 ${W - 220},700 ${W - 194},700" opacity="0.9"/>
+        <rect x="0" y="640" width="${W}" height="${H - 640}" fill="url(#floor)"/>
+        <ellipse class="floor-line" cx="800" cy="905" rx="980" ry="150" stroke="#ff2d8a"/>
+        <ellipse class="floor-line" cx="800" cy="905" rx="820" ry="95" stroke="#1fd6f2"/>
+        <ellipse class="floor-line" cx="800" cy="660" rx="700" ry="18" stroke="#1fd6f2" opacity="0.7"/>
+      </svg>`;
+      document.getElementById('studio-bg').innerHTML = svg;
+    })();
+
+    // Show-Logo: Wörter gestapelt, „uns“ hervorgehoben.
+    function showLogo(name, small) {
+      const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+      return h('div', { class: `show-logo${small ? ' small' : ''}`, role: 'heading', 'aria-level': '1', 'aria-label': name },
+        words.map((w, i) => h('span', { class: /^uns$/i.test(w) ? 'hot' : '', style: { animationDelay: `${i * 0.12}s` } }, w)));
+    }
+
+    // Gewinnstufe zur Münzposition (nach Spiel 4, 6, 8).
+    const STAGE_OF = { 4: 1, 6: 2, 8: 3 };
+
     function start(s) {
       return [
-        h('div', { class: 'logo', 'aria-hidden': 'true' }, h('span', { class: 'logo-mark', style: { width: '14vh', height: '14vh' } }, h('i', { class: 'a' }), h('i', { class: 'b' }))),
-        h('div', { class: 'mega' }, s.show.name),
-        h('div', { class: 'sub' }, s.show.subtitle),
+        showLogo(s.show.name),
+        s.show.subtitle ? h('div', { class: 'sub', style: { marginTop: '3vh' } }, s.show.subtitle) : '',
       ];
     }
 
+    // Teampulte aus dem Show-Bild; Nummer im schwarzen Feld, Name darunter.
+    const PODIUMS = [
+      [68, 180, 87, 216], [214, 167, 234, 202], [340, 155, 360, 191],
+      [556, 156, 576, 192], [692, 166, 711, 202], [832, 180, 852, 216],
+    ];
     function intro(s) {
+      const W = 938, H = 336;
+      const pct = (v, total) => `${(v / total) * 100}%`;
+      const shown = s.teams.slice(0, PODIUMS.length);
+      const scene = h('div', { class: 'scene scene-teams' },
+        h('img', { src: 'assets/img/studio-teams.webp', alt: '' }),
+        // Alle Felder überdecken (im Bild steht „0“); freie Pulte bleiben leer.
+        PODIUMS.map(([x0, y0, x1, y1], i) => h('div', { class: 'overlay', style: { left: pct(x0, W), top: pct(y0, H), width: pct(x1 - x0 + 1, W), height: pct(y1 - y0 + 1, H) } }, i < shown.length ? String(i + 1) : '')),
+        shown.map((t, i) => {
+          const [x0, , x1] = PODIUMS[i];
+          return h('div', { class: 'name', '--team': t.color, style: { left: pct((x0 + x1) / 2, W), animationDelay: `${0.4 + i * 0.25}s` } }, t.name);
+        }));
+      const rest = s.teams.slice(PODIUMS.length);
       return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)' } }, `Willkommen bei ${s.show.name}!`),
-        h('div', { class: 'sub' }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
-        h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '5vh', gap: '1.5vw' } },
-          s.teams.map((t, i) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}`, animation: `pop .5s ${i * 0.25}s both` } }, h('span', { class: 'dot', style: { background: t.color } }), t.name))),
+        h('div', { class: 'kicker' }, 'Willkommen bei'),
+        h('div', { style: { margin: '1vh 0 2.5vh' } }, showLogo(s.show.name, true)),
+        scene,
+        rest.length ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh', gap: '1vw' } },
+          rest.map((t) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}` } }, t.name))) : '',
+        h('div', { class: 'sub', style: { marginTop: '2.5vh' } }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
       ];
     }
 
+    // 4-2-2-Pyramide: Kategorien 1–4, Gewinnstufe 1, Kategorien 5–6,
+    // Gewinnstufe 2, Kategorien 7–8, Gewinnstufe 3, ganz oben das Finale.
     function pyramid(s) {
-      const g = s.games || [];
-      const tier = (from, to, label, delay) => h('div', { class: 'tier' },
-        g.slice(from, to).map((x, i) => h('div', { style: { animationDelay: `${delay + i * 0.15}s` } }, `${x.position}. ${x.title}`)),
-        h('div', { class: 'coin-label', style: { animationDelay: `${delay + 0.6}s` } }, label));
-      return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, '4 – 2 – 2'),
-        h('div', { class: 'sub' }, 'Drei Preisstufen, drei Münzen'),
-        h('div', { class: 'pyramid' }, tier(0, 4, '🪙 Münze 1', 0), tier(4, 6, '🪙 Münze 2', 0.8), tier(6, 8, '🪙 Münze 3', 1.4)),
+      const NS = 'http://www.w3.org/2000/svg';
+      const el = (tag, attrs, text) => {
+        const n = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+        if (text !== undefined) n.textContent = text;
+        return n;
+      };
+      const W = 1000, apexY = 0, baseY = 880, baseHalf = 430, gap = 6;
+      const half = (y) => baseHalf * ((y - apexY) / (baseY - apexY));
+      // Bänder von oben nach unten: [Art, Beschriftung, Höhe]
+      const bands = [
+        ['finale', 'FINALE', 250],
+        ['k3', 'KATEGORIE 8', 50], ['k3', 'KATEGORIE 7', 50],
+        ['stage', 'GEWINNSTUFE 3', 48],
+        ['k2', 'KATEGORIE 6', 60], ['k2', 'KATEGORIE 5', 60],
+        ['stage', 'GEWINNSTUFE 2', 48],
+        ['k1', 'KATEGORIE 4', 50], ['k1', 'KATEGORIE 3', 50], ['k1', 'KATEGORIE 2', 50], ['k1', 'KATEGORIE 1', 50],
+        ['stage', 'GEWINNSTUFE 1', 48],
       ];
+      const total = bands.reduce((a, b) => a + b[2], 0) + gap * (bands.length - 1);
+      const scale = (baseY - apexY) / total;
+      const svg = el('svg', { viewBox: `-40 -10 ${W + 80} ${baseY + 30}`, role: 'img', 'aria-label': 'Pyramide 4 – 2 – 2 bis zum Finale' });
+      const defs = el('defs', {});
+      const grad = (id, stops) => {
+        const g = el('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
+        stops.forEach(([o, c]) => g.append(el('stop', { offset: o, 'stop-color': c })));
+        defs.append(g);
+      };
+      grad('g-finale', [[0, '#f0b45a'], [0.55, '#c9802c'], [1, '#8f5317']]);
+      grad('g-k3', [[0, '#b9d2e8'], [1, '#86a6c4']]);
+      grad('g-k2', [[0, '#7a848f'], [1, '#55606b']]);
+      grad('g-k1', [[0, '#5b7287'], [1, '#3f5367']]);
+      grad('g-stage', [[0, '#ffffff'], [0.5, '#e9e9ee'], [1, '#cfd0d8']]);
+      svg.append(defs);
+      const current = s.game ? s.game.position : null;
+      let y = apexY;
+      const order = [];
+      bands.forEach((b, idx) => {
+        const hgt = b[2] * scale;
+        const y0 = y, y1 = y + hgt;
+        const ext = b[0] === 'stage' ? 26 : 0;
+        const h0 = b[0] === 'finale' ? 0 : half(y0) + ext, h1 = half(y1) + ext;
+        const pts = `${W / 2 - h0},${y0} ${W / 2 + h0},${y0} ${W / 2 + h1},${y1} ${W / 2 - h1},${y1}`;
+        const g = el('g', { class: 'pyr-band' });
+        const num = /KATEGORIE (\d)/.exec(b[1]);
+        if (num && Number(num[1]) === current) g.setAttribute('class', 'pyr-band pyr-current');
+        const isCurrent = num && Number(num[1]) === current;
+        g.append(el('polygon', isCurrent
+          ? { points: pts, fill: `url(#g-${b[0]})`, stroke: '#ff2d8a', 'stroke-width': 7, 'stroke-linejoin': 'round' }
+          : { points: pts, fill: `url(#g-${b[0]})` }));
+        if (b[0] !== 'finale' && b[0] !== 'stage') g.append(el('line', { x1: W / 2 - h0 + 4, y1: y0 + 1, x2: W / 2 + h0 - 4, y2: y0 + 1, stroke: 'rgba(255,255,255,0.25)', 'stroke-width': 1.5 }));
+        const cls = b[0] === 'stage' ? 'pyr-stage' : b[0] === 'finale' ? 'pyr-finale' : 'pyr-label';
+        const fs = b[0] === 'finale' ? 52 : b[0] === 'stage' ? 30 : 26;
+        const ty = b[0] === 'finale' ? y1 - hgt * 0.22 : (y0 + y1) / 2 + fs * 0.36;
+        g.append(el('text', { x: W / 2, y: ty, 'text-anchor': 'middle', class: cls, 'font-size': fs }, b[1]));
+        if (num && s.games) {
+          const gm = s.games[Number(num[1]) - 1];
+          if (gm) g.append(el('title', {}, gm.title));
+        }
+        order.unshift(g);
+        svg.append(g);
+        y = y1 + gap * scale;
+      });
+      // Von unten nach oben einblenden.
+      order.forEach((g, i) => { g.style.animationDelay = `${i * 0.12}s`; });
+      return [h('div', { class: 'pyr-wrap' }, svg)];
     }
 
-    // Titelanimation: Buchstaben tanzen, dann Titelkarte, dann Ausblenden.
-    function title(s, replay) {
-      const total = (s.settings.titleDurationSec || 7) * 1000;
-      const card = () => h('div', { class: 'title-card' },
-        h('div', { class: 'num' }, s.game.position),
-        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)' } }, s.game.title));
-      if (!replay || s.settings.reducedMotion) return [card()];
-      const letters = h('div', { class: 'letters' }, [...s.game.title].map((ch, i) =>
-        h('span', { style: { animationDelay: `${(i % 7) * -0.1}s` } }, ch === ' ' ? ' ' : ch)));
-      const wrap = h('div', { class: 'title-anim' }, letters);
-      titleTimer = setTimeout(() => {
-        wrap.classList.add('phase-card');
-        wrap.replaceChildren(card());
-        titleTimer = setTimeout(() => wrap.replaceWith(card()), total * 0.4);
-      }, total * 0.6);
-      return [wrap];
+    // Spieltitel: Fernseher mit Kachelschrift „KATEGORIE n“ und großem Titel.
+    function titleCard(s, opts = {}) {
+      const label = `Kategorie ${s.game.position}`;
+      const line = Array(14).fill(label).join(' ');
+      const tiles = h('div', { class: 'tv-tiles', 'aria-hidden': 'true' },
+        Array.from({ length: 10 }, (_, i) => h('div', { class: i % 3 === 1 ? 'ghost' : '' }, `${line} ${line}`)));
+      const letters = [...s.game.title].map((ch, i) => h('span', { style: { animationDelay: `${0.3 + i * 0.04}s` } }, ch === ' ' ? ' ' : ch));
+      return h('div', { class: `tv${opts.compact ? ' compact' : ''}` },
+        h('div', { class: 'tv-screen' }, tiles,
+          h('div', { class: 'tv-plate' }, h('span', { class: 'tv-num' }, label), h('div', { class: 'tv-title' }, letters))));
+    }
+
+    function title(s) {
+      return [titleCard(s)];
     }
 
     function game(s) {
       const v = s.gameView;
       if (!v) return start(s);
-      if (v.waiting && v.type !== 'land') return [h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)' } }, s.game.title)];
+      if (v.waiting && v.type !== 'land') return [titleCard(s, { compact: true })];
       return renderGame(v, s, (id) => teamOf(s, id));
     }
 
@@ -155,12 +276,19 @@
       ];
     }
 
+    // Münze / Gewinnstufe: Moderationspult aus dem Show-Bild, Bildschirm zeigt die Stufe.
     function coin(s) {
       const t = teamOf(s, s.coin.teamId);
+      const stage = STAGE_OF[s.coin.position];
+      const W = 938, H = 530, scr = [389, 34, 547, 157];
+      const pct = (v, total) => `${(v / total) * 100}%`;
       return [
-        h('div', { class: 'coin-stage' }, h('div', { class: 'coin' }, '★')),
-        h('div', { class: 'sub', style: { marginTop: 0 } }, `Münze nach Spiel ${s.coin.position}`),
-        h('div', { class: 'mega', style: { color: t.color, marginTop: '3vh', animation: 'pop .6s 2.6s both' } }, t.name),
+        h('div', { class: 'scene scene-pult' },
+          h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
+          h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
+            stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
+          h('div', { class: 'scene-coin', 'aria-hidden': 'true' }, '★'),
+          h('div', { class: 'scene-banner', '--team': t.color }, `Münze an ${t.name}`)),
       ];
     }
   </script>

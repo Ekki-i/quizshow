@@ -1,4 +1,5 @@
 <title>Wer stiehlt uns die Show – Prototyp</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;600;700;800&display=swap">
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
   /* Leitstand: alle Bildschirme der Show nebeneinander, jeder in echter Größe skaliert. */
@@ -11,14 +12,14 @@
     --pink: #ff2e88;
     --yellow: #ffd400;
     --cyan: #00d1ff;
-    --font: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-    --font-display: "Arial Black", "Segoe UI Black", Impact, system-ui, sans-serif;
+    --font: "Jost", "Futura", "Century Gothic", "Segoe UI", system-ui, sans-serif;
+    --font-display: "Jost", "Futura", "Century Gothic", "Arial Black", system-ui, sans-serif;
     color-scheme: dark;
   }
   body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; }
   .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; max-width: 1600px; margin: 0 auto; }
   header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
-  h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; }
   h1 span { color: var(--pink); }
   .lead { color: var(--muted); max-width: 70ch; margin: 6px 0 0; line-height: 1.5; }
   .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }

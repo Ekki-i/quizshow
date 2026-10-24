@@ -125,8 +125,23 @@ function buildPage(file) {
   } else throw new Error(`Kein Skript in ${file}`);
   const js = pageCode(bundle(entry.code, entry.dir));
   html = html.replace(entry.tag, () => `<script>${PRELUDE.replace(/<\/(script)/gi, '<\\/$1')}</script>\n<script>${js}</script>`);
+  html = inlineImages(html);
   if (/(src|href)="(assets|demo)\//.test(html)) throw new Error(`Externe Datei in ${file} übrig`);
   return html;
+}
+
+// Bilder aus assets/img als data:-URIs einbetten.
+const MIME = { '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml' };
+const imageCache = {};
+function inlineImages(text) {
+  return text.replace(/assets\/img\/([\w.-]+)/g, (_, name) => {
+    if (!imageCache[name]) {
+      const file = path.join(SRC, 'assets', 'img', name);
+      const mime = MIME[path.extname(name).toLowerCase()] || 'application/octet-stream';
+      imageCache[name] = `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
+    }
+    return imageCache[name];
+  });
 }
 
 const pages = {};

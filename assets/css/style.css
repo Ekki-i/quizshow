@@ -1,23 +1,33 @@
-/* Design-Tokens: alle Farben, Formen und Tempi an einer Stelle. */
+/* Schrift: Jost – geometrisch, im Stil von Futura (wie im Show-Logo). */
+@import url("https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&display=swap");
+
+/* Design-Tokens: alle Farben, Formen und Tempi an einer Stelle.
+   Look: dunkle Studiobühne mit Neon-Pink und Cyan, Lachs für Spieltitel,
+   Gold für das Finale. */
 :root {
-  --bg: #14062e;
-  --bg-2: #240b52;
-  --surface: #2d1163;
-  --surface-2: #3a1880;
+  --bg: #07081a;
+  --bg-2: #141436;
+  --surface: #17193a;
+  --surface-2: #272a58;
   --text: #ffffff;
-  --text-muted: #c9b8f0;
-  --accent: #ff2e88;
-  --accent-2: #ffd400;
-  --accent-3: #00d1ff;
+  --text-muted: #b9bde0;
+  --accent: #ff2d8a;
+  --accent-2: #ffc23d;
+  --accent-3: #1fd6f2;
+  --salmon: #ff8a7a;
+  --gold: #d99a3e;
+  --slate-1: #4d6377;
+  --slate-2: #67727e;
+  --slate-3: #a7c2da;
   --ok: #2bd96b;
   --bad: #ff4a4a;
   --warn: #ffb020;
   --radius: 18px;
   --radius-sm: 10px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --glow: 0 0 24px rgba(255, 46, 136, 0.55);
-  --font: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-  --font-display: "Arial Black", "Segoe UI Black", Impact, system-ui, sans-serif;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --glow: 0 0 24px rgba(255, 45, 138, 0.6);
+  --font: "Jost", "Futura", "Century Gothic", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Jost", "Futura", "Century Gothic", "Arial Black", system-ui, sans-serif;
   --speed: 1;
   color-scheme: dark;
 }
@@ -35,7 +45,7 @@ body {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
 
-h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.01em; margin: 0 0 0.5em; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.01em; margin: 0 0 0.5em; }
 a { color: var(--accent-3); }
 .muted { color: var(--text-muted); }
 .hidden { display: none !important; }
@@ -51,7 +61,7 @@ a { color: var(--accent-3); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font: 700 1rem var(--font); color: #14062e; background: var(--accent-2);
+  font: 700 1rem var(--font); color: #1a0f00; background: var(--accent-2);
   border: 0; border-radius: var(--radius-sm); padding: 12px 18px; min-height: 48px;
   cursor: pointer; text-decoration: none; box-shadow: var(--shadow);
   transition: transform 0.12s ease, filter 0.12s ease;
@@ -100,7 +110,7 @@ label { display: block; font-weight: 600; margin: 10px 0 6px; }
 .logo-mark i { position: absolute; display: block; }
 .logo-mark .a { inset: 0; background: var(--accent); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .logo-mark .b { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-2); right: -6px; top: -4px; mix-blend-mode: screen; }
-.logo-text { font-family: var(--font-display); font-size: 1.6rem; text-transform: uppercase; }
+.logo-text { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; text-transform: uppercase; }
 
 /* Startseite */
 .hero { text-align: center; padding: 32px 0 12px; }
@@ -115,7 +125,7 @@ label { display: block; font-weight: 600; margin: 10px 0 6px; }
 
 /* Teamansicht (iPad) */
 .team-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 6px solid var(--team, var(--accent)); background: var(--surface); }
-.team-head .name { font-family: var(--font-display); font-size: 1.5rem; }
+.team-head .name { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; }
 .team-main { max-width: 820px; margin: 0 auto; padding: 24px 16px 80px; }
 .question { font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 800; margin: 8px 0 20px; }
 .answer-box { font-size: 1.6rem; min-height: 140px; }
@@ -129,7 +139,7 @@ label { display: block; font-weight: 600; margin: 10px 0 6px; }
 .buzzer:active { transform: translateY(8px); box-shadow: 0 6px 0 #7a003b; }
 .buzzer:disabled { background: #555; box-shadow: 0 14px 0 #333; cursor: not-allowed; }
 .wait { text-align: center; padding: 60px 16px; }
-.wait .big { font-family: var(--font-display); font-size: 2rem; }
+.wait .big { font-family: var(--font-display); font-weight: 800; font-size: 2rem; }
 
 /* Moderation */
 .mod-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; background: var(--surface); position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
@@ -153,7 +163,7 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 /* Beamer */
 .beamer { overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 4vh 4vw; }
 .beamer .stage { width: 100%; }
-.beamer .mega { font-family: var(--font-display); font-size: clamp(1rem, min(8vw, 15vh), 9rem); text-wrap: balance; text-transform: uppercase; line-height: 0.95; text-shadow: var(--glow); }
+.beamer .mega { font-family: var(--font-display); font-weight: 800; font-size: clamp(1rem, min(8vw, 15vh), 9rem); text-wrap: balance; text-transform: uppercase; line-height: 0.95; text-shadow: var(--glow); }
 .beamer .sub { font-size: clamp(0.7rem, 2.6vw, 2.4rem); color: var(--text-muted); margin-top: 2vh; }
 .beamer .q { font-size: clamp(2rem, 4.4vw, 4.4rem); font-weight: 800; margin-bottom: 4vh; }
 .beamer .answers { display: grid; grid-template-columns: repeat(auto-fit, minmax(28vw, 1fr)); gap: 2vh 2vw; }
@@ -162,7 +172,7 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 .beamer .mark { font-size: 1.4em; font-weight: 900; padding: 0 0.3em; border-radius: 12px; }
 .beamer .mark.ok { background: var(--ok); color: #062b14; }
 .beamer .mark.bad { background: var(--bad); }
-.beamer .solution { margin-top: 4vh; font-size: clamp(1.6rem, 3.4vw, 3.6rem); background: var(--accent-2); color: #14062e; display: inline-block; padding: 1.5vh 3vw; border-radius: var(--radius); font-weight: 900; animation: pop 0.5s ease-out; }
+.beamer .solution { margin-top: 4vh; font-size: clamp(1.6rem, 3.4vw, 3.6rem); background: var(--accent-2); color: #1a0f00; display: inline-block; padding: 1.5vh 3vw; border-radius: var(--radius); font-weight: 900; animation: pop 0.5s ease-out; }
 .beamer .hints { list-style: none; padding: 0; margin: 0 auto; max-width: 80vw; display: grid; gap: 1.5vh; }
 .beamer .hints li { background: var(--surface); font-size: clamp(1.4rem, 2.8vw, 3rem); padding: 1.5vh 2vw; border-radius: var(--radius); text-align: left; animation: slideIn 0.5s ease-out; }
 .beamer .hints li b { color: var(--accent-2); margin-right: 1vw; }
@@ -177,18 +187,18 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 .pyramid { display: flex; flex-direction: column-reverse; align-items: center; gap: 1.5vh; margin-top: 4vh; }
 .pyramid .tier { display: flex; gap: 1vw; justify-content: center; }
 .pyramid .tier div { background: var(--surface); border-radius: var(--radius-sm); padding: 1.2vh 1.2vw; font-weight: 800; font-size: clamp(0.9rem, 1.4vw, 1.4rem); width: 17vw; animation: pop 0.5s ease-out both; }
-.pyramid .tier .coin-label { width: auto; background: var(--accent-2); color: #14062e; }
+.pyramid .tier .coin-label { width: auto; background: var(--accent-2); color: #1a0f00; }
 
 /* Spieltitel-Animation: Buchstaben tanzen, dann Titelkarte */
 .title-anim { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--accent); }
-.title-anim .letters { font-family: var(--font-display); font-size: clamp(3rem, 9vw, 9rem); text-transform: uppercase; color: #fff; padding: 0 4vw; line-height: 1.05; }
+.title-anim .letters { font-family: var(--font-display); font-weight: 800; font-size: clamp(3rem, 9vw, 9rem); text-transform: uppercase; color: #fff; padding: 0 4vw; line-height: 1.05; }
 .title-anim .letters span { display: inline-block; animation: dance calc(0.7s * var(--speed)) ease-in-out infinite alternate; }
 .title-anim.phase-card { background: var(--bg); }
 .title-card { animation: pop 0.5s ease-out; }
-.title-card .num { font-family: var(--font-display); font-size: clamp(5rem, 16vw, 16rem); color: var(--accent-2); line-height: 1; }
+.title-card .num { font-family: var(--font-display); font-weight: 800; font-size: clamp(5rem, 16vw, 16rem); color: var(--accent-2); line-height: 1; }
 
 .coin-stage { perspective: 800px; }
-.coin { width: 34vh; height: 34vh; margin: 0 auto 4vh; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, var(--accent-2) 45%, #b38600); box-shadow: 0 0 60px rgba(255, 212, 0, 0.6); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 10vh; color: #7a5a00; animation: spin calc(3s * var(--speed)) ease-out; }
+.coin { width: 34vh; height: 34vh; margin: 0 auto 4vh; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, var(--accent-2) 45%, #b38600); box-shadow: 0 0 60px rgba(255, 212, 0, 0.6); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 10vh; color: #7a5a00; animation: spin calc(3s * var(--speed)) ease-out; }
 
 @keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -221,7 +231,7 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 .slot.over { border-color: var(--accent-3); background: var(--surface-2); }
 .slot.empty { border-style: dashed; align-items: center; }
 .slot.empty .btn { grid-column: 2; justify-self: start; }
-.slot-pos { font-family: var(--font-display); font-size: 1.8rem; color: var(--accent-2); line-height: 1; grid-row: span 2; min-width: 1.4em; text-align: center; }
+.slot-pos { font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; color: var(--accent-2); line-height: 1; grid-row: span 2; min-width: 1.4em; text-align: center; }
 .slot-body { display: grid; gap: 4px; min-width: 0; }
 .slot-title { overflow-wrap: anywhere; }
 .slot-type { font-size: 0.85rem; }
@@ -253,7 +263,7 @@ details.item summary { cursor: pointer; padding: 4px 0; overflow-wrap: anywhere;
 /* A–D-Auswahl auf dem iPad */
 .abcd { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 8px 0 12px; }
 .abcd-opt { display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 14px 18px; border-radius: var(--radius); border: 3px solid var(--surface-2); background: var(--surface); color: var(--text); font: 700 1.3rem var(--font); text-align: left; cursor: pointer; }
-.abcd-opt b { font-family: var(--font-display); font-size: 1.6rem; color: var(--accent-2); min-width: 1.2em; }
+.abcd-opt b { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; color: var(--accent-2); min-width: 1.2em; }
 .abcd-opt:disabled { cursor: default; opacity: 0.75; }
 .abcd-opt.selected { border-color: var(--accent); opacity: 1; box-shadow: var(--glow); }
 .abcd-opt.correct { border-color: var(--ok); background: var(--ok); color: #062b14; opacity: 1; }
@@ -276,12 +286,12 @@ details.item summary { cursor: pointer; padding: 4px 0; overflow-wrap: anywhere;
 .beamer .map-box.beamer-map { max-width: min(88vw, 130vh); margin: 0 auto; }
 
 /* Kassenschlager-Paywall */
-.wallet { font-family: var(--font-display); font-size: 1.6rem; color: var(--accent-2); }
+.wallet { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; color: var(--accent-2); }
 .paywall { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .paywall .hint { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px; padding: 10px 12px; border-radius: var(--radius-sm); border: 2px solid var(--surface-2); background: var(--surface); color: var(--text); font: 600 0.95rem var(--font); text-align: left; cursor: pointer; }
 .paywall .hint:disabled { cursor: default; opacity: 0.55; }
 .paywall .hint.bought { opacity: 1; border-color: var(--accent-2); background: var(--surface-2); }
-.paywall .hint .price { font-family: var(--font-display); font-size: 1.3rem; color: var(--accent-2); }
+.paywall .hint .price { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; color: var(--accent-2); }
 .paywall .hint .text { font-size: 1.1rem; font-weight: 800; color: #fff; }
 
 /* Musikquiz-Brett */
@@ -310,7 +320,7 @@ button.cell:disabled { cursor: default; }
 /* A–D auf dem Beamer */
 .beamer .options { display: grid; grid-template-columns: 1fr 1fr; gap: 2vh 2vw; max-width: 90vw; margin: 0 auto; }
 .beamer .opt { display: flex; align-items: center; gap: 1.5vw; background: var(--surface); border-radius: var(--radius); padding: 2vh 2vw; font-size: clamp(1.2rem, 2.6vw, 2.8rem); font-weight: 800; text-align: left; border: 0.4vw solid transparent; }
-.beamer .opt b { font-family: var(--font-display); color: var(--accent-2); }
+.beamer .opt b { font-family: var(--font-display); font-weight: 800; color: var(--accent-2); }
 .beamer .opt .grow { flex: 1; }
 .beamer .opt .marks { display: flex; gap: 0.4vw; }
 .beamer .opt .marks .dot { width: 1.6vw; height: 1.6vw; min-width: 14px; min-height: 14px; }
@@ -321,7 +331,7 @@ button.cell:disabled { cursor: default; }
 .bid-input { font-size: 2rem; width: 8ch; text-align: center; }
 .beamer .q.finale { color: var(--accent-2); text-shadow: var(--glow); }
 .beamer .nerd-score { display: flex; align-items: center; justify-content: center; gap: 4vw; margin-top: 4vh; font-size: clamp(1.4rem, 3vw, 3rem); font-weight: 900; }
-.beamer .nerd-score .big-num { font-family: var(--font-display); font-size: 2.2em; }
+.beamer .nerd-score .big-num { font-family: var(--font-display); font-weight: 800; font-size: 2.2em; }
 .beamer .nerd-score .x { opacity: 0.25; margin: 0 0.15em; }
 .beamer .nerd-score .x.on { opacity: 1; color: var(--bad); }
 .beamer .named { display: flex; flex-wrap: wrap; justify-content: center; gap: 1vh 1vw; margin-top: 3vh; }
@@ -330,3 +340,80 @@ button.cell:disabled { cursor: default; }
 .beamer .q.compact { font-size: clamp(1.5rem, 3.2vw, 3.2rem); margin-bottom: 2.5vh; }
 .beamer .options.compact .opt { padding: 1.2vh 2vw; font-size: clamp(1.1rem, 2.2vw, 2.4rem); }
 .grid > .card + .card { margin-top: 0; }
+
+/* ==========================================================================
+   Beamer-Design „Wer stiehlt uns die Show“: Neon-Studiobühne
+   ========================================================================== */
+
+body.beamer-page { background: #05060f; }
+.studio-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: radial-gradient(ellipse 70% 60% at 50% 38%, #141a3c 0%, #070818 60%, #03040b 100%); }
+.studio-bg svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.studio-bg .tri { fill: none; stroke: #ff3d7f; stroke-width: 2.4; filter: url(#neon); opacity: 0.9; }
+.studio-bg .tri.dim { opacity: 0.45; }
+.studio-bg .beam-pink { fill: #ff2d8a; filter: url(#neon); }
+.studio-bg .beam-cyan { fill: #1fd6f2; filter: url(#neon); }
+.studio-bg .floor-line { fill: none; stroke-width: 3; filter: url(#neon); }
+.studio-bg .spot { fill: url(#spot); mix-blend-mode: screen; }
+.studio-bg .tri { animation: neonFlicker 6s ease-in-out infinite; }
+.studio-bg .tri:nth-child(3n) { animation-delay: -2s; }
+.studio-bg .tri:nth-child(5n) { animation-delay: -4s; }
+@keyframes neonFlicker { 0%, 100% { opacity: 0.9; } 48% { opacity: 0.9; } 50% { opacity: 0.55; } 52% { opacity: 0.9; } }
+
+.beamer { font-family: var(--font-display); }
+
+/* Show-Logo: Wörter gestapelt, weiß mit schwarzer Kontur, „UNS“ in Neon-Pink */
+.show-logo { display: inline-flex; flex-direction: column; align-items: center; line-height: 0.92; font-weight: 800; text-transform: uppercase; font-size: clamp(1rem, min(9.5vw, 13vh), 10rem); letter-spacing: 0.02em; }
+.show-logo span { color: #fff; -webkit-text-stroke: 0.045em #0a0a0a; paint-order: stroke fill; text-shadow: 0.05em 0.06em 0 rgba(0, 0, 0, 0.85); animation: logoIn calc(0.6s * var(--speed)) cubic-bezier(.2,1.4,.4,1) both; }
+.show-logo span.hot { font-size: 1.55em; line-height: 0.9; color: #ff4fb0; -webkit-text-stroke: 0.035em #ffd0ea; text-shadow: 0.045em 0.05em 0 #b0125f, 0 0 0.4em rgba(255, 45, 138, 0.55); }
+.show-logo.small { font-size: clamp(0.55rem, min(2.4vw, 3.6vh), 2.6rem); }
+@keyframes logoIn { from { transform: translateY(0.4em) scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.beamer .sub { font-weight: 600; letter-spacing: 0.02em; }
+.beamer .kicker { font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-3); font-size: clamp(0.8rem, 2vw, 2rem); text-shadow: 0 0 0.6em rgba(31, 214, 242, 0.6); }
+
+/* 4-2-2-Pyramide */
+.pyr-wrap { width: min(86vw, 98vh); margin: 0 auto; }
+.pyr-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+.pyr-band { animation: bandIn calc(0.5s * var(--speed)) ease-out both; transform-box: fill-box; transform-origin: center; }
+.pyr-label { font-family: var(--font-display); font-weight: 700; fill: #fff; text-transform: uppercase; letter-spacing: 0.03em; }
+.pyr-stage { font-family: var(--font-display); font-weight: 800; font-style: italic; fill: #111; text-transform: uppercase; }
+.pyr-finale { font-family: var(--font-display); font-weight: 800; fill: #fff; letter-spacing: 0.04em; paint-order: stroke fill; stroke: rgba(80, 40, 0, 0.45); stroke-width: 3; }
+.pyr-current { animation: bandIn calc(0.5s * var(--speed)) ease-out both, currentGlow 1.4s ease-in-out infinite alternate; }
+@keyframes bandIn { from { transform: scaleX(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes currentGlow { from { filter: drop-shadow(0 0 6px #ff2d8a); } to { filter: drop-shadow(0 0 26px #ff2d8a) drop-shadow(0 0 8px #ff7cc0); } }
+
+/* Spieltitel: Bildschirm mit Kachelschrift in Lachs */
+.tv { position: relative; width: min(92vw, 150vh); aspect-ratio: 16 / 10; margin: 0 auto; border-radius: 1.2vh; padding: 2.2vh; background: linear-gradient(#2a2d36, #15171d); box-shadow: 0 0 0 0.5vh #3b3f4a, 0 3vh 6vh rgba(0, 0, 0, 0.7); }
+.tv.compact { width: min(80vw, 120vh); }
+.tv-screen { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--salmon); border-radius: 0.6vh; display: flex; align-items: center; justify-content: center; }
+.tv-tiles { position: absolute; inset: -10% -5%; display: flex; flex-direction: column; justify-content: space-between; transform: rotate(0deg); }
+.tv-tiles div { white-space: nowrap; font-weight: 800; font-size: clamp(0.8rem, 4.3vh, 3.4rem); line-height: 1; color: #120a0a; text-transform: uppercase; animation: tilesLeft calc(26s * var(--speed)) linear infinite; }
+.tv-tiles div:nth-child(even) { animation-name: tilesRight; }
+.tv-tiles .ghost { color: transparent; -webkit-text-stroke: 1px rgba(20, 10, 10, 0.35); }
+@keyframes tilesLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes tilesRight { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+.tv-plate { position: relative; z-index: 1; background: var(--salmon); padding: 2.4vh 4vw; box-shadow: 0 0 0 1.4vh var(--salmon); }
+.tv-title { font-weight: 800; text-transform: uppercase; line-height: 0.95; font-size: clamp(1rem, min(7.2vw, 13vh), 8.5rem); color: #0d0909; -webkit-text-stroke: 0.06em #fff; paint-order: stroke fill; text-shadow: 0.07em 0.08em 0 rgba(0, 0, 0, 0.85); text-wrap: balance; }
+.tv-title span { display: inline-block; animation: letterDrop calc(0.5s * var(--speed)) cubic-bezier(.2,1.5,.4,1) both; }
+.tv-num { display: block; font-weight: 800; font-size: clamp(0.7rem, 3.4vh, 2.4rem); letter-spacing: 0.12em; color: #fff; text-transform: uppercase; margin-bottom: 1vh; text-shadow: 0 0.08em 0 rgba(0, 0, 0, 0.5); }
+@keyframes letterDrop { from { transform: translateY(-0.6em) rotate(-10deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Studioszenen aus den Show-Bildern (Teampulte, Moderationspult) */
+.scene { position: relative; margin: 0 auto; }
+.scene img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; border-radius: 1vh; }
+.scene .overlay { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; background: #000; color: #fff; font-weight: 800; line-height: 1; overflow: hidden; }
+.scene-teams { width: min(94vw, 165vh); }
+.scene-teams .overlay { font-size: clamp(0.5rem, 2.6vw, 4.2vh); border-radius: 2px; }
+.scene-teams .name { position: absolute; translate: -50% 0; bottom: -0.2em; white-space: nowrap; font-weight: 800; font-size: clamp(0.6rem, 1.5vw, 3vh); padding: 0.25em 0.7em; border-radius: 999px; background: rgba(5, 6, 15, 0.82); border-bottom: 0.25em solid var(--team); animation: logoIn calc(0.5s * var(--speed)) ease-out both; }
+.scene-pult { width: min(94vw, 150vh); container-type: inline-size; }
+.scene-pult .overlay { flex-direction: column; gap: 0.1em; text-transform: uppercase; letter-spacing: 0.02em; }
+.scene-pult .overlay small { font-size: 1.85cqw; font-weight: 800; }
+.scene-pult .overlay b { font-size: 7cqw; line-height: 0.9; color: #fff; text-shadow: 0 0 0.25em rgba(255, 45, 138, 0.9); }
+.scene-banner { position: absolute; left: 50%; bottom: 6%; translate: -50% 0; white-space: nowrap; font-weight: 800; text-transform: uppercase; font-size: clamp(0.8rem, 4vw, 7vh); padding: 0.2em 0.8em; border-radius: 0.3em; background: #fff; color: #0b0b0b; border-bottom: 0.18em solid var(--team, var(--accent)); box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.6); animation: logoIn calc(0.6s * var(--speed)) 2.4s cubic-bezier(.2,1.4,.4,1) both; }
+.scene-coin { position: absolute; left: 50%; top: 22%; width: 12%; aspect-ratio: 1; margin-left: -6%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff1c4, var(--gold) 50%, #8a5512); box-shadow: 0 0 4vh rgba(217, 154, 62, 0.7); display: flex; align-items: center; justify-content: center; font-size: 5vh; color: #5c3608; animation: spin calc(2.4s * var(--speed)) ease-out both, coinAway 0.6s calc(2.4s * var(--speed)) ease-in forwards; }
+@keyframes coinAway { to { transform: translateY(40vh) scale(0.4); opacity: 0; } }
+
+/* Rangliste im Studio-Look */
+.beamer .rank li { background: linear-gradient(90deg, rgba(23, 25, 58, 0.95), rgba(39, 42, 88, 0.85)); font-family: var(--font-display); font-weight: 800; text-transform: uppercase; }
+.beamer .rank li .pts { color: var(--accent-2); }
+.beamer .mega { font-weight: 800; }
