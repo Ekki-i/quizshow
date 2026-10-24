@@ -57,7 +57,6 @@
       <p class="lead">Alle Bildschirme der Show laufen hier gleichzeitig und sind live verbunden. Gib als Team eine Antwort ab und bewerte sie in der Moderation – Beamer und iPads ändern sich sofort.</p>
       <div class="facts">
         <span class="fact">Moderator-Passwort <b>demo</b></span>
-        <span class="fact" id="codes">Teamcodes</span>
       </div>
     </div>
     <button class="reset" id="reset" type="button">Demo zurücksetzen</button>
@@ -97,8 +96,6 @@
     ...server.demoTeams.map((t, i) => ({ id: `team${i + 1}`, label: `iPad ${t.name}`, cls: 'team', src: `team.html?code=${t.code}`, w: 820, h: 1100, color: teamColors[i] })),
     { id: 'start', label: 'Startseite', cls: 'start', src: 'start.html', w: 1100, h: 1100, color: '#c9b8f0' },
   ];
-
-  document.getElementById('codes').innerHTML = server.demoTeams.map((t) => `${t.name} <b>${t.code}</b>`).join(' · ');
 
   const stage = document.getElementById('stage');
   const tabs = document.getElementById('tabs');
