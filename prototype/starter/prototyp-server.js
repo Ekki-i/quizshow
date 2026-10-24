@@ -67,7 +67,7 @@ function listen(port) {
   server.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}/prototype.html`;
     console.log('');
-    console.log('  Quizshow-Prototyp läuft:');
+    console.log('  Prototyp „Wer stiehlt uns die Show“ läuft:');
     console.log(`  ${url}`);
     console.log('  Moderator-Passwort: demo');
     console.log('');

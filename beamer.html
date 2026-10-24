@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quizshow – Beamer</title>
+  <title>Wer stiehlt uns die Show – Beamer</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -101,7 +101,7 @@
 
     function intro(s) {
       return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, `Willkommen bei ${s.show.name}!`),
+        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)' } }, `Willkommen bei ${s.show.name}!`),
         h('div', { class: 'sub' }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
         h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '5vh', gap: '1.5vw' } },
           s.teams.map((t, i) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}`, animation: `pop .5s ${i * 0.25}s both` } }, h('span', { class: 'dot', style: { background: t.color } }), t.name))),
@@ -125,7 +125,7 @@
       const total = (s.settings.titleDurationSec || 7) * 1000;
       const card = () => h('div', { class: 'title-card' },
         h('div', { class: 'num' }, s.game.position),
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title));
+        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)' } }, s.game.title));
       if (!replay || s.settings.reducedMotion) return [card()];
       const letters = h('div', { class: 'letters' }, [...s.game.title].map((ch, i) =>
         h('span', { style: { animationDelay: `${(i % 7) * -0.1}s` } }, ch === ' ' ? ' ' : ch)));
@@ -141,7 +141,7 @@
     function game(s) {
       const v = s.gameView;
       if (!v) return start(s);
-      if (v.waiting && v.type !== 'land') return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title)];
+      if (v.waiting && v.type !== 'land') return [h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)' } }, s.game.title)];
       return renderGame(v, s, (id) => teamOf(s, id));
     }
 
@@ -149,7 +149,7 @@
     function ranking(s) {
       const list = s.ranking || [];
       return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)', marginBottom: '4vh' } }, 'Zwischenstand'),
+        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)', marginBottom: '4vh' } }, 'Zwischenstand'),
         h('ol', { class: 'rank' }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
           h('span', {}, `${i + 1}.`), h('span', {}, r.name), h('span', { class: 'pts' }, r.points)))),
       ];

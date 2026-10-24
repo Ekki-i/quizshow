@@ -57,7 +57,7 @@ function instanceFrom(entry) {
 }
 
 // Eine neue Show mit der Standardreihenfolge, je Spieltyp der erste Eintrag der Datenbank.
-function newProject(library, name = 'Quizshow') {
+function newProject(library, name = 'Wer stiehlt uns die Show') {
   const games = DEFAULT_ORDER.map((type) => library.find((e) => e.type === type)).filter(Boolean).map(instanceFrom);
   if (games[0]?.type === 'leichte5') games[0].locked = true; // „Die leichten 5“ als festes Eröffnungsspiel
   return {
@@ -246,7 +246,7 @@ function requireEditable(db) {
 const moderatorActions = {
   'project.update'(db, ctx, p) {
     const pr = db.project;
-    if ('name' in p) pr.name = cleanText(p.name, 80) || 'Quizshow';
+    if ('name' in p) pr.name = cleanText(p.name, 80) || 'Wer stiehlt uns die Show';
     if ('subtitle' in p) pr.subtitle = cleanText(p.subtitle, 160);
     if ('host' in p) pr.host = cleanText(p.host, 80);
     if ('coHost' in p) pr.coHost = cleanText(p.coHost, 80);

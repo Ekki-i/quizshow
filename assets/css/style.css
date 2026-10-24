@@ -153,8 +153,8 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 /* Beamer */
 .beamer { overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 4vh 4vw; }
 .beamer .stage { width: 100%; }
-.beamer .mega { font-family: var(--font-display); font-size: clamp(3rem, 9vw, 9rem); text-transform: uppercase; line-height: 0.95; text-shadow: var(--glow); }
-.beamer .sub { font-size: clamp(1.2rem, 2.6vw, 2.4rem); color: var(--text-muted); margin-top: 2vh; }
+.beamer .mega { font-family: var(--font-display); font-size: clamp(1rem, min(8vw, 15vh), 9rem); text-wrap: balance; text-transform: uppercase; line-height: 0.95; text-shadow: var(--glow); }
+.beamer .sub { font-size: clamp(0.7rem, 2.6vw, 2.4rem); color: var(--text-muted); margin-top: 2vh; }
 .beamer .q { font-size: clamp(2rem, 4.4vw, 4.4rem); font-weight: 800; margin-bottom: 4vh; }
 .beamer .answers { display: grid; grid-template-columns: repeat(auto-fit, minmax(28vw, 1fr)); gap: 2vh 2vw; }
 .beamer .answer { background: var(--surface); border-left: 1.2vw solid var(--team); border-radius: var(--radius); padding: 2vh 2vw; font-size: clamp(1.4rem, 2.6vw, 2.8rem); display: flex; align-items: center; justify-content: space-between; gap: 2vw; text-align: left; animation: pop calc(0.4s * var(--speed)) ease-out; }

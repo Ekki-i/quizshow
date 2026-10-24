@@ -290,5 +290,5 @@ setInterval(() => {
 
 ensureModeratorPassword();
 server.listen(PORT, () => {
-  console.log(`Quizshow läuft auf http://localhost:${PORT}`);
+  console.log(`„Wer stiehlt uns die Show“ läuft auf http://localhost:${PORT}`);
 });
