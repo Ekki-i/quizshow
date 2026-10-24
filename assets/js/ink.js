@@ -169,7 +169,7 @@ export function inkPad({ draftKey, label, button, onSubmit, ask, toast }) {
     h('button', { type: 'button', class: 'btn ghost', onclick: () => { strokes.pop(); saveDraft(draftKey); redraw(); } }, '↶ Rückgängig'),
     h('button', { type: 'button', class: 'btn ghost', onclick: async () => {
       if (!strokes.length) return;
-      if (await ask('Alles im Schreibfeld löschen?', { confirmLabel: 'Löschen', danger: true })) { strokes.length = 0; saveDraft(draftKey); redraw(); }
+      strokes.length = 0; saveDraft(draftKey); redraw(); // sofort, ohne Rückfrage
     } }, '✕ Löschen'));
 
   const submit = h('button', { type: 'button', class: 'btn pink huge', style: { width: '100%' }, onclick: async () => {

@@ -113,7 +113,7 @@ function dummes(g, ui) {
     out.push(stateBox('ok', '🔔', 'Ihr wart am schnellsten! Mit wem tauscht ihr eure Antwort?'));
     out.push(h('div', { class: 'row' }, g.swapTargets.map((t) => h('button', {
       class: 'btn huge', onclick: async () => {
-        if (await ask(`Antwort mit ${t.name} tauschen? Das geht nur einmal im ganzen Spiel.`, { confirmLabel: 'Ja, tauschen' })) run(ui.conn, 'play.swap', { teamId: t.id });
+        run(ui.conn, 'play.swap', { teamId: t.id }); // sofort, ohne Rückfrage
       },
     }, t.name))));
     return out;
@@ -279,7 +279,7 @@ function jauch(g, ui) {
       out.push(h('button', {
         class: 'btn ghost huge', style: { width: '100%' },
         onclick: async () => {
-          if (await ask(`Jetzt aussteigen und ${pts(g.secured)} sichern?`, { confirmLabel: 'Ja, aussteigen' })) run(ui.conn, 'play.quit');
+          run(ui.conn, 'play.quit'); // sofort, ohne Rückfrage
         },
       }, `Aussteigen und ${pts(g.secured)} sichern`));
     }
@@ -292,7 +292,7 @@ function jauch(g, ui) {
     const jokerBtn = (kind, label) => h('button', {
       class: 'btn', disabled: !g.jokers[kind] || g.jokerBlocked || g.removed.length > 0,
       onclick: async () => {
-        if (await ask(`${label} jetzt einsetzen? Pro Frage darf nur ein Team einen Joker nutzen, und ihr müsst ihn dann auch einsetzen.`, { confirmLabel: 'Ja, einsetzen' })) run(ui.conn, 'play.joker', { kind });
+        run(ui.conn, 'play.joker', { kind }); // sofort, ohne Rückfrage
       },
     }, label);
     out.push(h('div', { class: 'row', style: { marginTop: '12px' } }, jokerBtn('fifty', '50:50-Joker'), jokerBtn('phone', '📞 Telefonjoker'),
