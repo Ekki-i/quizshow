@@ -605,10 +605,13 @@ function beamerGameView(db) {
 function beamerView(db) {
   const pr = db.project;
   const b = db.live.beamer;
+  // Punktestände zeigt der Beamer nur bei der Münzvergabe auf den Teampulten;
+  // sonst bleiben sie geheim (Team-iPads sehen nie fremde Punkte).
+  const sums = b.view === 'coin' ? totals(db) : null;
   const view = {
     role: 'beamer',
     show: { name: pr.name, subtitle: pr.subtitle, host: pr.host, coHost: pr.coHost },
-    teams: publicTeams(db),
+    teams: publicTeams(db).map((t) => (sums ? { ...t, points: sums[t.id] || 0 } : t)),
     settings: { reducedMotion: pr.settings.reducedMotion, sound: pr.settings.sound, titleDurationSec: pr.settings.titleDurationSec },
     view: b.view,
     effect: db.live.effect,

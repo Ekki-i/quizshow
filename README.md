@@ -66,7 +66,7 @@ Umgesetzt:
 - Punktebuch mit Begründung, „Rückgängig“ als Gegenbuchung, Änderungsprotokoll.
 - Showablauf mit acht Positionen, „Die leichten 5“ fest auf Position 1,
   Münzen nach Position 4, 6 und 8 inkl. Gleichstandswarnung und Schätzfrage-Entscheid.
-- Beamer: Startbild, Intro mit Teams, Pyramide 4–2–2, Spieltitel-Animation, Spielansicht,
+- Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
   Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
 - **Mehrere Shows**: anlegen (optional mit den Teams der geöffneten Show), umbenennen,
   mit Datum versehen, öffnen, duplizieren und löschen. Jede Show hat eigene Spiele, Teams und Punkte.

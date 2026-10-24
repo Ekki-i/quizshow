@@ -144,35 +144,70 @@
       ];
     }
 
-    // Teampulte aus dem Show-Bild; Nummer im schwarzen Feld, Name darunter.
+    // Teampulte aus dem Show-Bild: echte Punkte im schwarzen Feld,
+    // Teamname gebogen über dem Bogen des Pults.
     const PODIUMS = [
       [68, 180, 87, 216], [214, 167, 234, 202], [340, 155, 360, 191],
       [556, 156, 576, 192], [692, 166, 711, 202], [832, 180, 852, 216],
     ];
-    function intro(s) {
+    // Mitte und Oberkante des Bogens je Pult (Bildkoordinaten 938 × 336).
+    const ARCHES = [[70, 52], [210, 47], [338, 44], [576, 42], [710, 48], [857, 54]];
+    // Szene mit den Teampulten. Punkte nur, wenn opts.points (Münzvergabe).
+    function teamsScene(s, opts = {}) {
       const W = 938, H = 336;
       const pct = (v, total) => `${(v / total) * 100}%`;
       const shown = s.teams.slice(0, PODIUMS.length);
-      const scene = h('div', { class: 'scene scene-teams' },
+      const NS = 'http://www.w3.org/2000/svg';
+      const el = (tag, attrs, text) => {
+        const n = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+        if (text !== undefined) n.textContent = text;
+        return n;
+      };
+      const names = el('svg', { class: 'arch-names', viewBox: `0 0 ${W} ${H}`, 'aria-hidden': 'true' });
+      shown.forEach((t, i) => {
+        const [cx, top] = ARCHES[i];
+        // Bogen über ±42° um die Spitze, passend zur Breite des Pults.
+        const r = 86, cy = top + r - 6, a = Math.PI / 2 - (42 * Math.PI) / 180;
+        const id = `arch-${opts.points ? 'p' : 'i'}-${i}`;
+        names.append(el('path', { id, d: `M ${cx - r * Math.cos(a)} ${cy - r * Math.sin(a)} A ${r} ${r} 0 0 1 ${cx + r * Math.cos(a)} ${cy - r * Math.sin(a)}`, fill: 'none' }));
+        const label = t.name.toUpperCase();
+        const budget = 112; // nutzbare Bogenlänge in Bildeinheiten
+        const fs = Math.min(17, budget / Math.max(4, label.length * 0.68));
+        const winner = opts.winnerId === t.id;
+        const text = el('text', { class: `arch-name${winner ? ' winner' : ''}`, 'font-size': fs.toFixed(1), style: `--team:${t.color};animation-delay:${0.3 + i * 0.2}s` });
+        const tpAttrs = { href: `#${id}`, startOffset: '50%', 'text-anchor': 'middle' };
+        // Sehr lange Namen auf die Bogenlänge stauchen statt abschneiden.
+        if (label.length * fs * 0.68 > budget) Object.assign(tpAttrs, { textLength: budget, lengthAdjust: 'spacingAndGlyphs' });
+        text.append(el('textPath', tpAttrs, label));
+        names.append(text);
+      });
+      return h('div', { class: 'scene scene-teams' },
         h('img', { src: 'assets/img/studio-teams.webp', alt: '' }),
-        // Alle Felder überdecken (im Bild steht „0“); freie Pulte bleiben leer.
-        PODIUMS.map(([x0, y0, x1, y1], i) => h('div', { class: 'overlay', style: { left: pct(x0, W), top: pct(y0, H), width: pct(x1 - x0 + 1, W), height: pct(y1 - y0 + 1, H) } }, i < shown.length ? String(i + 1) : '')),
-        shown.map((t, i) => {
-          const [x0, , x1] = PODIUMS[i];
-          return h('div', { class: 'name', '--team': t.color, style: { left: pct((x0 + x1) / 2, W), animationDelay: `${0.4 + i * 0.25}s` } }, t.name);
-        }));
+        // Alle Felder überdecken (im Bild steht „0“); ohne Punkte bleiben sie leer.
+        PODIUMS.map(([x0, y0, x1, y1], i) => {
+          const t = shown[i];
+          const winner = t && opts.winnerId === t.id;
+          return h('div', { class: `overlay points${winner ? ' winner' : ''}`, style: { left: pct(x0, W), top: pct(y0, H), width: pct(x1 - x0 + 1, W), height: pct(y1 - y0 + 1, H), animationDelay: `${0.6 + i * 0.15}s` } },
+            opts.points && t ? String(t.points ?? 0) : '');
+        }),
+        names,
+        opts.banner || '');
+    }
+
+    function intro(s) {
       const rest = s.teams.slice(PODIUMS.length);
       return [
         h('div', { class: 'kicker' }, 'Willkommen bei'),
         h('div', { style: { margin: '1vh 0 2.5vh' } }, showLogo(s.show.name, true)),
-        scene,
+        teamsScene(s),
         rest.length ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh', gap: '1vw' } },
           rest.map((t) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}` } }, t.name))) : '',
         h('div', { class: 'sub', style: { marginTop: '2.5vh' } }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
       ];
     }
 
-    // 4-2-2-Pyramide: Kategorien 1–4, Gewinnstufe 1, Kategorien 5–6,
+    // Übersicht Kategorien (4-2-2): Kategorien 1–4, Gewinnstufe 1, Kategorien 5–6,
     // Gewinnstufe 2, Kategorien 7–8, Gewinnstufe 3, ganz oben das Finale.
     function pyramid(s) {
       const NS = 'http://www.w3.org/2000/svg';
@@ -196,7 +231,7 @@
       ];
       const total = bands.reduce((a, b) => a + b[2], 0) + gap * (bands.length - 1);
       const scale = (baseY - apexY) / total;
-      const svg = el('svg', { viewBox: `-40 -10 ${W + 80} ${baseY + 30}`, role: 'img', 'aria-label': 'Pyramide 4 – 2 – 2 bis zum Finale' });
+      const svg = el('svg', { viewBox: `-40 -10 ${W + 80} ${baseY + 30}`, role: 'img', 'aria-label': 'Übersicht Kategorien bis zum Finale' });
       const defs = el('defs', {});
       const grad = (id, stops) => {
         const g = el('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
@@ -244,15 +279,24 @@
     }
 
     // Spieltitel: Fernseher mit Kachelschrift „KATEGORIE n“ und großem Titel.
+    // Jedes Spiel (Position 1–8) bekommt eine eigene Farbe.
+    const GAME_COLORS = ['#ff8a7a', '#3fd3ea', '#ff63b1', '#f4b740', '#ab8dff', '#4fdca4', '#ff9d45', '#7fb0ff'];
     function titleCard(s, opts = {}) {
-      const label = `Kategorie ${s.game.position}`;
+      const pos = s.game.position;
+      const label = `Kategorie ${pos}`;
+      const color = GAME_COLORS[(pos - 1) % GAME_COLORS.length];
       const line = Array(14).fill(label).join(' ');
       const tiles = h('div', { class: 'tv-tiles', 'aria-hidden': 'true' },
         Array.from({ length: 10 }, (_, i) => h('div', { class: i % 3 === 1 ? 'ghost' : '' }, `${line} ${line}`)));
-      const letters = [...s.game.title].map((ch, i) => h('span', { style: { animationDelay: `${0.3 + i * 0.04}s` } }, ch === ' ' ? ' ' : ch));
-      return h('div', { class: `tv${opts.compact ? ' compact' : ''}` },
+      // Buchstaben einzeln animieren, aber je Wort zusammenhalten: Umbruch nur zwischen Wörtern.
+      let n = 0;
+      const words = s.game.title.split(/\s+/).filter(Boolean).map((w) =>
+        h('span', { class: 'word' }, [...w].map((ch) => h('span', { style: { animationDelay: `${0.3 + n++ * 0.04}s` } }, ch))));
+      const title = h('div', { class: 'tv-title', 'aria-label': s.game.title });
+      words.forEach((w, i) => { if (i) title.append(' '); title.append(w); });
+      return h('div', { class: `tv${opts.compact ? ' compact' : ''}`, '--tv': color },
         h('div', { class: 'tv-screen' }, tiles,
-          h('div', { class: 'tv-plate' }, h('span', { class: 'tv-num' }, label), h('div', { class: 'tv-title' }, letters))));
+          h('div', { class: 'tv-plate' }, h('span', { class: 'tv-num' }, label), title)));
     }
 
     function title(s) {
@@ -276,20 +320,31 @@
       ];
     }
 
-    // Münze / Gewinnstufe: Moderationspult aus dem Show-Bild, Bildschirm zeigt die Stufe.
+    // Münze / Gewinnstufe: erst das Moderationspult mit der Stufe auf dem Bildschirm,
+    // dann werden die Teampulte mit den aktuellen Punkten wieder eingeblendet.
     function coin(s) {
       const t = teamOf(s, s.coin.teamId);
       const stage = STAGE_OF[s.coin.position];
       const W = 938, H = 530, scr = [389, 34, 547, 157];
       const pct = (v, total) => `${(v / total) * 100}%`;
-      return [
-        h('div', { class: 'scene scene-pult' },
-          h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
-          h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
-            stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
-          h('div', { class: 'scene-coin', 'aria-hidden': 'true' }, '★'),
-          h('div', { class: 'scene-banner', '--team': t.color }, `Münze an ${t.name}`)),
-      ];
+      const pult = h('div', { class: 'scene scene-pult' },
+        h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
+        h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
+          stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
+        h('div', { class: 'scene-coin', 'aria-hidden': 'true' }, '★'));
+      const wrap = h('div', { class: 'coin-sequence' }, pult);
+      const showTeams = () => {
+        const rest = s.teams.slice(PODIUMS.length);
+        wrap.replaceChildren(
+          h('div', { class: 'kicker' }, stage ? `Gewinnstufe ${stage} · Zwischenstand` : 'Zwischenstand'),
+          h('div', { class: 'coin-teams' },
+            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, `🪙 Münze an ${t.name}`) })),
+          rest.length ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh', gap: '1vw' } },
+            rest.map((r) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${r.color}` } }, `${r.name} · ${r.points ?? 0}`))) : '');
+      };
+      if (s.settings.reducedMotion) showTeams();
+      else titleTimer = setTimeout(showTeams, 3400 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
+      return [wrap];
     }
   </script>
 </body>

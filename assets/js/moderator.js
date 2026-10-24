@@ -136,7 +136,7 @@ function buildGameControl() {
 
 function buildBeamerControls() {
   const views = [
-    ['start', 'Startbild'], ['intro', 'Intro & Teams'], ['pyramid', 'Pyramide 4–2–2'], ['title', 'Spieltitel'],
+    ['start', 'Startbild'], ['intro', 'Intro & Teams'], ['pyramid', 'Übersicht Kategorien'], ['title', 'Spieltitel'],
     ['game', 'Spiel'], ['ranking', 'Rangliste enthüllen'], ['coin', 'Münze zeigen'], ['blank', 'Schwarz'],
   ];
   const current = S.live.beamer.view;

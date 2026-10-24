@@ -76,6 +76,8 @@ test('Privatsphäre: Teams sehen keine fremden Antworten, Beamer nur freigegeben
   // Beamer und Teams sehen nie Zugangscodes oder Punktestände.
   const beamer = JSON.stringify(game.beamerView(db));
   for (const t of db.project.teams) assert.ok(!beamer.includes(t.code));
+  // Punkte erscheinen auf dem Beamer nur in der Münzansicht.
+  assert.ok(game.beamerView(db).teams.every((t) => !('points' in t)));
   assert.equal(game.teamView(db, ids[1]).ranking, undefined);
 });
 
