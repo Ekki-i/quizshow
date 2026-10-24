@@ -5,7 +5,7 @@
 
 const crypto = require('crypto');
 const { TYPES, DEFAULT_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
-const { QuizError, fail, newId, log, effect, teamName, totals, cleanText } = require('./core');
+const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage } = require('./core');
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
 // Moderationsaktionen sowie die Sichten für Teams und Beamer.
@@ -22,7 +22,7 @@ const PLAY = {
 
 const STATE_VERSION = 2;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const BEAMER_VIEWS = ['start', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'blank'];
+const BEAMER_VIEWS = ['start', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'blank'];
 const MAX_PROCESSED = 5000;
 
 // 10 Zeichen aus 32 Symbolen ≈ 50 Bit: nicht erratbar, aber noch abtippbar.
@@ -278,7 +278,9 @@ const moderatorActions = {
     const team = findTeam(db, p.teamId);
     if ('name' in p) team.name = cleanText(p.name, 40) || team.name;
     if ('color' in p) team.color = cleanColor(p.color);
-    log(db, ctx, 'team', `Team „${team.name}“ geändert`);
+    // 3D-Avatar hinter dem Pult; null entfernt ihn (Pult bleibt dann leer).
+    if ('avatar' in p) team.avatar = p.avatar ? cleanImage(p.avatar) : null;
+    log(db, ctx, 'team', `Team „${team.name}“ geändert${'avatar' in p ? (p.avatar ? ' (Avatar gesetzt)' : ' (Avatar entfernt)') : ''}`);
   },
 
   'team.regenCode'(db, ctx, p) {
@@ -611,7 +613,13 @@ function beamerView(db) {
   const view = {
     role: 'beamer',
     show: { name: pr.name, subtitle: pr.subtitle, host: pr.host, coHost: pr.coHost },
-    teams: publicTeams(db).map((t) => (sums ? { ...t, points: sums[t.id] || 0 } : t)),
+    teams: publicTeams(db).map((t, i) => {
+      const out = sums ? { ...t, points: sums[t.id] || 0 } : { ...t };
+      // Avatare nur in den Ansichten mit Teampulten mitschicken (große Bilder).
+      const avatar = db.project.teams[i].avatar;
+      if (avatar && (b.view === 'intro' || b.view === 'coin')) out.avatar = avatar;
+      return out;
+    }),
     settings: { reducedMotion: pr.settings.reducedMotion, sound: pr.settings.sound, titleDurationSec: pr.settings.titleDurationSec },
     view: b.view,
     effect: db.live.effect,

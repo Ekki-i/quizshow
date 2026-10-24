@@ -69,6 +69,14 @@ function cleanInk(v) {
   return v;
 }
 
+// Bild als data:-URI (z. B. 3D-Avatar eines Teams), PNG/WebP/JPEG.
+const IMAGE_MAX = 900000;
+function cleanImage(v) {
+  if (typeof v !== 'string' || !/^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(v)) fail('Ungültiges Bild. Erlaubt sind PNG, WebP oder JPEG.');
+  if (v.length > IMAGE_MAX) fail('Das Bild ist zu groß.');
+  return v;
+}
+
 function cleanText(v, max) {
   if (typeof v !== 'string') fail('Ungültige Eingabe.');
   const s = v.trim();
@@ -123,6 +131,6 @@ function distanceKm(a, b) {
 }
 
 module.exports = {
-  QuizError, fail, newId, randomInt, log, effect, teamName, teamIds, totals, bookTarget, cleanText, cleanInk, cleanChoice, pts,
+  QuizError, fail, newId, randomInt, log, effect, teamName, teamIds, totals, bookTarget, cleanText, cleanInk, cleanImage, cleanChoice, pts,
   buzzIn, currentBuzz, buzzTeamView, distanceKm,
 };

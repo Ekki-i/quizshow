@@ -532,3 +532,20 @@ test('Handschrift: Spiel 1 und Kassenschlager nehmen PNG-Antworten an und prüfe
   assert.equal(game.teamView(db, a).play.lastAnswer.ink, INK);
   assert.ok(!JSON.stringify(game.beamerView(db)).includes(INK));
 });
+
+test('Avatare: nur gültige Bilder, nur auf dem Beamer bei Intro und Münze, entfernbar', () => {
+  const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { db, ids } = setup(2);
+  assert.throws(() => game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: 'data:image/svg+xml;base64,PHN2Zz4=' }), /Ungültiges Bild/);
+  assert.throws(() => game.applyAction(db, team(ids[0]), 'team.update', { teamId: ids[0], avatar: IMG }), /nicht erlaubt/);
+  game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: IMG });
+  assert.ok(!JSON.stringify(game.beamerView(db)).includes(IMG));
+  assert.ok(!JSON.stringify(game.teamView(db, ids[1])).includes(IMG));
+  game.applyAction(db, mod(), 'beamer.show', { view: 'intro' });
+  assert.equal(game.beamerView(db).teams[0].avatar, IMG);
+  assert.equal(game.beamerView(db).teams[1].avatar, undefined);
+  game.applyAction(db, mod(), 'beamer.show', { view: 'pause' });
+  assert.equal(game.beamerView(db).view, 'pause');
+  game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: null });
+  assert.equal(db.project.teams[0].avatar, null);
+});

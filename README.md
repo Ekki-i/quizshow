@@ -66,6 +66,11 @@ Umgesetzt:
 - Punktebuch mit Begründung, „Rückgängig“ als Gegenbuchung, Änderungsprotokoll.
 - Showablauf mit acht Positionen, „Die leichten 5“ fest auf Position 1,
   Münzen nach Position 4, 6 und 8 inkl. Gleichstandswarnung und Schätzfrage-Entscheid.
+- Teampulte auf dem Beamer werden gezeichnet; je Team lässt sich unter **Teams** ein 3D-Avatar
+  (am besten freigestelltes PNG) hochladen, der im Bogen hinter dem Pult steht. Ohne Avatar bleibt
+  das Pult leer.
+- **Pause**: Moderationspult mit „PAUSE“-Bildschirm, dahinter eine animierte Live-Band, die im Takt
+  eines eigenen, mit WebAudio erzeugten Pausen-Songs spielt (Ton nach „Ton aktivieren“ am Beamer).
 - Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
   Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
 - **Mehrere Shows**: anlegen (optional mit den Teams der geöffneten Show), umbenennen,

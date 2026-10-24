@@ -136,7 +136,7 @@ function buildGameControl() {
 
 function buildBeamerControls() {
   const views = [
-    ['start', 'Startbild'], ['intro', 'Intro & Teams'], ['pyramid', 'Übersicht Kategorien'], ['title', 'Spieltitel'],
+    ['start', 'Startbild'], ['intro', 'Intro & Teams'], ['pyramid', 'Übersicht Kategorien'], ['pause', 'Pause'], ['title', 'Spieltitel'],
     ['game', 'Spiel'], ['ranking', 'Rangliste enthüllen'], ['coin', 'Münze zeigen'], ['blank', 'Schwarz'],
   ];
   const current = S.live.beamer.view;
@@ -180,6 +180,52 @@ function buildCoins() {
 
 // ---------- Teams ----------
 
+// 3D-Avatar eines Teams: steht auf dem Beamer im Bogen hinter dem Pult.
+// Das Bild wird vor dem Speichern verkleinert (max. 480 px hoch).
+async function shrinkImage(file) {
+  if (!/^image\/(png|webp|jpeg)$/.test(file.type)) throw new Error('Bitte ein PNG-, WebP- oder JPEG-Bild wählen.');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Bild konnte nicht gelesen werden.'));
+      i.src = url;
+    });
+    const scale = Math.min(1, 480 / img.naturalHeight, 480 / img.naturalWidth);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    // WebP behält Transparenz und ist klein; Safari kann es nicht erzeugen → PNG.
+    let data = c.toDataURL('image/webp', 0.86);
+    if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
+    return data;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function avatarCell(t) {
+  const input = h('input', {
+    type: 'file', accept: 'image/png,image/webp,image/jpeg', class: 'visually-hidden', 'aria-label': `3D-Avatar für ${t.name} wählen`,
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      try {
+        act('team.update', { teamId: t.id, avatar: await shrinkImage(file) });
+      } catch (err) {
+        toast(err.message);
+      }
+    },
+  });
+  return h('div', { class: 'avatar-cell' },
+    t.avatar ? h('img', { class: 'avatar-thumb', src: t.avatar, alt: `Avatar von ${t.name}` }) : h('span', { class: 'avatar-empty', title: 'Kein Avatar – das Pult bleibt leer' }, '–'),
+    h('label', { class: 'btn small ghost' }, input, t.avatar ? 'Ändern' : 'Avatar wählen'),
+    t.avatar ? h('button', { class: 'btn small ghost', onclick: () => act('team.update', { teamId: t.id, avatar: null }) }, 'Entfernen') : null);
+}
+
 function buildTeams() {
   const base = `${location.origin}${location.pathname.replace(/moderator\.html$/, '')}team.html?code=`;
   return [
@@ -193,13 +239,15 @@ function buildTeams() {
         },
       }, h('input', { name: 'name', placeholder: 'Teamname', maxlength: '40', style: { flex: '1 1 220px', width: 'auto' } }),
       h('button', { class: 'btn', type: 'submit' }, '+ Team hinzufügen')),
-      h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.')),
+      h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.'),
+      h('p', { class: 'muted' }, '3D-Avatar: am besten ein freigestelltes PNG (transparenter Hintergrund), hochkant. Er steht auf dem Beamer im Bogen hinter dem Pult; ohne Avatar bleibt das Pult leer.')),
     card(`Teams (${S.project.teams.length})`,
       S.project.teams.length ? h('table', {},
-        h('thead', {}, h('tr', {}, h('th', {}, 'Farbe'), h('th', {}, 'Name'), h('th', {}, 'Zugangscode / Link'), h('th', {}, ''))),
+        h('thead', {}, h('tr', {}, h('th', {}, 'Farbe'), h('th', {}, 'Name'), h('th', {}, '3D-Avatar'), h('th', {}, 'Zugangscode / Link'), h('th', {}, ''))),
         h('tbody', {}, S.project.teams.map((t) => h('tr', {},
           h('td', {}, h('input', { type: 'color', value: t.color, 'aria-label': `Farbe ${t.name}`, style: { width: '56px', padding: '2px' }, onchange: (ev) => act('team.update', { teamId: t.id, color: ev.target.value }) })),
           h('td', {}, h('input', { value: t.name, maxlength: '40', 'aria-label': 'Teamname', onchange: (ev) => act('team.update', { teamId: t.id, name: ev.target.value }) })),
+          h('td', {}, avatarCell(t)),
           h('td', {}, h('div', { class: 'code' }, t.code),
             h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(base + t.code)).then(() => toast('Link kopiert', 'info'), () => toast(`Kopieren nicht möglich. Link: ${base + t.code}`, 'info')) }, 'Link kopieren')),
           h('td', {}, h('div', { class: 'row' },

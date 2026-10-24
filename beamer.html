@@ -14,6 +14,8 @@
   <script type="module">
     import { h, connect } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
+    import { podiumRow } from './assets/js/studio.js';
+    import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
     const embedded = new URLSearchParams(location.search).has('preview');
@@ -22,6 +24,7 @@
     let titleTimer = null;
     let audio = null;
     let clockOffset = 0;
+    let lastState = null;
 
     setInterval(() => {
       for (const el of document.querySelectorAll('[data-deadline]')) {
@@ -33,6 +36,8 @@
     document.getElementById('sound-on').onclick = (ev) => {
       audio = new AudioContext();
       ev.currentTarget.remove();
+      // Läuft gerade die Pause, setzt die Musik jetzt ein.
+      if (lastState && lastState.view === 'pause' && lastState.settings.sound) startPause(audio);
     };
     if (embedded) document.getElementById('sound-on').remove();
 
@@ -87,7 +92,10 @@
       lastKey = key;
       clearTimeout(titleTimer);
 
-      const views = { start, intro, pyramid, title, game, ranking, coin, blank: () => [] };
+      lastState = s;
+      // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
+      if (s.view !== 'pause') stopPause();
+      const views = { start, intro, pyramid, title, game, ranking, coin, pause, blank: () => [] };
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
 
@@ -144,65 +152,16 @@
       ];
     }
 
-    // Teampulte aus dem Show-Bild: echte Punkte im schwarzen Feld,
-    // Teamname gebogen über dem Bogen des Pults.
-    const PODIUMS = [
-      [68, 180, 87, 216], [214, 167, 234, 202], [340, 155, 360, 191],
-      [556, 156, 576, 192], [692, 166, 711, 202], [832, 180, 852, 216],
-    ];
-    // Mitte und Oberkante des Bogens je Pult (Bildkoordinaten 938 × 336).
-    const ARCHES = [[70, 52], [210, 47], [338, 44], [576, 42], [710, 48], [857, 54]];
-    // Szene mit den Teampulten. Punkte nur, wenn opts.points (Münzvergabe).
+    // Teampulte (gezeichnet), Avatar im Bogen. Punkte nur, wenn opts.points (Münzvergabe).
     function teamsScene(s, opts = {}) {
-      const W = 938, H = 336;
-      const pct = (v, total) => `${(v / total) * 100}%`;
-      const shown = s.teams.slice(0, PODIUMS.length);
-      const NS = 'http://www.w3.org/2000/svg';
-      const el = (tag, attrs, text) => {
-        const n = document.createElementNS(NS, tag);
-        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-        if (text !== undefined) n.textContent = text;
-        return n;
-      };
-      const names = el('svg', { class: 'arch-names', viewBox: `0 0 ${W} ${H}`, 'aria-hidden': 'true' });
-      shown.forEach((t, i) => {
-        const [cx, top] = ARCHES[i];
-        // Bogen über ±42° um die Spitze, passend zur Breite des Pults.
-        const r = 86, cy = top + r - 6, a = Math.PI / 2 - (42 * Math.PI) / 180;
-        const id = `arch-${opts.points ? 'p' : 'i'}-${i}`;
-        names.append(el('path', { id, d: `M ${cx - r * Math.cos(a)} ${cy - r * Math.sin(a)} A ${r} ${r} 0 0 1 ${cx + r * Math.cos(a)} ${cy - r * Math.sin(a)}`, fill: 'none' }));
-        const label = t.name.toUpperCase();
-        const budget = 112; // nutzbare Bogenlänge in Bildeinheiten
-        const fs = Math.min(17, budget / Math.max(4, label.length * 0.68));
-        const winner = opts.winnerId === t.id;
-        const text = el('text', { class: `arch-name${winner ? ' winner' : ''}`, 'font-size': fs.toFixed(1), style: `--team:${t.color};animation-delay:${0.3 + i * 0.2}s` });
-        const tpAttrs = { href: `#${id}`, startOffset: '50%', 'text-anchor': 'middle' };
-        // Sehr lange Namen auf die Bogenlänge stauchen statt abschneiden.
-        if (label.length * fs * 0.68 > budget) Object.assign(tpAttrs, { textLength: budget, lengthAdjust: 'spacingAndGlyphs' });
-        text.append(el('textPath', tpAttrs, label));
-        names.append(text);
-      });
-      return h('div', { class: 'scene scene-teams' },
-        h('img', { src: 'assets/img/studio-teams.webp', alt: '' }),
-        // Alle Felder überdecken (im Bild steht „0“); ohne Punkte bleiben sie leer.
-        PODIUMS.map(([x0, y0, x1, y1], i) => {
-          const t = shown[i];
-          const winner = t && opts.winnerId === t.id;
-          return h('div', { class: `overlay points${winner ? ' winner' : ''}`, style: { left: pct(x0, W), top: pct(y0, H), width: pct(x1 - x0 + 1, W), height: pct(y1 - y0 + 1, H), animationDelay: `${0.6 + i * 0.15}s` } },
-            opts.points && t ? String(t.points ?? 0) : '');
-        }),
-        names,
-        opts.banner || '');
+      return podiumRow(s.teams, opts);
     }
 
     function intro(s) {
-      const rest = s.teams.slice(PODIUMS.length);
       return [
         h('div', { class: 'kicker' }, 'Willkommen bei'),
         h('div', { style: { margin: '1vh 0 2.5vh' } }, showLogo(s.show.name, true)),
         teamsScene(s),
-        rest.length ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh', gap: '1vw' } },
-          rest.map((t) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}` } }, t.name))) : '',
         h('div', { class: 'sub', style: { marginTop: '2.5vh' } }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
       ];
     }
@@ -320,6 +279,13 @@
       ];
     }
 
+    // Pause: Moderationspult, dahinter die Live-Band im Takt der Pausenmusik.
+    // Ton nur auf dem echten Beamer, wenn er aktiviert und erlaubt ist.
+    function pause(s) {
+      startPause(!embedded && s.settings.sound && audioReady(audio) ? audio : null);
+      return [bandScene()];
+    }
+
     // Münze / Gewinnstufe: erst das Moderationspult mit der Stufe auf dem Bildschirm,
     // dann werden die Teampulte mit den aktuellen Punkten wieder eingeblendet.
     function coin(s) {
@@ -334,13 +300,10 @@
         h('div', { class: 'scene-coin', 'aria-hidden': 'true' }, '★'));
       const wrap = h('div', { class: 'coin-sequence' }, pult);
       const showTeams = () => {
-        const rest = s.teams.slice(PODIUMS.length);
         wrap.replaceChildren(
           h('div', { class: 'kicker' }, stage ? `Gewinnstufe ${stage} · Zwischenstand` : 'Zwischenstand'),
           h('div', { class: 'coin-teams' },
-            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, `🪙 Münze an ${t.name}`) })),
-          rest.length ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh', gap: '1vw' } },
-            rest.map((r) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${r.color}` } }, `${r.name} · ${r.points ?? 0}`))) : '');
+            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, `🪙 Münze an ${t.name}`) })));
       };
       if (s.settings.reducedMotion) showTeams();
       else titleTimer = setTimeout(showTeams, 3400 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));

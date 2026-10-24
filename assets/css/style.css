@@ -430,7 +430,8 @@ body.beamer-page { background: #05060f; }
 .coin-sequence { animation: logoIn calc(0.4s * var(--speed)) ease-out both; }
 .coin-teams { margin-top: 2vh; }
 .coin-teams .scene-teams { animation: sceneIn calc(0.6s * var(--speed)) ease-out both; }
-.coin-teams .scene-banner { bottom: -4%; animation-delay: calc(1.4s * var(--speed)); }
+.coin-teams .scene-banner { bottom: auto; top: 100%; margin-top: 1.5vh; animation-delay: calc(1.4s * var(--speed)); }
+.coin-teams { padding-bottom: 11vh; }
 .scene-teams .overlay.points { animation: logoIn calc(0.4s * var(--speed)) ease-out both; }
 .scene-teams .overlay.points.winner { background: #1a1200; color: var(--accent-2); box-shadow: 0 0 0 2px var(--accent-2), 0 0 18px var(--accent-2); }
 .scene-teams .arch-name.winner { fill: var(--accent-2); }
@@ -515,3 +516,29 @@ body.beamer-page { background: #05060f; }
 .beamer .opt.correct b { color: #b6ffd1; }
 .beamer .opt.dim { opacity: 0.4; }
 .beamer .options.compact .opt { --tri: clamp(1.6rem, 4.4vh, 3.6rem); padding-top: 1vh; padding-bottom: 1vh; font-size: clamp(0.9rem, min(2vw, 3.3vh), 2.2rem); }
+
+/* Editor: 3D-Avatar je Team */
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.avatar-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.avatar-cell label.btn { cursor: pointer; margin: 0; font-weight: 700; }
+.avatar-thumb { width: 44px; height: 56px; object-fit: contain; background: radial-gradient(circle at 50% 40%, var(--surface-2), var(--bg)); border-radius: 8px; }
+.avatar-empty { width: 44px; height: 56px; display: inline-grid; place-items: center; color: var(--text-muted); border: 2px dashed var(--surface-2); border-radius: 8px; }
+
+/* Gezeichnete Teampulte */
+.scene-teams .podiums { display: block; width: 100%; height: auto; overflow: visible; }
+.podium { animation: podiumIn calc(0.6s * var(--speed)) cubic-bezier(.2,1.2,.4,1) both; transform-box: fill-box; transform-origin: 50% 100%; }
+.podium-name { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.03em; fill: #fff; stroke: #07081a; stroke-width: 4.5; stroke-linejoin: round; paint-order: stroke fill; filter: drop-shadow(0 0 5px var(--team)); }
+.podium-name.winner { fill: var(--accent-2); }
+.podium-points { font-family: var(--font-display); font-weight: 800; fill: #fff; font-variant-numeric: tabular-nums; }
+.podium-points.winner { fill: var(--accent-2); }
+.podium-score.winner { filter: drop-shadow(0 0 8px #ffc23d); }
+.podium-avatar { animation: avatarIn calc(0.7s * var(--speed)) ease-out both; animation-delay: inherit; }
+@keyframes podiumIn { from { opacity: 0; transform: translateY(12%) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes avatarIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+/* Pause mit Live-Band */
+.band-scene { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+.band-scene .band-svg { width: 100%; height: 100%; }
+.band-scene .bd-lights polygon { opacity: calc(0.08 + var(--kick, 0) * 0.22); mix-blend-mode: screen; }
+.band-scene .bd-pause { font-family: var(--font-display); font-weight: 800; font-size: 92px; letter-spacing: 0.06em; fill: #fff; filter: drop-shadow(0 0 calc(4px + var(--beat, 0) * 14px) #ff2d8a); }
+.band-scene .bd-pause-sub { font-family: var(--font); font-weight: 600; font-size: 24px; fill: #b9bde0; letter-spacing: 0.04em; }
