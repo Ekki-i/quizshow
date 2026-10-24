@@ -44,6 +44,10 @@
   .device { position: relative; overflow: hidden; border-radius: 12px; border: 2px solid var(--line); background: #000; }
   .device iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: var(--bg); }
   .note { color: var(--muted); font-size: 0.85rem; margin-top: 18px; }
+  .local-file { background: var(--panel); border: 2px solid var(--yellow); border-radius: 14px; padding: 18px 20px; margin: 20px 0; line-height: 1.55; max-width: 70ch; }
+  .local-file h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--yellow); }
+  .local-file ol { margin: 8px 0 0; padding-left: 1.3em; }
+  .local-file code { background: var(--bg); padding: 1px 6px; border-radius: 6px; }
 </style>
 
 <div class="wrap">
@@ -64,6 +68,22 @@
   <p class="note">Prototyp ohne Server: Alles läuft in diesem Browser und bleibt nur hier gespeichert. Für die echte Show mit iPads und Beamer startet der Node-Server aus dem Repository. Ton gibt es auf dem Beamer nach Klick auf „Ton aktivieren“.</p>
 </div>
 
+<script>
+  // Direkt per Doppelklick geöffnet (file://): Der Browser blockiert dort die
+  // Module, die Bildschirme bleiben leer. Statt dessen eine Anleitung zeigen.
+  if (location.protocol === 'file:') {
+    document.getElementById('tabs').hidden = true;
+    document.getElementById('stage').outerHTML = `<div class="local-file" role="alert">
+      <h2>So startest du den Prototyp</h2>
+      Direkt per Doppelklick auf <code>prototype.html</code> lässt der Browser den Prototyp nicht laufen. Nimm stattdessen den Starter im selben Ordner:
+      <ol>
+        <li><b>Windows:</b> Doppelklick auf <code>Prototyp starten (Windows).bat</code></li>
+        <li><b>Mac:</b> Rechtsklick auf <code>Prototyp starten (Mac).command</code> → „Öffnen“ (beim ersten Mal bestätigen)</li>
+      </ol>
+      Der Browser öffnet sich dann von selbst. Das schwarze Fenster offen lassen, solange du spielst. Benötigt wird <a href="https://nodejs.org" style="color:var(--cyan)">Node.js</a> (kostenlos, LTS-Version).
+    </div>`;
+  }
+</script>
 <script type="module">
   import { createLocalServer } from './demo/local-server.js';
 

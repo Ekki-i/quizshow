@@ -26,6 +26,11 @@ const modJs = path.join(OUT, 'assets', 'js', 'moderator.js');
 fs.writeFileSync(modJs, rename(fs.readFileSync(modJs, 'utf8')));
 fs.copyFileSync(path.join(ROOT, 'prototype', 'index.html'), path.join(OUT, 'prototype.html'));
 fs.copyFileSync(path.join(ROOT, 'prototype', 'local-server.js'), path.join(OUT, 'demo', 'local-server.js'));
+// Starter für den entpackten Prototyp: kleiner Webserver plus Doppelklick-Dateien.
+for (const f of fs.readdirSync(path.join(ROOT, 'prototype', 'starter'))) {
+  fs.copyFileSync(path.join(ROOT, 'prototype', 'starter', f), path.join(OUT, f));
+  if (f.endsWith('.command')) fs.chmodSync(path.join(OUT, f), 0o755);
+}
 
 // CommonJS-Module der Spiellogik in ein ES-Modul verpacken (alles aus server/
 // außer dem HTTP-Server und der Dateispeicherung).
