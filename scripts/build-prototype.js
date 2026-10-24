@@ -20,6 +20,8 @@ for (const f of ['index.html', 'team.html', 'moderator.html', 'beamer.html']) {
   fs.writeFileSync(path.join(OUT, f === 'index.html' ? 'start.html' : f), rename(text));
 }
 fs.cpSync(path.join(ROOT, 'assets'), path.join(OUT, 'assets'), { recursive: true });
+const clientJs = path.join(OUT, 'assets', 'js', 'client.js');
+fs.writeFileSync(clientJs, fs.readFileSync(clientJs, 'utf8').replace('const PROTOTYPE_BUILD = false;', 'const PROTOTYPE_BUILD = true;'));
 const modJs = path.join(OUT, 'assets', 'js', 'moderator.js');
 fs.writeFileSync(modJs, rename(fs.readFileSync(modJs, 'utf8')));
 fs.copyFileSync(path.join(ROOT, 'prototype', 'index.html'), path.join(OUT, 'prototype.html'));

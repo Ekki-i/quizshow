@@ -91,10 +91,52 @@
     el.innerHTML = `<div class="label"><span class="dot" style="--c:${s.color}"></span>${s.label}<span class="size">${s.w} × ${s.h}</span></div><div class="device"><iframe title="${s.label}" width="${s.w}" height="${s.h}"></iframe></div>`;
     stage.append(el);
     const iframe = el.querySelector('iframe');
+    iframe.name = 'quiz-proto';
     iframe.src = s.src;
     frames.push({ s, el, iframe, device: el.querySelector('.device') });
   }
 
+  // Brücke für abgeschottete Bildschirme: Kommt ein Bildschirm nicht direkt an
+  // window.__quizServer, schickt er Verbindungen und API-Aufrufe per postMessage.
+  const bridged = new Map(); // Fenster -> Map(cid -> Verbindung)
+  function bridgeConns(source) {
+    if (!bridged.has(source)) bridged.set(source, new Map());
+    return bridged.get(source);
+  }
+  window.addEventListener('message', async (ev) => {
+    const msg = ev.data;
+    const source = ev.source;
+    if (!msg || msg.quiz !== true || !source || !frames.some((f) => f.iframe.contentWindow === source)) return;
+    const reply = (m) => {
+      try {
+        source.postMessage({ quiz: true, ...m }, '*');
+      } catch {
+        // Bildschirm wurde inzwischen neu geladen.
+      }
+    };
+    const conns = bridgeConns(source);
+    if (msg.op === 'connect') {
+      const c = server.connect();
+      conns.set(msg.cid, c);
+      c.onopen = () => reply({ op: 'open', cid: msg.cid });
+      c.onmessage = (e) => reply({ op: 'message', cid: msg.cid, data: e.data });
+      const close = c.close;
+      c.close = () => {
+        conns.delete(msg.cid);
+        close();
+        reply({ op: 'close', cid: msg.cid });
+      };
+    } else if (msg.op === 'send') {
+      conns.get(msg.cid)?.send(msg.text);
+    } else if (msg.op === 'close') {
+      const c = conns.get(msg.cid);
+      conns.delete(msg.cid);
+      c?.close();
+    } else if (msg.op === 'api') {
+      const [status, data] = await server.api(msg.name, msg.body);
+      reply({ op: 'api', callId: msg.callId, status, data });
+    }
+  });
   // Jeden Bildschirm in seiner echten Größe rendern und auf die Spaltenbreite skalieren.
   function fit() {
     for (const f of frames) {

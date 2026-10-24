@@ -18,17 +18,104 @@ function findLocalServer() {
   return null;
 }
 
-export const localServer = findLocalServer();
+// Ist die umgebende Seite abgeschottet (anderer Ursprung, z. B. in einer
+// eingebetteten Vorschau), geht kein direkter Zugriff. Die Prototyp-Seite gibt
+// ihren Bildschirmen dann den Fensternamen „quiz-proto“ mit, und Verbindung und
+// API laufen über postMessage zur umgebende Seite.
+// Der Prototyp-Build setzt PROTOTYPE_BUILD auf true; in der echten Anwendung
+// bleibt die Brücke aus.
+const PROTOTYPE_BUILD = false;
+
+function messageProxy() {
+  if (window.parent === window || !(PROTOTYPE_BUILD || window.name === 'quiz-proto')) return null;
+  const conns = new Map();
+  const calls = new Map();
+  let seq = 0;
+  const post = (msg) => window.parent.postMessage({ quiz: true, ...msg }, '*');
+  // Verschachtelte Bildschirme (z. B. die Beamer-Vorschau in der Moderation)
+  // schicken ihre Nachrichten hierher; sie werden nach oben weitergereicht und
+  // die Antworten anhand der IDs zurück nach unten.
+  const children = new Map();
+  window.addEventListener('message', (ev) => {
+    const msg = ev.data;
+    if (!msg || msg.quiz !== true) return;
+    if (ev.source !== window.parent) {
+      const key = msg.cid || msg.callId;
+      if (ev.source && key) {
+        children.set(key, ev.source);
+        window.parent.postMessage(msg, '*');
+      }
+      return;
+    }
+    const child = children.get(msg.cid || msg.callId);
+    if (child) {
+      if (msg.op === 'api' || msg.op === 'close') children.delete(msg.cid || msg.callId);
+      try {
+        child.postMessage(msg, '*');
+      } catch {
+        // Verschachtelter Bildschirm existiert nicht mehr.
+      }
+      return;
+    }
+    if (msg.op === 'api') {
+      const done = calls.get(msg.callId);
+      calls.delete(msg.callId);
+      return done?.([msg.status, msg.data]);
+    }
+    const c = conns.get(msg.cid);
+    if (!c) return;
+    if (msg.op === 'open') {
+      c.readyState = 1;
+      c.onopen?.();
+    } else if (msg.op === 'message') {
+      c.onmessage?.({ data: msg.data });
+    } else if (msg.op === 'close') {
+      conns.delete(msg.cid);
+      if (c.readyState !== 3) {
+        c.readyState = 3;
+        c.onclose?.();
+      }
+    }
+  });
+  return {
+    demoToken: 'demo-token',
+    connect() {
+      const cid = `c${++seq}_${Math.random().toString(36).slice(2)}`;
+      const c = {
+        readyState: 0,
+        send: (text) => post({ op: 'send', cid, text }),
+        close: () => {
+          if (c.readyState === 3) return;
+          c.readyState = 3;
+          conns.delete(cid);
+          post({ op: 'close', cid });
+        },
+      };
+      conns.set(cid, c);
+      post({ op: 'connect', cid });
+      return c;
+    },
+    api(name, body) {
+      const callId = `a${++seq}`;
+      return new Promise((resolve) => {
+        calls.set(callId, resolve);
+        post({ op: 'api', callId, name, body });
+      });
+    },
+  };
+}
+
+export const localServer = findLocalServer() || messageProxy();
 
 if (localServer) {
   const realFetch = window.fetch.bind(window);
-  window.fetch = (input, init) => {
+  window.fetch = async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);
     const m = url.pathname.match(/\/api\/(teams|login|logout)$/);
     if (!m) return realFetch(input, init);
     const body = init?.body ? JSON.parse(init.body) : {};
-    const [status, data] = localServer.api(m[1], body);
-    return Promise.resolve(new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }));
+    const [status, data] = await localServer.api(m[1], body);
+    return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
   };
 }
 
