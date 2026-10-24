@@ -467,3 +467,25 @@ body.beamer-page { background: #05060f; }
 .beamer .t5-value { font-weight: 700; font-size: clamp(0.8rem, min(1.8vw, 3vh), 2rem); color: var(--text-muted); }
 .beamer .t5 .solution { margin-top: 0.4vh; font-size: clamp(1rem, min(3vw, 5.2vh), 3.4rem); padding: 1vh 2.4vw; }
 .beamer .t5 .chip { font-size: clamp(0.8rem, min(1.6vw, 2.8vh), 1.8rem); }
+
+/* Fragen-Banner: dunkle Box mit grauen Dreiecken links und rechts, die nach
+   innen zeigen; hebt die Frage klar vom Bühnenhintergrund ab. */
+.beamer .q {
+  --tri: clamp(3rem, 9vh, 7.5rem);
+  position: relative; width: min(92vw, 160vh); margin: 0 auto 3vh; box-sizing: border-box;
+  min-height: calc(var(--tri) * 1.4); display: flex; align-items: center; justify-content: center;
+  padding: 2.2vh calc(var(--tri) * 1.35);
+  background: #201f22; color: #fff; text-shadow: none;
+  font-family: var(--font); font-weight: 500; letter-spacing: 0.01em; line-height: 1.2;
+  font-size: clamp(1rem, min(2.6vw, 4.4vh), 2.8rem); text-wrap: balance;
+  box-shadow: 0 1.2vh 3vh rgba(0, 0, 0, 0.55);
+  animation: qIn calc(0.45s * var(--speed)) ease-out both;
+}
+.beamer .q::before, .beamer .q::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: var(--tri); background: #444446;
+}
+.beamer .q::before { left: 0; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.beamer .q::after { right: 0; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+.beamer .q.compact { --tri: clamp(2.6rem, 7.5vh, 6.2rem); font-size: clamp(0.95rem, min(2.3vw, 3.9vh), 2.5rem); margin-bottom: 2vh; padding-top: 1.6vh; padding-bottom: 1.6vh; }
+.beamer .q.finale { color: var(--accent-2); }
+@keyframes qIn { from { opacity: 0; transform: scaleX(0.92); } to { opacity: 1; transform: none; } }

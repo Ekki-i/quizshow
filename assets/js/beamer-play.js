@@ -59,7 +59,7 @@ function land(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, 'Ich sehe ein Land …'), h('div', { class: 'map-box beamer-map' }, mapView(v.map))];
   const markers = (v.guesses || []).map((g) => ({ lat: g.lat, lng: g.lng, color: teamOf(g.teamId).color, label: teamOf(g.teamId).name, showLabel: true }));
   if (v.target) markers.push({ lat: v.target.lat, lng: v.target.lng, kind: 'target', label: v.target.name });
-  const out = [h('div', { class: 'q', style: { fontSize: 'clamp(1.4rem,3vw,3rem)' } }, v.question), h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers }))];
+  const out = [h('div', { class: 'q compact' }, v.question), h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers }))];
   if (!v.guesses) out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben ihren Punkt gesetzt`, { marginTop: '2vh' }));
   if (v.target) {
     const w = v.winners.map((id) => teamOf(id).name).join(', ');
