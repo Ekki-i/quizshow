@@ -110,8 +110,10 @@ export const localServer = findLocalServer() || messageProxy();
 if (localServer) {
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
-    const url = new URL(typeof input === 'string' ? input : input.url, location.href);
-    const m = url.pathname.match(/\/api\/(teams|login|logout)$/);
+    // Ohne new URL(): In eingebetteten Einzeldatei-Seiten (srcdoc) gibt es keine
+    // auflösbare Seitenadresse.
+    const raw = typeof input === 'string' ? input : input.url;
+    const m = raw.split(/[?#]/)[0].match(/(?:^|\/)api\/(teams|login|logout)$/);
     if (!m) return realFetch(input, init);
     const body = init?.body ? JSON.parse(init.body) : {};
     const [status, data] = await localServer.api(m[1], body);

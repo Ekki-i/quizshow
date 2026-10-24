@@ -38,6 +38,10 @@ Die Übersichtsseite `prototype.html` zeigt Moderation, Beamer, drei Team-iPads 
 die Startseite nebeneinander. Die Spiellogik läuft dabei im Browser, alles bleibt in
 diesem einen Browser gespeichert. Moderator-Passwort im Prototyp: `demo`.
 
+`npm run build:single` erzeugt zusätzlich `dist-single/quizshow-prototyp.html`: den
+kompletten Prototyp als **eine** eigenständige Datei ohne nachgeladene Dateien. Sie läuft
+per Doppelklick direkt von der Festplatte und auch in abgeschotteten Vorschauen.
+
 ## Ablauf in Kürze
 
 1. Als Moderator anmelden, unter **Teams** die Teams anlegen (Standard: sechs).
