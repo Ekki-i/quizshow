@@ -60,6 +60,15 @@ function bookTarget(db, ctx, ref, teamId, target, reason) {
   return entry;
 }
 
+// Handschriftliche Antwort als PNG (data:-URI) vom Team-iPad.
+const INK_MAX = 400000;
+function cleanInk(v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(v)) fail('Ungültige Handschrift.');
+  if (v.length > INK_MAX) fail('Die Handschrift ist zu groß.');
+  return v;
+}
+
 function cleanText(v, max) {
   if (typeof v !== 'string') fail('Ungültige Eingabe.');
   const s = v.trim();
@@ -114,6 +123,6 @@ function distanceKm(a, b) {
 }
 
 module.exports = {
-  QuizError, fail, newId, randomInt, log, effect, teamName, teamIds, totals, bookTarget, cleanText, cleanChoice, pts,
+  QuizError, fail, newId, randomInt, log, effect, teamName, teamIds, totals, bookTarget, cleanText, cleanInk, cleanChoice, pts,
   buzzIn, currentBuzz, buzzTeamView, distanceKm,
 };

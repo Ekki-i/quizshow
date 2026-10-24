@@ -2,6 +2,7 @@
 // vollständigen Spielzustand (Antworten, Gebote, Guthaben), Teams und Beamer nicht.
 
 import { h } from './client.js';
+import { answerContent } from './ink.js';
 import { mapView } from './map.js';
 
 const MOVIE_HINTS = [
@@ -65,7 +66,7 @@ function leichte5(ui, g, st) {
     if (!a) return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, t.name, h('span', { class: 'muted' }, ' – noch nicht abgegeben')));
     const grade = a.grade === true ? badge('ok', '✓ richtig') : a.grade === false ? badge('bad', '✗ falsch') : badge('warn', 'offen');
     return h('li', {}, ui.dot(t.color),
-      h('span', { class: 'grow' }, h('b', {}, t.name), ': ', a.text),
+      h('span', { class: 'grow' }, h('b', {}, t.name), ': ', answerContent(a, 'mod')),
       grade,
       btn(`small ${a.onBeamer ? 'cyan' : 'ghost'}`, a.onBeamer ? 'Auf Beamer ✓' : 'Auf Beamer zeigen', () => ui.act('play.showAnswer', { teamId: t.id, visible: !a.onBeamer })),
       btn('small ok', '✓ Richtig', () => ui.act('play.grade', { teamId: t.id, correct: true })),
@@ -190,10 +191,10 @@ function kassenschlager(ui, g, st) {
     if (m.turn.phase === 'grading') {
       const a = tm.answers[tm.answers.length - 1];
       const forms = [movie.title, ...movie.aliases.split(',')].map(norm).filter(Boolean);
-      const suggest = forms.includes(norm(a.text));
+      const suggest = !a.ink && forms.includes(norm(a.text));
       out.push(h('div', { class: 'card', style: { background: 'rgba(255,255,255,.05)' } },
-        h('p', { style: { fontSize: '1.4rem', margin: 0 } }, `„${a.text}“`),
-        h('p', { class: 'muted' }, suggest ? 'Vorschlag: stimmt mit Titel/Alias überein' : 'Vorschlag: kein exakter Treffer – bitte selbst prüfen'),
+        a.ink ? answerContent(a, 'mod-large') : h('p', { style: { fontSize: '1.4rem', margin: 0 } }, `„${a.text}“`),
+        h('p', { class: 'muted' }, a.ink ? `Handschrift – bitte selbst prüfen. Lösung: ${movie.title}` : suggest ? 'Vorschlag: stimmt mit Titel/Alias überein' : 'Vorschlag: kein exakter Treffer – bitte selbst prüfen'),
         row(btn('ok', '✓ Richtig (+5 $)', () => ui.act('play.grade', { correct: true })), btn('bad', '✗ Falsch', () => ui.act('play.grade', { correct: false })))));
     } else {
       out.push(row(btn('small ghost', 'Zug überspringen', () => ui.confirmAct(`Zug von ${ui.teamName(m.turn.teamId)} überspringen?`, 'play.skip'))));

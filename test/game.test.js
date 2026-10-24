@@ -507,3 +507,28 @@ test('Mehrere Shows: anlegen, umbenennen, wechseln, duplizieren, löschen', () =
   assert.equal(db.shows.length, 1);
   assert.throws(() => game.applyAction(db, mod(), 'shows.rename', { showId: first, date: '12.11.2026' }), /Datum/);
 });
+
+test('Handschrift: Spiel 1 und Kassenschlager nehmen PNG-Antworten an und prüfen sie', () => {
+  const INK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { db, ids } = setup(2);
+  const [a, b] = ids;
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
+  game.applyAction(db, mod(), 'play.open', { qIndex: 0 });
+  assert.throws(() => game.applyAction(db, team(a), 'play.submit', { ink: 'data:text/html;base64,PHNjcmlwdD4=' }), /Ungültige Handschrift/);
+  assert.throws(() => game.applyAction(db, team(a), 'play.submit', { ink: `data:image/png;base64,${'A'.repeat(400001)}` }), /zu groß/);
+  assert.throws(() => game.applyAction(db, team(a), 'play.submit', {}), /aufschreiben/);
+  game.applyAction(db, team(a), 'play.submit', { ink: INK });
+  assert.equal(game.teamView(db, a).play.answer.ink, INK);
+  game.applyAction(db, mod(), 'play.showAnswer', { teamId: a, visible: true });
+  game.applyAction(db, mod(), 'beamer.show', { view: 'game' });
+  assert.equal(game.beamerView(db).gameView.answers[0].ink, INK);
+  assert.equal(game.teamView(db, b).play.answer, null);
+
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'kassenschlager') });
+  game.applyAction(db, mod(), 'play.startMovie', { movieIndex: 0 });
+  game.applyAction(db, team(a), 'play.buy', { hint: 3 });
+  game.applyAction(db, team(a), 'play.answer', { ink: INK });
+  game.applyAction(db, mod(), 'play.grade', { correct: false });
+  assert.equal(game.teamView(db, a).play.lastAnswer.ink, INK);
+  assert.ok(!JSON.stringify(game.beamerView(db)).includes(INK));
+});

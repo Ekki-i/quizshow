@@ -1,6 +1,7 @@
 // Beamer: Spielansichten für alle acht Spiele. Es kommen nur freigegebene Daten an.
 
 import { h } from './client.js';
+import { answerContent } from './ink.js';
 import { mapView } from './map.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -36,7 +37,7 @@ function leichte5(v, teamOf) {
   out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
     const t = teamOf(a.teamId);
     const mark = a.grade === true ? h('span', { class: 'mark ok', 'aria-label': 'richtig' }, '✓') : a.grade === false ? h('span', { class: 'mark bad', 'aria-label': 'falsch' }, '✗') : null;
-    return h('div', { class: 'answer', '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), a.text), mark);
+    return h('div', { class: `answer${a.ink ? ' has-ink' : ''}`, '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), answerContent(a, 'beamer')), mark);
   })));
   if (v.solution) out.push(h('div', { class: 'solution' }, `Lösung: ${v.solution}`));
   return out;

@@ -4,7 +4,7 @@
 // private Paywall mit zehn Hinweisen und startet mit 20 $. Pro Zug kauft ein
 // Team einen Hinweis und rät; richtig gibt 5 $. Am Ende: Punkte = ⌈Guthaben ÷ 2⌉.
 
-const { fail, log, effect, teamName, teamIds, bookTarget, cleanText } = require('./core');
+const { fail, log, effect, teamName, teamIds, bookTarget, cleanText, cleanInk } = require('./core');
 const { MOVIE_HINTS } = require('./defaults');
 
 const START_MONEY = 20;
@@ -103,9 +103,11 @@ module.exports = {
       const m = movie(st);
       if (!m.turn || m.turn.teamId !== ctx.teamId) fail('Ihr seid gerade nicht am Zug.');
       if (m.turn.phase !== 'answer') fail(m.turn.phase === 'buy' ? 'Erst einen Hinweis kaufen.' : 'Eure Antwort wird gerade bewertet.');
-      const text = cleanText(p.text, 120);
-      if (!text) fail('Bitte einen Filmtitel eingeben.');
-      teamMovie(m, ctx.teamId).answers.push({ text, at: ctx.now, grade: null, cycle: m.cycle });
+      // Filmtitel handschriftlich (Apple Pencil) oder als Text.
+      const ink = cleanInk(p.ink);
+      const text = ink ? '' : cleanText(p.text ?? '', 120);
+      if (!ink && !text) fail('Bitte zuerst den Filmtitel aufschreiben.');
+      teamMovie(m, ctx.teamId).answers.push({ text, ink, at: ctx.now, grade: null, cycle: m.cycle });
       m.turn.phase = 'grading';
       log(db, ctx, 'antwort', `${teamName(db, ctx.teamId)} hat einen Titel abgegeben`);
     },
@@ -139,7 +141,7 @@ module.exports = {
         tm.solved = true;
         st.wallet[id] += REWARD;
       }
-      log(db, ctx, 'bewertung', `${teamName(db, id)}: „${a.text}“ ${a.grade ? `richtig (+${REWARD} $)` : 'falsch'}`);
+      log(db, ctx, 'bewertung', `${teamName(db, id)}: ${a.ink ? 'handschriftliche Antwort' : `„${a.text}“`} ${a.grade ? `richtig (+${REWARD} $)` : 'falsch'}`);
       advance(db, ctx, game, st, m);
     },
 
@@ -202,7 +204,7 @@ module.exports = {
         text: tm.bought.includes(i) ? content.hints[i] : null,
       })),
       solved: tm.solved,
-      lastAnswer: answer ? { text: answer.text, grade: answer.grade } : null,
+      lastAnswer: answer ? { text: answer.text, ink: answer.ink || null, grade: answer.grade } : null,
     };
   },
 
