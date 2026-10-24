@@ -90,12 +90,23 @@ function kassenschlager(v, teamOf) {
 // ---------- 5 ----------
 function trumpf5(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, '5 ist Trümpf')];
-  const out = [sub(`Begriff ${v.termIndex + 1} · Kategorie`), h('div', { class: 'q' }, v.category)];
-  out.push(h('ol', { class: 'hints' }, v.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}`), t))));
-  if (!v.resolved && v.hints.length) out.push(sub(`Jetzt noch ${pts(v.value)}`, { marginTop: '2vh' }));
-  out.push(buzzRow(v, teamOf, v.buzzOrder, v.answering));
-  if (v.term) out.push(h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(v.winner).name}` : ''}`));
-  return out;
+  // Kompakt: alles muss auf einen Beamer-Bildschirm passen. Noch verdeckte
+  // Hinweise stehen als Platzhalter da, damit nichts springt.
+  const slots = Array.from({ length: 5 }, (_, i) => {
+    const text = v.hints[i];
+    const value = 5 - i;
+    return h('li', { class: text === undefined ? 'empty' : '' },
+      h('span', { class: 'pv', 'aria-label': `${value} ${value === 1 ? 'Punkt' : 'Punkte'}` }, String(value)),
+      h('span', { class: 'tx' }, text === undefined ? '' : text));
+  });
+  const foot = [];
+  if (!v.resolved && v.hints.length) foot.push(h('span', { class: 't5-value' }, `Jetzt noch ${pts(v.value)}`));
+  const buzz = buzzRow(v, teamOf, v.buzzOrder, v.answering);
+  return [h('div', { class: 't5' },
+    h('div', { class: 't5-cat' }, h('small', {}, `Begriff ${v.termIndex + 1} · Kategorie`), v.category),
+    h('ol', { class: 'hints' }, slots),
+    foot.length || buzz ? h('div', { class: 't5-foot' }, ...foot, buzz) : null,
+    v.term ? h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(v.winner).name}` : ''}`) : null)];
 }
 
 // ---------- 6 ----------

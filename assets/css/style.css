@@ -452,3 +452,18 @@ body.beamer-page { background: #05060f; }
 .ink-answer.mod-large { width: 100%; max-width: 560px; margin-bottom: 8px; }
 .beamer .answer.has-ink { align-items: center; }
 .beamer .answer .ink-answer.beamer { height: 20vh; width: auto; max-width: 100%; margin-top: 0.6vh; object-fit: contain; }
+
+/* Spiel 5 „5 ist Trümpf“: kompakt, passt mit allen Hinweisen auf den Beamer */
+.beamer .t5 { display: flex; flex-direction: column; align-items: center; gap: 1.6vh; width: 100%; }
+.beamer .t5-cat { font-weight: 800; text-transform: uppercase; line-height: 1; font-size: clamp(1.2rem, min(4.4vw, 7vh), 4.6rem); text-shadow: var(--glow); }
+.beamer .t5-cat small { display: block; font-size: 0.3em; letter-spacing: 0.14em; color: var(--accent-3); margin-bottom: 0.5em; text-shadow: none; }
+.beamer .t5 .hints { width: 100%; max-width: min(86vw, 150vh); gap: 0.9vh; }
+.beamer .t5 .hints li { display: flex; align-items: center; gap: 1.1vw; font-family: var(--font); font-weight: 600; letter-spacing: 0.005em; line-height: 1.15; font-size: clamp(0.85rem, min(2.4vw, 3.9vh), 2.7rem); padding: 1.1vh 1.6vw; min-height: 7.2vh; background: linear-gradient(90deg, rgba(23, 25, 58, 0.96), rgba(39, 42, 88, 0.9)); border-left: 0.5vw solid var(--accent); text-wrap: pretty; }
+.beamer .t5 .hints li .pv { flex: none; width: 2em; height: 2em; border-radius: 50%; display: grid; place-items: center; background: var(--accent-2); color: #1a0f00; font-family: var(--font-display); font-weight: 800; font-size: 0.78em; }
+.beamer .t5 .hints li.empty { background: rgba(23, 25, 58, 0.45); border-left-color: rgba(255, 255, 255, 0.15); animation: none; }
+.beamer .t5 .hints li.empty .pv { background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.5); }
+.beamer .t5-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1.2vw; }
+.beamer .t5-foot .row { margin-top: 0 !important; }
+.beamer .t5-value { font-weight: 700; font-size: clamp(0.8rem, min(1.8vw, 3vh), 2rem); color: var(--text-muted); }
+.beamer .t5 .solution { margin-top: 0.4vh; font-size: clamp(1rem, min(3vw, 5.2vh), 3.4rem); padding: 1vh 2.4vw; }
+.beamer .t5 .chip { font-size: clamp(0.8rem, min(1.6vw, 2.8vh), 1.8rem); }
