@@ -568,6 +568,9 @@ test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze 
   assert.equal(steps.filter((s) => s.kind === 'pyramid').length, 1);
   assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
   assert.ok(steps.some((s) => s.kind === 'pause'));
+  // Nach Spiel 4: erst Pause, dann Münzvergabe
+  const p4 = steps.findIndex((s) => s.kind === 'game' && s.pos === 4);
+  assert.deepEqual(steps.slice(p4 + 1, p4 + 3).map((s) => s.kind), ['pause', 'coin']);
   assert.equal(steps.at(-1).kind, 'end');
   assert.throws(() => game.applyAction(db, mod(), 'run.prev', {}), /erste Schritt/);
   game.applyAction(db, mod(), 'run.next', {});
@@ -586,7 +589,8 @@ test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze 
   assert.equal(db.live.beamer.view, 'coin');
   assert.equal(db.live.coins[0].teamId, ids[1]);
   game.applyAction(db, mod(), 'run.next', {});
-  assert.equal(db.live.beamer.view, 'pause');
+  assert.equal(db.live.beamer.view, 'title');
+  assert.equal(db.live.activeGame, db.project.games[4].id);
   // eigener Ablauf mit zusätzlicher Pause; ungültige Schritte werden abgelehnt
   const custom = steps.map(({ id, kind, pos }) => ({ id, kind, pos }));
   custom.splice(2, 0, { kind: 'pause' });
