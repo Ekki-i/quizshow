@@ -463,7 +463,7 @@
         tris(Math.min(score, f.target), who));
       const question = !r
         ? h('div', { class: 'fx-q' }, h('span', {}, `${f.team.name} gegen ${f.host || 'die Moderation'}`), h('b', {}, `Wer zuerst ${f.target} Punkte hat, gewinnt`))
-        : h('div', { class: `fx-q${an(isNew.question, 'enter')}${r.resolved ? '' : ' no-answer'}` }, h('span', {}, r.question),
+        : h('div', { class: `fx-q${an(isNew.question, 'enter')}${r.resolved ? '' : ' no-answer'}${r.question.length > 70 ? ' long' : ''}` }, h('span', {}, r.question),
           r.resolved ? h('b', { class: an(isNew.resolved, 'enter').trim() }, r.solution || '–',
             r.challenged ? h('em', { class: r.coinLost ? 'bad' : 'ok' }, r.coinLost ? 'Münze verloren' : 'Münze zurück') : null) : null);
       // Münzfeld auf der Pultfront: verlorene Münzen bleiben liegen, die eingesetzte glänzt.
