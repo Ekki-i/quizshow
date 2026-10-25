@@ -696,7 +696,10 @@ test('Finale: Moderation punktet immer, Münze erzwingt Aufdecken, Sudden Death'
 
 test('Finale: Team erreicht das Ziel allein und gewinnt das Ticket', () => {
   const { db, ids } = setup(2);
-  db.live.coins.push({ position: 4, teamId: ids[0] });
+  db.live.coins.push({ position: 4, teamId: ids[1] }, { position: 8, teamId: ids[0] });
+  // Gleichstand nach Punkten: Finalteam ist das Team mit der Münze der letzten Gewinnstufe
+  assert.equal(game.moderatorView(db).finale.suggestion, ids[0]);
+  db.live.coins = [{ position: 4, teamId: ids[0] }];
   game.applyAction(db, mod(), 'finale.config', { target: 1, questions: [{ question: 'Q?', answer: 'A' }] });
   game.applyAction(db, mod(), 'finale.start', { teamId: ids[0] });
   game.applyAction(db, mod(), 'finale.next', {});

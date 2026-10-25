@@ -72,8 +72,15 @@ function coinsLeft(db, f) {
   return Math.max(0, coinsOf(db, f.teamId) - f.coinsLost);
 }
 
-// Das Team mit den meisten Punkten (bei Gleichstand: mehr Münzen, dann Reihenfolge).
+// Finalteam: der Sieger nach allen acht Spielen. Das ist das Team mit der Münze der
+// letzten Gewinnstufe (bei Punktgleichstand per Schätzfrage entschieden), sonst das
+// Team mit den meisten Punkten.
 function topTeam(db) {
+  const last = [...db.live.coins].sort((a, b) => b.position - a.position)[0];
+  if (last && last.position === 8) {
+    const t = db.project.teams.find((x) => x.id === last.teamId);
+    if (t) return t;
+  }
   const sums = totals(db);
   const teams = [...db.project.teams].sort((a, b) => (sums[b.id] || 0) - (sums[a.id] || 0) || coinsOf(db, b.id) - coinsOf(db, a.id));
   return teams[0] || null;
