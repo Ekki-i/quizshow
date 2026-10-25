@@ -271,7 +271,7 @@ function jauch(ui, g, st) {
   const q = st.qIndex ?? -1;
   const r = q >= 0 ? st.rounds[q] : null;
   const teams = ui.S.project.teams;
-  const out = [h('div', { class: 'ladder' }, JAUCH_LADDER.map((v, i) => h('span', { class: `step ${i === q ? 'current' : ''} ${i === 3 ? 'safe' : ''}` }, `${i + 1}: ${v}`)))];
+  const out = [h('div', { class: 'ladder' }, JAUCH_LADDER.map((v, i) => h('span', { class: `step ${i === q ? 'current' : ''} ${i === 3 ? 'safe' : ''}` }, `${i + 1}: ${v} P`)))];
   const canNext = q < JAUCH_LADDER.length - 1 && (q < 0 || r?.revealed);
   if (!r) return [...out, row(btn('pink', 'Frage 1 freigeben', () => ui.act('play.next'), !canNext))];
   const question = g.content.questions[q];
