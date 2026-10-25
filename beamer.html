@@ -471,16 +471,18 @@
       for (let i = 0; i < lostCount; i++) deskCoins.push(coinImg(`fx-desk-coin${an(isNew.resolved && r.coinLost && i === lostCount - 1, 'target')}`));
       if (inPlay) deskCoins.push(coinImg(`fx-desk-coin inplay${an(isNew.challenge, 'target')}`));
       const { W: PW, H: PH, pc } = PULT;
-      const pult = h('div', { class: 'fx-pultwrap' }, h('div', { class: 'scene fx-pult' },
+      // Ein durchgehender Raum: das ganze Studio-Bild füllt den Beamer, das Pult steht in der Mitte.
+      const pult = h('div', { class: 'scene fx-room' },
         ...pultLayers(s.show, 'cohost'),
+        h('div', { class: 'overlay fx-screen', style: { left: pc(389, PW), top: pc(34, PH), width: pc(159, PW), height: pc(124, PH) } }, h('b', {}, f.sudden ? 'SUDDEN DEATH' : 'FINALE')),
         h('div', { class: 'fx-field', style: { left: pc(372, PW), top: pc(316, PH), width: pc(130, PW), height: pc(72, PH) } },
-          h('span', { class: 'fx-glitch' }, 'FINALE'), h('div', { class: 'fx-field-coins' }, deskCoins))));
-      const out = [h('div', { class: 'fb-stage fx' },
+          h('span', { class: 'fx-glitch' }, 'FINALE'), h('div', { class: 'fx-field-coins' }, deskCoins)));
+      const out = [h('div', { class: 'fb-stage fx' }, pult,
         h('div', { class: 'fx-top' }, f.sudden ? h('div', { class: `fb-sudden${an(isNew.sudden, 'enter')}` }, 'SUDDEN DEATH') : null),
         h('div', { class: 'fx-bottom' },
           side('team', f.team.name, f.team.color, teamBoard, f.score.team, r ? r.teamGrade : null, isNew.teamGrade,
             singlePodium({ avatar: f.team.avatar, color: f.team.color, label: `Pult ${f.team.name}`, extra: coinRow })),
-          h('div', { class: 'fx-mid' }, pult, question),
+          h('div', { class: 'fx-mid' }, question),
           side('mod', f.host || 'Moderation', '#7fc8bd', modBoard, f.score.mod, r ? r.modGrade : null, isNew.modGrade,
             singlePodium({ mirror: true, avatar: hostAvatar, color: '#7fc8bd', label: `Pult ${f.host || 'Moderation'}` }))))];
       // Münzflug: Einsatz → vom Team auf das Pult; zurück → vom Pult zum Team.
