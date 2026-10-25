@@ -206,6 +206,7 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--surface-
 @keyframes pulse { 50% { transform: scale(1.06); } }
 @keyframes dance { from { transform: translate(-0.12em, 0.06em) rotate(-8deg); } to { transform: translate(0.12em, -0.08em) rotate(8deg); } }
 @keyframes spin { from { transform: rotateY(0) scale(0.4); } to { transform: rotateY(1440deg) scale(1); } }
+@keyframes spinIn { from { transform: rotateY(0) scale(0.4); opacity: 0; } 8% { opacity: 1; } to { transform: rotateY(1440deg) scale(1); opacity: 1; } }
 
 /* Bestätigungsdialog */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(10, 2, 24, 0.72); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 200; }
@@ -411,14 +412,17 @@ body.beamer-page { background: #05060f; }
 .scene-pult .overlay { flex-direction: column; gap: 0.1em; text-transform: uppercase; letter-spacing: 0.02em; }
 .scene-pult .overlay small { font-size: 1.85cqw; font-weight: 800; }
 .scene-pult .overlay b { font-size: 7cqw; line-height: 0.9; color: #fff; text-shadow: 0 0 0.25em rgba(255, 45, 138, 0.9); }
-.scene-banner { position: absolute; left: 50%; bottom: 6%; translate: -50% 0; white-space: nowrap; font-weight: 800; text-transform: uppercase; font-size: clamp(0.8rem, 4vw, 7vh); padding: 0.2em 0.8em; border-radius: 0.3em; background: #fff; color: #0b0b0b; border-bottom: 0.18em solid var(--team, var(--accent)); box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.6); animation: logoIn calc(0.6s * var(--speed)) 2.4s cubic-bezier(.2,1.4,.4,1) both; }
+.scene-banner { position: absolute; left: 50%; bottom: 6%; translate: -50% 0; white-space: nowrap; font-weight: 800; text-transform: uppercase; font-size: clamp(0.8rem, 4vw, 7vh); padding: 0.2em 0.8em; border-radius: 0.3em; background: #fff; color: #0b0b0b; border-bottom: 0.18em solid var(--team, var(--accent)); box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.6); animation: logoIn calc(0.6s * var(--speed)) calc(4.2s * var(--speed)) cubic-bezier(.2,1.4,.4,1) both; }
 .scene-coin { position: absolute; left: 50%; top: 18%; width: 16%; height: auto; margin-left: -8%; filter: drop-shadow(0 0 3vh rgba(255, 170, 110, 0.75)) drop-shadow(0 1vh 1.5vh rgba(0, 0, 0, 0.6)); animation: spin calc(2.4s * var(--speed)) ease-out both, coinAway 0.6s calc(2.4s * var(--speed)) ease-in forwards; }
 @keyframes coinAway { to { transform: translateY(40vh) scale(0.4); opacity: 0; } }
 /* Münzen auf dem Moderationspult; die vergebene hebt ab und wird zur großen Münze */
 .scene-pult .pult-coin { position: absolute; height: auto; filter: drop-shadow(0 0.3vh 0.4vh rgba(0, 0, 0, 0.55)); }
-.scene-pult .pult-coin.lift { animation: pultLift calc(0.6s * var(--speed)) 0.15s ease-in forwards; }
+.scene-pult .pult-coin.lift { animation: pultLift calc(1.4s * var(--speed)) calc(1.2s * var(--speed)) ease-in forwards; }
 @keyframes pultLift { 40% { transform: translateY(-15%) scale(1.15); filter: drop-shadow(0 0 2vh rgba(255, 170, 110, 0.9)); } to { transform: translateY(-500%) scale(2.2); opacity: 0; } }
-.scene-coin.from-pult { animation: spin calc(2.4s * var(--speed)) calc(0.55s * var(--speed)) ease-out both, coinAway 0.6s calc(2.95s * var(--speed)) ease-in forwards; }
+.scene-coin.from-pult { animation: spinIn calc(4.2s * var(--speed)) calc(2.2s * var(--speed)) ease-out both, coinAway calc(1s * var(--speed)) calc(6.4s * var(--speed)) ease-in forwards; }
+/* Moderationspult bei der Münzvergabe bildschirmfüllend (Bild deckt den ganzen Beamer ab) */
+.scene-pult.full { position: fixed; left: 50%; top: 50%; width: max(100vw, calc(100vh * 938 / 530)); translate: -50% -50%; margin: 0; z-index: 1; }
+.scene-pult.full > img:not(.scene-coin):not(.pult-coin) { border-radius: 0; }
 .reduced-motion .scene-pult .pult-coin.lift { animation: none; opacity: 0; }
 /* Münzen auf den Teampulten */
 .podium-coin { filter: drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, 0.6)); }
@@ -439,7 +443,7 @@ body.beamer-page { background: #05060f; }
 .coin-sequence { animation: logoIn calc(0.4s * var(--speed)) ease-out both; }
 .coin-teams { margin-top: 2vh; }
 .coin-teams .scene-teams { animation: sceneIn calc(0.6s * var(--speed)) ease-out both; }
-.coin-teams .scene-banner { bottom: auto; top: 100%; margin-top: 1.5vh; animation-delay: calc(1.4s * var(--speed)); }
+.coin-teams .scene-banner { bottom: auto; top: 100%; margin-top: 1.5vh; animation-delay: calc(4.3s * var(--speed)); }
 .coin-teams { padding-bottom: 11vh; }
 .scene-teams .overlay.points { animation: logoIn calc(0.4s * var(--speed)) ease-out both; }
 .scene-teams .overlay.points.winner { background: #1a1200; color: var(--accent-2); box-shadow: 0 0 0 2px var(--accent-2), 0 0 18px var(--accent-2); }
@@ -655,3 +659,15 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .tabs.sub-tabs { padding-left: 10px; border-left: 2px solid rgba(255, 45, 138, 0.55); }
 #main-tabs.hidden + .tabs.sub-tabs { padding-left: 0; border-left: 0; }
 .tabs.sub-tabs button { font-size: 0.95rem; padding: 8px 12px; }
+
+/* Team-Vorstellung: Pult für Pult mit Lichtkegel, Aufleuchten, Avatar fährt hoch, Name schwingt ein */
+.podiums.intro .podium-slot { animation: none; }
+.podiums.intro .podium-spot { opacity: 0; mix-blend-mode: screen; animation: spotOn calc(2.2s * var(--speed)) calc(var(--d) * var(--speed)) ease-out both; }
+.podiums.intro .podium-flash { opacity: 0; mix-blend-mode: screen; filter: blur(14px); animation: podFlash calc(1.6s * var(--speed)) calc((var(--d) + 0.3s) * var(--speed)) ease-out both; }
+.podiums.intro .podium-avatar { transform-box: fill-box; animation: avatarRise calc(1.3s * var(--speed)) calc((var(--d) + 0.4s) * var(--speed)) cubic-bezier(.2,1.25,.4,1) both; }
+.podiums.intro .podium-name { transform-box: fill-box; transform-origin: 50% 100%; animation: namePop calc(0.9s * var(--speed)) calc((var(--d) + 1s) * var(--speed)) cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes spotOn { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0.35; } }
+@keyframes podFlash { 0% { opacity: 0; } 30% { opacity: 0.55; } 100% { opacity: 0; } }
+@keyframes avatarRise { from { transform: translateY(75%); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+@keyframes namePop { from { transform: translateY(-20px) scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.intro-host { animation: logoIn calc(0.8s * var(--speed)) calc(var(--d) * var(--speed)) ease-out both; }
