@@ -163,7 +163,8 @@ export function singlePodium({ avatar, color, label, mirror = false, extra = nul
   const VW = 394, VH = 560, PY = VH - 342;
   const svg = el('svg', { class: 'single-podium', viewBox: `0 0 ${VW} ${VH}`, role: 'img', 'aria-label': label || '' });
   const cx = mirror ? 104 : 290;
-  if (avatar) svg.append(el('image', { href: avatar, x: cx - 135, y: 0, width: 270, height: 290, preserveAspectRatio: 'xMidYMin meet' }));
+  // Avatar so breit wie die Pultoberseite, unten bündig hinter der Pultkante (Oberkörper hinter dem Pult).
+  if (avatar) svg.append(el('image', { href: avatar, x: cx - 100, y: PY - 175, width: 200, height: 222, preserveAspectRatio: 'xMidYMax meet' }));
   svg.append(el('ellipse', { cx: VW / 2, cy: VH - 8, rx: 180, ry: 12, fill: '#000', opacity: 0.45 }));
   svg.append(el('image', { href: 'assets/img/finale-pult.webp', x: 0, y: PY, width: VW, height: 342, transform: mirror ? `translate(${VW} 0) scale(-1 1)` : null }));
   const top = h('div', { class: 'sp-top', style: { left: `${((mirror ? 6 : 200) / VW) * 100}%`, width: `${(188 / VW) * 100}%`, top: `${((PY - 34) / VH) * 100}%`, height: `${(44 / VH) * 100}%` } }, extra);
