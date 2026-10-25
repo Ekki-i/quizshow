@@ -7,6 +7,8 @@
 // - Das Team bekommt einen Punkt für jede richtige Antwort.
 // - Die Moderation bekommt bei jeder Frage einen Punkt, egal ob ihre Antwort
 //   stimmt, und muss sie nicht zeigen.
+// - Ablauf je Frage: beide antworten → die Frage wird aufgelöst und das Team bekommt
+//   seinen Punkt (oder nicht) → erst dann entscheidet das Team, ob es eine Münze setzt.
 // - Mit einer Münze zwingt das Team die Moderation, ihre Antwort aufzudecken:
 //   Ist sie richtig, ist die Münze weg und die Moderation behält ihren Punkt.
 //   Ist sie falsch, bekommt die Moderation keinen Punkt und das Team die Münze zurück.
@@ -108,6 +110,32 @@ function decide(db, ctx, f, winner, why) {
   log(db, ctx, 'finale', `Finale entschieden: ${winner === 'team' ? `${teamName(db, f.teamId)} stiehlt die Show` : 'Die Moderation behält die Show'} (${why})`);
 }
 
+// Runde abschließen, sobald das Team entschieden hat (Münze oder nicht).
+function finish(db, ctx, f, r) {
+  if (r.resolved) return;
+  r.resolved = true;
+  r.modPoint = r.challenged && r.modGrade === false ? 0 : 1;
+  r.coinLost = r.challenged && r.modGrade === true;
+  if (r.coinLost) f.coinsLost += 1;
+  f.score.mod += r.modPoint;
+  const target = config(db).target;
+  log(db, ctx, 'finale', `Finalfrage ${f.qIndex + 1} abgeschlossen: Team ${f.score.team}, Moderation ${f.score.mod}`);
+  // Keine Münze mehr: Das Team hat automatisch verloren.
+  if (r.coinLost && coinsLeft(db, f) === 0) return decide(db, ctx, f, 'mod', 'letzte Münze verloren');
+  if (f.sudden) {
+    if (!r.teamGrade) return decide(db, ctx, f, 'mod', 'Fehler des Teams im Sudden Death');
+    if (r.challenged && r.modGrade === false) return decide(db, ctx, f, 'team', 'Fehler der Moderation im Sudden Death');
+    return;
+  }
+  const t = f.score.team >= target, m = f.score.mod >= target;
+  if (t && m) {
+    f.sudden = true;
+    effect(db, 'reveal');
+    log(db, ctx, 'finale', 'Gleichstand am Ziel – Sudden Death');
+  } else if (t) decide(db, ctx, f, 'team', `${target} Punkte erreicht`);
+  else if (m) decide(db, ctx, f, 'mod', `${target} Punkte erreicht`);
+}
+
 const mod = {
   'finale.config'(db, ctx, p) {
     db.project.finale = cleanConfig(p);
@@ -127,7 +155,7 @@ const mod = {
     const qs = config(db).questions.filter((q) => q.question);
     if (f.qIndex + 1 >= qs.length) fail('Keine Finalfragen mehr – bitte im Editor weitere anlegen.');
     f.qIndex += 1;
-    f.rounds.push({ team: null, mod: null, teamGrade: null, challenged: false, modGrade: null, resolved: false, teamPoint: 0, modPoint: 0, coinLost: false });
+    f.rounds.push({ team: null, mod: null, teamGrade: null, challenged: false, modGrade: null, revealed: false, decided: false, resolved: false, teamPoint: 0, modPoint: 0, coinLost: false });
     log(db, ctx, 'finale', `Finalfrage ${f.qIndex + 1}${f.sudden ? ' (Sudden Death)' : ''} gestellt`);
   },
 
@@ -148,7 +176,7 @@ const mod = {
     const f = state(db);
     const r = current(f);
     if (!r.team) fail('Das Team hat noch nicht geantwortet.');
-    if (r.resolved) fail('Diese Frage ist schon aufgelöst.');
+    if (r.revealed) fail('Die Frage ist schon aufgelöst.');
     r.teamGrade = !!p.correct;
     effect(db, r.teamGrade ? 'correct' : 'wrong');
     log(db, ctx, 'finale', `${teamName(db, f.teamId)} Finalfrage ${f.qIndex + 1}: ${r.teamGrade ? 'richtig' : 'falsch'}`);
@@ -162,38 +190,33 @@ const mod = {
     r.modGrade = !!p.correct;
     effect(db, r.modGrade ? 'correct' : 'wrong');
     log(db, ctx, 'finale', `Aufgedeckte Antwort der Moderation: ${r.modGrade ? 'richtig – Münze verloren' : 'falsch – kein Punkt, Münze zurück'}`);
+    finish(db, ctx, f, r);
   },
 
+  // Frage auflösen: Lösung zeigen, das Team bekommt sofort seinen Punkt (oder keinen).
+  'finale.reveal'(db, ctx) {
+    const f = state(db);
+    const r = current(f);
+    if (r.revealed) fail('Die Frage ist schon aufgelöst.');
+    if (!r.team || !r.mod) fail('Erst müssen Team und Moderation antworten.');
+    if (r.teamGrade === null) fail('Erst die Antwort des Teams bewerten.');
+    r.revealed = true;
+    r.teamPoint = r.teamGrade ? 1 : 0;
+    f.score.team += r.teamPoint;
+    effect(db, 'reveal');
+    log(db, ctx, 'finale', `Finalfrage ${f.qIndex + 1} aufgelöst: Team ${r.teamPoint ? '+1' : '±0'} – jetzt entscheidet das Team über die Münze`);
+    if (coinsLeft(db, f) < 1) { r.decided = true; finish(db, ctx, f, r); }
+  },
+
+  // Ohne Münzeinsatz weiter (falls das Team nicht selbst entscheidet).
   'finale.resolve'(db, ctx) {
     const f = state(db);
     const r = current(f);
-    if (r.resolved) fail('Diese Frage ist schon aufgelöst.');
-    if (!r.team || !r.mod) fail('Erst müssen Team und Moderation antworten.');
-    if (r.teamGrade === null) fail('Erst die Antwort des Teams bewerten.');
+    if (r.resolved) fail('Diese Frage ist schon fertig.');
+    if (!r.revealed) fail('Erst die Frage auflösen.');
     if (r.challenged && r.modGrade === null) fail('Erst die aufgedeckte Antwort der Moderation bewerten.');
-    r.resolved = true;
-    r.teamPoint = r.teamGrade ? 1 : 0;
-    r.modPoint = r.challenged && r.modGrade === false ? 0 : 1;
-    r.coinLost = r.challenged && r.modGrade === true;
-    if (r.coinLost) f.coinsLost += 1;
-    f.score.team += r.teamPoint;
-    f.score.mod += r.modPoint;
-    const target = config(db).target;
-    log(db, ctx, 'finale', `Finalfrage ${f.qIndex + 1} aufgelöst: Team ${f.score.team}, Moderation ${f.score.mod}`);
-    // Keine Münze mehr: Das Team hat automatisch verloren.
-    if (r.coinLost && coinsLeft(db, f) === 0) return decide(db, ctx, f, 'mod', 'letzte Münze verloren');
-    if (f.sudden) {
-      if (!r.teamGrade) return decide(db, ctx, f, 'mod', 'Fehler des Teams im Sudden Death');
-      if (r.challenged && r.modGrade === false) return decide(db, ctx, f, 'team', 'Fehler der Moderation im Sudden Death');
-      return;
-    }
-    const t = f.score.team >= target, m = f.score.mod >= target;
-    if (t && m) {
-      f.sudden = true;
-      effect(db, 'reveal');
-      log(db, ctx, 'finale', 'Gleichstand am Ziel – Sudden Death');
-    } else if (t) decide(db, ctx, f, 'team', `${target} Punkte erreicht`);
-    else if (m) decide(db, ctx, f, 'mod', `${target} Punkte erreicht`);
+    r.decided = true;
+    finish(db, ctx, f, r);
   },
 
   // Notfall: Sieger von Hand festlegen oder Entscheidung zurücknehmen.
@@ -230,13 +253,26 @@ const team = {
     if (ctx.teamId !== f.teamId) fail('Nur das Finalteam kann eine Münze einsetzen.');
     const r = current(f);
     if (r.resolved) fail('Diese Frage ist schon aufgelöst.');
-    if (!r.team || !r.mod) fail('Erst wenn ihr und die Moderation geantwortet habt.');
-    if (r.challenged) fail('Die Moderation deckt ihre Antwort bereits auf.');
+    if (!r.revealed) fail('Erst wird die Frage aufgelöst, dann entscheidet ihr über die Münze.');
+    if (r.challenged || r.decided) fail('Ihr habt für diese Frage schon entschieden.');
     if (coinsLeft(db, f) < 1) fail('Ihr habt keine Münze mehr.');
     r.challenged = true;
+    r.decided = true;
     effect(db, 'coin');
     log(db, ctx, 'finale', `${teamName(db, f.teamId)} setzt eine Münze ein – die Moderation muss aufdecken`);
   },
+};
+
+// Keine Münze einsetzen: die Moderation behält ihren Punkt, weiter zur nächsten Frage.
+team['finale.pass'] = function (db, ctx) {
+  const f = state(db);
+  if (ctx.teamId !== f.teamId) fail('Nur das Finalteam entscheidet im Finale.');
+  const r = current(f);
+  if (!r.revealed) fail('Erst wird die Frage aufgelöst.');
+  if (r.challenged || r.decided) fail('Ihr habt für diese Frage schon entschieden.');
+  r.decided = true;
+  log(db, ctx, 'finale', `${teamName(db, f.teamId)} setzt keine Münze ein`);
+  finish(db, ctx, f, r);
 };
 
 // ---------- Sichten ----------
@@ -247,12 +283,14 @@ function roundPublic(r, question, solution) {
     teamAnswered: !!r.team,
     modAnswered: !!r.mod,
     teamGrade: r.teamGrade,
-    teamAnswer: r.teamGrade !== null || r.resolved ? r.team : null,
+    teamAnswer: r.teamGrade !== null || r.revealed ? r.team : null,
+    revealed: r.revealed,
+    decided: r.decided,
     challenged: r.challenged,
     modAnswer: r.challenged ? r.mod : null,
     modGrade: r.modGrade,
     resolved: r.resolved,
-    solution: r.resolved ? solution : null,
+    solution: r.revealed ? solution : null,
     teamPoint: r.teamPoint,
     modPoint: r.modPoint,
     coinLost: r.coinLost,
@@ -295,7 +333,7 @@ function teamView(db, teamId) {
   const r = f.rounds[f.qIndex];
   if (out.player && r) {
     out.round.own = r.team; // eigene Antwort sofort sehen
-    out.canChallenge = !r.resolved && !!r.team && !!r.mod && !r.challenged && out.coins > 0;
+    out.canChallenge = r.revealed && !r.decided && out.coins > 0;
   }
   return out;
 }

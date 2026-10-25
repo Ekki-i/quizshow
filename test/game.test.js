@@ -659,18 +659,22 @@ test('Finale: Moderation punktet immer, Münze erzwingt Aufdecken, Sudden Death'
     game.applyAction(db, mod(), 'finale.next', {});
     assert.throws(() => game.applyAction(db, team(ids[0]), 'finale.answer', { text: 'x' }), /Finalteam/);
     game.applyAction(db, team(ids[1]), 'finale.answer', { text: 'Antwort' });
-    assert.throws(() => game.applyAction(db, team(ids[1]), 'finale.challenge', {}), /Moderation geantwortet/);
     game.applyAction(db, mod(), 'finale.modAnswer', { text: 'Geheim' });
     // Verdeckte Antwort ist für Beamer und Team unsichtbar
     assert.ok(!JSON.stringify(game.beamerView(db)).includes('Geheim'));
     assert.ok(!JSON.stringify(game.teamView(db, ids[1])).includes('Geheim'));
     game.applyAction(db, mod(), 'finale.gradeTeam', { correct: correctTeam });
+    assert.throws(() => game.applyAction(db, team(ids[1]), 'finale.challenge', {}), /aufgelöst/);
+    const before = db.live.finale.score.team;
+    game.applyAction(db, mod(), 'finale.reveal', {});
+    assert.equal(db.live.finale.score.team, before + (correctTeam ? 1 : 0)); // Teampunkt sofort
     if (challenge) {
       game.applyAction(db, team(ids[1]), 'finale.challenge', {});
       assert.ok(JSON.stringify(game.beamerView(db)).includes('Geheim'));
       game.applyAction(db, mod(), 'finale.gradeMod', { correct: modCorrect });
+    } else {
+      game.applyAction(db, team(ids[1]), 'finale.pass', {});
     }
-    game.applyAction(db, mod(), 'finale.resolve', {});
   };
   answer(true, true, false); // Moderation falsch aufgedeckt: kein Punkt, Münze zurück
   assert.deepEqual(db.live.finale.score, { team: 1, mod: 0 });
@@ -706,9 +710,9 @@ test('Finale: Team erreicht das Ziel allein und gewinnt das Ticket', () => {
   game.applyAction(db, team(ids[0]), 'finale.answer', { text: 'A' });
   game.applyAction(db, mod(), 'finale.modAnswer', { text: 'B' });
   game.applyAction(db, mod(), 'finale.gradeTeam', { correct: true });
+  game.applyAction(db, mod(), 'finale.reveal', {});
   game.applyAction(db, team(ids[0]), 'finale.challenge', {});
   game.applyAction(db, mod(), 'finale.gradeMod', { correct: false });
-  game.applyAction(db, mod(), 'finale.resolve', {});
   assert.equal(db.live.finale.result, 'team');
   assert.equal(game.teamView(db, ids[0]).finale.result, 'team');
 });

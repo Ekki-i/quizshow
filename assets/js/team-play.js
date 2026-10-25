@@ -362,10 +362,18 @@ export function renderFinale(f, ui) {
   const r = f.round;
   if (!r) return [...out, ...wait('Gleich kommt die erste Finalfrage …', 'Antwortet in Ruhe – es gibt keinen Zeitdruck.')];
   out.push(h('p', { class: 'muted' }, `Finalfrage ${f.qIndex + 1}`), h('p', { class: 'question' }, r.question));
-  if (r.resolved) {
-    out.push(stateBox(r.teamPoint ? 'ok' : 'bad', r.teamPoint ? '✓' : '✗', `${r.teamPoint ? 'Richtig! +1' : 'Leider falsch'} · Lösung: ${r.solution}`));
-    if (r.challenged) out.push(stateBox(r.coinLost ? 'bad' : 'ok', '🪙', r.coinLost ? 'Die Moderation lag richtig – Münze verloren.' : 'Die Moderation lag falsch – kein Punkt für sie, ihr behaltet die Münze!'));
-    return [...out, ...wait('Gleich geht’s weiter …')];
+  if (r.revealed) {
+    out.push(stateBox(r.teamPoint ? 'ok' : 'bad', r.teamPoint ? '✓' : '✗', `${r.teamPoint ? 'Richtig! +1 Punkt' : 'Leider falsch – kein Punkt'} · Lösung: ${r.solution}`));
+    if (!r.decided) {
+      out.push(stateBox('', '🤫', 'Die Moderation hat verdeckt geantwortet und bekommt ihren Punkt – außer ihr setzt eine Münze ein und sie lag falsch. Liegt sie richtig, ist die Münze weg.'));
+      out.push(h('p', {}, h('button', { class: 'btn pink huge fin-challenge', style: { width: '100%' }, disabled: !f.canChallenge, onclick: () => run(ui.conn, 'finale.challenge') },
+        coinImg('fin-coin big'), ' Münze einsetzen – Moderation muss aufdecken')));
+      out.push(h('p', {}, h('button', { class: 'btn ghost huge', style: { width: '100%' }, onclick: () => run(ui.conn, 'finale.pass') }, 'Keine Münze – weiter')));
+      return out;
+    }
+    if (r.challenged) out.push(stateBox(r.modGrade === null ? '' : r.coinLost ? 'bad' : 'ok', '🪙', r.modGrade === null ? 'Münze eingesetzt – die Moderation deckt auf!' : r.coinLost ? 'Die Moderation lag richtig – eure Münze ist weg.' : 'Die Moderation lag falsch – kein Punkt für sie, ihr bekommt die Münze zurück!'));
+    if (r.resolved) out.push(...wait('Gleich geht’s weiter …'));
+    return out;
   }
   if (!r.own) {
     const key = `finale-team-${f.team.id}-${f.qIndex}`;
@@ -376,16 +384,6 @@ export function renderFinale(f, ui) {
     return out;
   }
   out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), answerContent(r.own)));
-  if (r.teamGrade === true) out.push(stateBox('ok', '✓', 'Richtig!'));
-  else if (r.teamGrade === false) out.push(stateBox('bad', '✗', 'Leider falsch'));
-  if (!r.modAnswered) out.push(stateBox('', '⏳', 'Die Moderation schreibt noch …'));
-  else if (r.challenged) {
-    out.push(stateBox('', '🪙', r.modGrade === null ? 'Münze eingesetzt – die Moderation deckt auf!' : r.modGrade ? 'Die Moderation lag richtig – eure Münze ist weg.' : 'Die Moderation lag falsch – kein Punkt für sie, ihr bekommt die Münze zurück!'));
-  } else {
-    out.push(stateBox('', '🤫', 'Die Moderation hat verdeckt geantwortet und bekommt ihren Punkt – außer ihr zwingt sie mit einer Münze zum Aufdecken.'));
-    // Münze einsetzen: sofort, ohne Rückfrage
-    out.push(h('p', {}, h('button', { class: 'btn pink huge fin-challenge', style: { width: '100%' }, disabled: !f.canChallenge, onclick: () => run(ui.conn, 'finale.challenge') },
-      coinImg('fin-coin big'), f.coins ? ' Münze einsetzen – Moderation muss aufdecken' : ' Keine Münze mehr')));
-  }
+  out.push(stateBox('', '⏳', r.modAnswered ? 'Gleich wird aufgelöst …' : 'Die Moderation schreibt noch …'));
   return out;
 }
