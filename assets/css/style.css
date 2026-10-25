@@ -600,3 +600,9 @@ body.beamer-page.is-fullscreen:not(.is-idle) .conn { opacity: 1; }
 
 .beamer-url code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--bg); padding: 6px 10px; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
 .beamer-url .notice { font-size: 0.85rem; }
+
+/* Kleine Beamer-Vorschau unter dem Showablauf */
+.beamer-mini { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 16px; }
+.beamer-mini .preview { width: min(100%, 400px); flex: none; box-shadow: 0 0 0 2px var(--surface-2); }
+.beamer-mini-info { flex: 1 1 260px; min-width: 0; }
+.beamer-mini-info h3 { margin-bottom: 6px; }
