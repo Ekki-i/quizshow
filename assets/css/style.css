@@ -939,3 +939,12 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .fx-side .single-podium-wrap { width: 80%; margin: 0 auto -3vh; }
 .fx-side .single-podium-wrap { width: 78%; margin: 0 auto -15vh; }
 .fx-field .fx-glitch { transform: rotate(-3deg); }
+/* Finale: ein ganzer Raum statt Ausschnitt */
+.fb-stage.fx { background: #05060f; }
+.fx-room { position: absolute; left: 50%; top: 0; width: max(100vw, calc(100vh * 938 / 530)); translate: -50% 0; margin: 0; z-index: 0; container-type: inline-size; }
+.fx-room > img.pult-bg { border-radius: 0; }
+.fx-room .fx-glitch { font-size: 3.4cqw; }
+.fx-room::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 60%, rgba(5, 6, 15, 0.55)); pointer-events: none; }
+.fx-top, .fx-bottom { z-index: 2; }
+.fx-room .fx-desk-coin { width: 2.6cqw; }
+.fx-room .fx-screen { background: #050507 !important; color: #fff; font-weight: 800; font-size: 2.2cqw; letter-spacing: 0.04em; }
