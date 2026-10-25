@@ -172,7 +172,7 @@
       if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo]);
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
@@ -240,8 +240,11 @@
 
     // Teampulte (gezeichnet), Avatar im Bogen. Punkte nur, wenn opts.points (Münzvergabe).
     function teamsScene(s, opts = {}) {
-      return podiumRow(s.teams, opts);
+      return podiumRow(s.teams, { coins: s.coins || [], ...opts });
     }
+
+    // Die drei Münzen vor der Moderatorin (Positionen im 938x530-Pultbild).
+    const PULT_COINS = [[485.5, 287.5], [518.5, 287.5], [550.5, 287]];
 
     function intro(s) {
       return [
@@ -394,7 +397,7 @@
     function pause(s) {
       // Eigene Lieder der Pause (aus dem Show-Editor), sonst der eingebaute Song.
       startPause(!embedded && s.settings.sound && audioReady(audio) ? audio : null, s.pauseSongs || []);
-      return [bandScene()];
+      return [bandScene(Math.max(0, 3 - (s.coins || []).length))];
     }
 
     // Münze / Gewinnstufe: erst das Moderationspult mit der Stufe auf dem Bildschirm,
@@ -403,21 +406,29 @@
       const t = teamOf(s, s.coin.teamId);
       const stage = STAGE_OF[s.coin.position];
       const W = 938, H = 530, scr = [389, 34, 547, 157];
+      // Münzen auf dem Pult vor dieser Vergabe: 3 minus die schon vergebenen.
+      const left = Math.max(1, 3 - (s.coins || []).filter((c) => c.position < s.coin.position).length);
       const pct = (v, total) => `${(v / total) * 100}%`;
       const pult = h('div', { class: 'scene scene-pult' },
         h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
         h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
           stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
-        h('img', { class: 'scene-coin', src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true' }));
+        // Noch nicht vergebene Münzen stehen auf dem Pult; die rechte davon hebt ab
+        // und wird zur großen Münze, die anschließend zum Gewinnerteam fliegt.
+        PULT_COINS.slice(0, left).map(([cx, cy], i) => h('img', {
+          class: `pult-coin${i === left - 1 ? ' lift' : ''}`, src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true',
+          style: { left: pct(cx - 16.5, W), top: pct(cy - 14.5, H), width: pct(33, W) },
+        })),
+        h('img', { class: 'scene-coin from-pult', src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true' }));
       const wrap = h('div', { class: 'coin-sequence' }, pult);
       const showTeams = () => {
         wrap.replaceChildren(
           h('div', { class: 'kicker' }, stage ? `Gewinnstufe ${stage} · Zwischenstand` : 'Zwischenstand'),
           h('div', { class: 'coin-teams' },
-            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, coinImg('banner-coin'), ` Münze an ${t.name}`) })));
+            teamsScene(s, { points: true, winnerId: t.id, flyPosition: s.coin.position, banner: h('div', { class: 'scene-banner', '--team': t.color }, coinImg('banner-coin'), ` Münze an ${t.name}`) })));
       };
       if (s.settings.reducedMotion) showTeams();
-      else titleTimer = setTimeout(showTeams, 3400 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
+      else titleTimer = setTimeout(showTeams, 3800 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
       return [wrap];
     }
   </script>

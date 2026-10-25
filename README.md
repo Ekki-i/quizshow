@@ -90,7 +90,7 @@ Umgesetzt:
   in Schleife, die Band reagiert auf Bass, Snare und Hi-Hat der Musik, der Liedtitel steht auf dem
   Bildschirm. Ohne eigene Lieder läuft der eingebaute Pausensong (Ton nach „Ton aktivieren“ am Beamer).
 - Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
-  Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
+  Ranglisten-Enthüllung, Münzanimation (die Münze hebt vom Moderationspult ab und fliegt auf das Pult des Gewinnerteams; vergebene Münzen bleiben dort stehen und fehlen auf dem Moderationspult, auch in der Pause), eigene synthetische Soundeffekte.
 - **Mehrere Shows**: anlegen (optional mit den Teams der geöffneten Show), umbenennen,
   mit Datum versehen, öffnen, duplizieren und löschen. Jede Show hat eigene Spiele, Teams und Punkte.
 - Show-Editor mit Autosave („Gespeichert“ / „Ungespeicherte Änderungen“).

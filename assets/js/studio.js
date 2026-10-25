@@ -24,6 +24,7 @@ export function podiumRow(teams, opts = {}) {
   const svg = el('svg', { class: 'podiums', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Teampulte: ${shown.map((t) => t.name).join(', ')}` });
   const defs = el('defs');
   svg.append(defs, el('image', { href: 'assets/img/studio-teams-empty.webp', x: 0, y: 0, width: W, height: H }));
+  const flights = [];
 
   podiums.forEach((p, i) => {
     const t = shown[i];
@@ -51,6 +52,18 @@ export function podiumRow(teams, opts = {}) {
       const fs = pts.length > 2 ? 11 : pts.length > 1 ? 15 : 19;
       g.append(el('text', { x: (sx0 + sx1 + 1) / 2, y: (sy0 + sy1) / 2 + fs * 0.36, 'text-anchor': 'middle', class: `podium-points${winner ? ' winner' : ''}`, 'font-size': fs }, pts));
     }
+    // Gewonnene Münzen stehen vorn auf der Pultkante; die gerade vergebene fliegt ein.
+    const won = t ? (opts.coins || []).filter((c) => c.teamId === t.id).sort((a, b) => a.position - b.position) : [];
+    won.forEach((c, j) => {
+      const cw = 28, ch = cw * 208 / 240, gap = 25;
+      const x = (l + r) / 2 + (j - (won.length - 1) / 2) * gap - cw / 2;
+      const img = el('image', { href: 'assets/img/muenze.webp', class: 'podium-coin', x, y: desk + 4 - ch, width: cw, height: ch });
+      if (opts.flyPosition === c.position) {
+        img.classList.add('fly');
+        flights.push({ img, dx: W / 2 - (x + cw / 2), dy: -60 - (desk + 4 - ch / 2) });
+      }
+      g.append(img);
+    });
     // Teamname gebogen über dem Bogen.
     if (t) {
       const cx = (l + r) / 2;
@@ -68,6 +81,22 @@ export function podiumRow(teams, opts = {}) {
     }
     svg.append(g);
   });
+
+  // Flug der neuen Münze: von oben Mitte groß und drehend auf das Pult, mit Aufprall.
+  const speed = Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1;
+  const still = document.documentElement.classList.contains('reduced-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (const { img, dx, dy } of flights) {
+    if (still || !img.animate) continue;
+    img.parentNode.parentNode.append(img.parentNode); // Gewinnerpult nach vorn, damit die Münze über allem fliegt
+    img.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(3.2) rotateY(0deg)`, opacity: 0, offset: 0 },
+      { transform: `translate(${dx}px, ${dy + 90}px) scale(3.2) rotateY(360deg)`, opacity: 1, offset: 0.2 },
+      { transform: 'translate(0, -6px) scale(1.15) rotateY(1080deg)', opacity: 1, offset: 0.8, easing: 'ease-in' },
+      { transform: 'translate(0, 0) scale(0.9, 1.08) rotateY(1080deg)', offset: 0.88 },
+      { transform: 'translate(0, -5px) scale(1.04) rotateY(1080deg)', offset: 0.94 },
+      { transform: 'translate(0, 0) scale(1) rotateY(1080deg)', opacity: 1, offset: 1 },
+    ], { duration: 1700 * speed, delay: 500 * speed, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'both' });
+  }
 
   const rest = teams.slice(podiums.length);
   return h('div', { class: 'scene scene-teams' }, svg,

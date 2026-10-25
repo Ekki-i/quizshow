@@ -365,7 +365,10 @@ function stage() {
     <path d="M220 742 L1380 742" stroke="#ff2d8a" stroke-width="4" opacity=".8"/>`;
 }
 
-function desk() {
+// Moderationspult; darauf stehen die noch nicht vergebenen Münzen (0–3).
+function desk(coins = 3) {
+  const coinImgs = [735, 800, 865].slice(0, coins)
+    .map((cx) => `<image href="assets/img/muenze.webp" class="bd-coin" x="${cx - 31}" y="${704 - 54}" width="62" height="54"/>`).join('');
   return `<g class="bd-desk" transform="translate(800 884) scale(0.8) translate(-800 -884)">
     <ellipse cx="800" cy="884" rx="250" ry="14" fill="#000" opacity=".55"/>
     <polygon points="610,700 820,700 820,880 610,880" fill="${grad('#ffb3b0', '#e87e86')}"/>
@@ -374,6 +377,7 @@ function desk() {
     <polygon points="664,728 800,716 954,728 926,830 776,846 690,818" fill="${grad('#ffe2a0', '#7a4d12')}"/>
     <polygon points="684,740 800,730 936,740 910,822 782,836 706,812" fill="#08080b"/>
     <polygon points="610,696 990,696 1008,708 610,708" fill="#ffe1df" opacity=".6"/>
+    ${coinImgs}
   </g>`;
 }
 
@@ -388,7 +392,7 @@ function screen() {
   </g>`;
 }
 
-export function bandSceneSvg() {
+export function bandSceneSvg(coins = 3) {
   gid = 0;
   defs.length = 0;
   const back = BAND.filter((m) => m.y < 400);
@@ -401,7 +405,7 @@ export function bandSceneSvg() {
     <g transform="translate(628 452) scale(0.8) translate(-628 -452)">${musicStand(628, 452, 64)}</g>
     ${mid.map(musician).join('')}
     ${frontRow.map(musician).join('')}
-    ${desk()}`;
+    ${desk(coins)}`;
   return `<svg class="band-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs>${defs.join('')}</defs>${body}</svg>`;
 }
