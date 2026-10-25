@@ -51,6 +51,7 @@
   .device { position: relative; overflow: hidden; border-radius: 12px; border: 2px solid var(--line); background: #000; }
   .device iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: var(--bg); }
   .note { color: var(--muted); font-size: 0.85rem; margin-top: 18px; }
+  .screen.mod .label .size { display: none; }
   .local-file { background: var(--panel); border: 2px solid var(--yellow); border-radius: 14px; padding: 18px 20px; margin: 20px 0; line-height: 1.55; max-width: 70ch; }
   .local-file h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--yellow); }
   .local-file ol { margin: 8px 0 0; padding-left: 1.3em; }
@@ -61,7 +62,7 @@
   <header class="top">
     <div>
       <h1>Wer stiehlt uns die Show <span>Prototyp</span></h1>
-      <p class="lead">Alle Bildschirme der Show laufen hier gleichzeitig und sind live verbunden. Gib als Team eine Antwort ab und bewerte sie in der Moderation – Beamer und iPads ändern sich sofort.</p>
+      <p class="lead">Hier steuerst du die Show. Beamer, Team-iPads und Startseite laufen im Hintergrund mit und sind über die Reiter erreichbar.</p>
     </div>
     <div class="top-actions">
       <button class="reset fs-btn" id="beamer-fs" type="button">⛶ Beamer im Vollbild</button>
@@ -178,14 +179,28 @@
       if (f.device.classList.contains('pseudo-fs') || (document.fullscreenElement || document.webkitFullscreenElement) === f.device) continue;
       const width = f.device.clientWidth;
       if (!width) continue;
+      // Moderation: in Originalgröße, so hoch wie das Fenster – wie die echte Anwendung.
+      if (f.s.id === 'moderation' && stage.dataset.focus === 'moderation') {
+        const top = f.device.getBoundingClientRect().top + window.scrollY;
+        const height = Math.max(560, window.innerHeight - top - 24);
+        f.iframe.width = width;
+        f.iframe.height = height;
+        f.iframe.style.transform = 'none';
+        f.device.style.height = `${height}px`;
+        continue;
+      }
+      f.iframe.width = f.s.w;
+      f.iframe.height = f.s.h;
       const scale = Math.min(1, width / f.s.w);
       f.iframe.style.transform = `scale(${scale})`;
       f.device.style.height = `${Math.round(f.s.h * scale)}px`;
     }
   }
   new ResizeObserver(fit).observe(stage);
+  window.addEventListener('resize', fit);
 
-  const views = [{ id: 'all', label: 'Alles im Blick' }, ...screens.map((s) => ({ id: s.id, label: s.label }))];
+  // Nur eine Ansicht auf einmal (Standard: Moderation); die anderen laufen im Hintergrund weiter.
+  const views = screens.map((s) => ({ id: s.id, label: s.label }));
   // Beamer bildschirmfüllend: echtes Vollbild, sonst Ersatz-Vollbild im Fenster.
   // Die Beamer-Seite skaliert dann auf die volle Größe, wie auf der Leinwand.
   let pseudoExit = null;
@@ -199,6 +214,7 @@
     if (!f) return;
     const el = f.device;
     const enter = () => {
+      f.el.style.display = 'block'; // auch wenn gerade eine andere Ansicht gewählt ist
       fitBeamerTo(f, window.innerWidth, window.innerHeight);
       f.iframe.width = '100%';
       f.iframe.height = '100%';
@@ -206,6 +222,7 @@
       f.iframe.style.height = '100%';
     };
     const leave = () => {
+      f.el.style.display = '';
       f.iframe.width = f.s.w;
       f.iframe.height = f.s.h;
       f.iframe.style.width = '';
@@ -270,7 +287,7 @@
     b.onclick = () => select(v.id);
     tabs.append(b);
   }
-  const initial = views.some((v) => v.id === location.hash.slice(1)) ? location.hash.slice(1) : 'all';
+  const initial = views.some((v) => v.id === location.hash.slice(1)) ? location.hash.slice(1) : 'moderation';
   select(initial);
 
   document.getElementById('reset').onclick = () => {
