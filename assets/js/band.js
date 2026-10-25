@@ -4,7 +4,8 @@
 // jeder Schlag, Anschlag und jedes Kopfnicken sitzt auf dem Beat.
 // Ohne Ton (Vorschau, Ton nicht aktiviert) läuft die Band im selben Takt stumm.
 
-import { h } from './client.js';
+import { h, mediaUrl } from './client.js';
+import { bandSceneSvg, poseBand } from './band-scene.js';
 
 const BPM = 104;
 const STEP = 60 / BPM / 4; // Sechzehntel
@@ -157,12 +158,112 @@ export function audioReady(ctx) {
   return !!ctx && ctx.state !== 'closed';
 }
 
-// ctx: AudioContext oder null (stumm). Mehrfachaufruf ist harmlos.
-export function startPause(ctx) {
-  if (ctx && (!engine || engine.ctx !== ctx)) {
-    if (engine) engine.stop();
-    if (ctx.state === 'suspended') ctx.resume();
-    engine = createEngine(ctx);
+// ---------------------------------------------------------------------------
+// Eigene Lieder: Playlist nacheinander, in Endlosschleife. Die Musik wird
+// mitgehört (AnalyserNode), die Band reagiert auf Bass, Snare und Hi-Hat.
+
+let player = null;
+
+function createSongPlayer(ctx, songs) {
+  const el = new Audio();
+  el.preload = 'auto';
+  const source = ctx.createMediaElementSource(el);
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.55;
+  source.connect(gain).connect(analyser).connect(ctx.destination);
+  gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.5);
+  const bins = new Uint8Array(analyser.frequencyBinCount);
+  const hz = ctx.sampleRate / analyser.fftSize;
+  const band = (lo, hi) => {
+    let sum = 0, n = 0;
+    for (let i = Math.max(1, Math.floor(lo / hz)); i <= Math.min(bins.length - 1, Math.ceil(hi / hz)); i++) { sum += bins[i]; n++; }
+    return n ? sum / n / 255 : 0;
+  };
+  // Einsatz-Erkennung: Pegel deutlich über dem gleitenden Mittel = Schlag.
+  const env = { kick: 0, snare: 0, hat: 0, stab: 0, lead: 0, bass: 0 };
+  const avg = { low: 0, mid: 0, high: 0, hmid: 0 };
+  let lastT = performance.now() / 1000;
+  let beatPhase = 0, lastBeat = 0, beatLen = 0.55;
+  let index = 0, stopped = false;
+
+  async function playAt(i) {
+    if (stopped || !songs.length) return;
+    index = ((i % songs.length) + songs.length) % songs.length;
+    const song = songs[index];
+    const url = await mediaUrl(song.id);
+    if (stopped) return;
+    if (!url) return playAt(index + 1);
+    el.src = url;
+    document.querySelectorAll('.band-scene .bd-pause-sub').forEach((n) => (n.textContent = `♪ ${song.name.replace(/\.[a-z0-9]{2,4}$/i, '')}`));
+    el.play().catch(() => {});
+  }
+  el.addEventListener('ended', () => playAt(index + 1));
+  el.addEventListener('error', () => setTimeout(() => playAt(index + 1), 300));
+  playAt(0);
+
+  return {
+    ctx, songs, key: songs.map((m) => m.id).join(','),
+    levels() {
+      analyser.getByteFrequencyData(bins);
+      const now = performance.now() / 1000;
+      const dt = Math.min(0.1, now - lastT);
+      lastT = now;
+      const low = band(35, 140), mid = band(180, 900), hmid = band(1500, 4500), high = band(6000, 14000);
+      const k = Math.exp(-dt * 1.5);
+      avg.low = avg.low * k + low * (1 - k);
+      avg.mid = avg.mid * k + mid * (1 - k);
+      avg.hmid = avg.hmid * k + hmid * (1 - k);
+      avg.high = avg.high * k + high * (1 - k);
+      const decay = (v, rate) => v * Math.exp(-dt * rate);
+      for (const key of Object.keys(env)) env[key] = decay(env[key], key === 'hat' ? 16 : key === 'lead' ? 4 : 9);
+      if (low > avg.low * 1.18 + 0.03 && now - lastBeat > 0.22) {
+        env.kick = 1;
+        const gap = now - lastBeat;
+        if (gap > 0.3 && gap < 1.2) beatLen = beatLen * 0.8 + gap * 0.2;
+        lastBeat = now;
+        beatPhase = 0;
+      }
+      if (hmid > avg.hmid * 1.2 + 0.02) env.snare = Math.max(env.snare, Math.min(1, (hmid - avg.hmid) * 6));
+      if (high > avg.high * 1.15 + 0.01) env.hat = Math.max(env.hat, Math.min(1, (high - avg.high) * 8));
+      env.bass = Math.max(env.bass, Math.min(1, low * 1.2));
+      env.stab = Math.max(env.stab, Math.min(1, (mid - avg.mid) * 5));
+      env.lead = Math.max(env.lead, Math.min(1, mid * 1.1));
+      beatPhase += dt / beatLen;
+      const beat = (now - lastBeat) / beatLen;
+      return { ...env, beat: beatPhase, pos: now / STEP, bar: 0, bob: Math.abs(Math.cos(Math.PI * Math.min(beat, 1) / 2)) * (0.6 + 0.4 * env.kick) };
+    },
+    stop() {
+      stopped = true;
+      const t = ctx.currentTime;
+      gain.gain.cancelScheduledValues(t);
+      gain.gain.setValueAtTime(gain.gain.value, t);
+      gain.gain.linearRampToValueAtTime(0, t + 0.8);
+      setTimeout(() => { el.pause(); el.removeAttribute('src'); el.load(); source.disconnect(); }, 900);
+    },
+  };
+}
+
+// ctx: AudioContext oder null (stumm). songs: eigene Lieder der Pause (oder leer
+// = eingebauter Song). Mehrfachaufruf mit denselben Liedern ist harmlos.
+export function startPause(ctx, songs = []) {
+  const key = (songs || []).map((m) => m.id).join(',');
+  if (ctx && songs && songs.length) {
+    if (!player || player.ctx !== ctx || player.key !== key) {
+      if (player) player.stop();
+      if (engine) { engine.stop(); engine = null; }
+      if (ctx.state === 'suspended') ctx.resume();
+      player = createSongPlayer(ctx, songs);
+    }
+  } else if (ctx) {
+    if (player) { player.stop(); player = null; }
+    if (!engine || engine.ctx !== ctx) {
+      if (engine) engine.stop();
+      if (ctx.state === 'suspended') ctx.resume();
+      engine = createEngine(ctx);
+    }
   }
   startLoop();
 }
@@ -170,6 +271,8 @@ export function startPause(ctx) {
 export function stopPause() {
   if (engine) engine.stop();
   engine = null;
+  if (player) player.stop();
+  player = null;
   silentStart = null;
   stopLoop();
 }
@@ -196,7 +299,8 @@ function startLoop() {
     raf = requestAnimationFrame(frame);
     const root = document.querySelector('.band-scene');
     if (!root) return;
-    animate(root, clock() / STEP);
+    if (player) applyPose(root, player.levels());
+    else animate(root, clock() / STEP);
   };
   raf = requestAnimationFrame(frame);
 }
@@ -209,159 +313,29 @@ function animate(root, pos) {
   if (pos < 0) pos = 0;
   const beat = pos / 4;
   const bar = Math.floor(pos / BAR) % BARS;
-  const kick = hit(KICK, pos, 9);
-  const snare = hit(SNARE, pos, 9);
-  const hat = hit(HAT, pos, 18);
-  const stab = hit(STAB, pos, 11);
-  const bass = hit(BASS.map((b) => b[0]), pos, 8);
   const leadSteps = (LEAD[bar] || []).map((l) => l[0]);
-  const lead = leadSteps.length ? hit(leadSteps, pos, 5) : 0;
-  const bob = Math.abs(Math.sin(Math.PI * beat)); // Kopfnicken auf jeden Schlag
-  const sway = Math.sin((Math.PI * beat) / 2); // langsames Wiegen über zwei Schläge
-  const set = (sel, tf) => { const n = root.querySelector(sel); if (n) n.setAttribute('transform', tf); };
-
-  // Schlagzeug
-  set('.dr-head', `translate(0 ${bob * 6})`);
-  set('.dr-arm-l', `rotate(${-38 * hat + 10} 0 0)`);
-  set('.dr-arm-r', `rotate(${40 * snare - 12} 0 0)`);
-  set('.dr-kick', `translate(860 640) scale(${1 + kick * 0.05}) translate(-860 -640)`);
-  set('.dr-crash', `rotate(${Math.sin(pos * 1.3) * 6 * (bar % 4 === 0 ? kick : 0.25)} 1010 470)`);
-  set('.dr-hat', `translate(0 ${hat * 4})`);
-  // Gitarre
-  set('.gt-body', `rotate(${sway * 3} 400 620)`);
-  set('.gt-head', `translate(${sway * 3} ${bob * 7})`);
-  set('.gt-arm', `rotate(${-30 + stab * 34} 0 0)`);
-  // Keyboard
-  set('.kb-head', `translate(0 ${bob * 5})`);
-  set('.kb-hand-l', `translate(0 ${stab * 8})`);
-  set('.kb-hand-r', `translate(0 ${lead * 9})`);
-  // Bass
-  set('.bs-body', `rotate(${-sway * 3} 1240 620)`);
-  set('.bs-head', `translate(${-sway * 3} ${bob * 7})`);
-  set('.bs-arm', `rotate(${-14 + bass * 22} 0 0)`);
-  // Licht und Bildschirm
-  root.style.setProperty('--kick', kick.toFixed(3));
-  root.style.setProperty('--beat', bob.toFixed(3));
-  const bars = root.querySelectorAll('.eq rect');
-  bars.forEach((r, i) => {
-    const v = [kick, snare, hat, bass, stab, lead][i % 6] * (0.55 + 0.45 * Math.abs(Math.sin(pos * 0.7 + i)));
-    r.setAttribute('height', (6 + v * 46).toFixed(1));
-    r.setAttribute('y', (606 - v * 46).toFixed(1));
+  applyPose(root, {
+    pos, beat, bar,
+    kick: hit(KICK, pos, 9),
+    snare: hit(SNARE, pos, 9),
+    hat: hit(HAT, pos, 18),
+    stab: hit(STAB, pos, 11),
+    bass: hit(BASS.map((b) => b[0]), pos, 8),
+    lead: leadSteps.length ? hit(leadSteps, pos, 5) : 0,
+    bob: Math.abs(Math.sin(Math.PI * beat)),
   });
 }
 
+// Pose der Band aus Pegeln (eingebauter Song oder Analyse eigener Lieder).
+function applyPose(root, lv) {
+  poseBand(root, lv);
+}
+
 // ---------------------------------------------------------------------------
-// Szene
-
-const SCENE = `
-<svg class="band-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <defs>
-    <linearGradient id="bd-riser" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2e44"/><stop offset="1" stop-color="#0c0d18"/></linearGradient>
-    <linearGradient id="bd-desk-l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb3b0"/><stop offset="1" stop-color="#e87e86"/></linearGradient>
-    <linearGradient id="bd-desk-r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f5560"/><stop offset="1" stop-color="#0f2f37"/></linearGradient>
-    <linearGradient id="bd-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe2a0"/><stop offset="0.5" stop-color="#c88b2c"/><stop offset="1" stop-color="#7a4d12"/></linearGradient>
-    <linearGradient id="bd-screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f2f2"/><stop offset="1" stop-color="#c9c2c6"/></linearGradient>
-    <radialGradient id="bd-drum" cx="0.5" cy="0.45" r="0.6"><stop offset="0" stop-color="#f3f0ff"/><stop offset="1" stop-color="#b9b4d6"/></radialGradient>
-    <linearGradient id="bd-cymbal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a6417"/><stop offset="0.5" stop-color="#ffd877"/><stop offset="1" stop-color="#8a6417"/></linearGradient>
-    <filter id="bd-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2"/></filter>
-  </defs>
-
-  <!-- Lichtkegel im Takt -->
-  <g class="bd-lights">
-    <polygon points="520,0 560,0 760,640 360,640" fill="#ff2d8a"/>
-    <polygon points="1040,0 1080,0 1240,640 840,640" fill="#1fd6f2"/>
-    <polygon points="790,0 810,0 960,560 640,560" fill="#ffffff"/>
-  </g>
-
-  <!-- Podest -->
-  <path d="M 230 600 L 1370 600 L 1430 680 L 170 680 Z" fill="url(#bd-riser)"/>
-  <path d="M 230 600 L 1370 600" stroke="#1fd6f2" stroke-width="4" opacity="0.8"/>
-  <path d="M 640 470 L 1080 470 L 1110 520 L 610 520 Z" fill="url(#bd-riser)"/>
-  <path d="M 640 470 L 1080 470" stroke="#ff2d8a" stroke-width="4" opacity="0.8"/>
-
-  <!-- Schlagzeuger (hinten, erhöht) -->
-  <g class="drummer">
-    <rect x="828" y="332" width="64" height="96" rx="24" fill="#6b3bd6"/>
-    <g class="dr-head"><circle cx="860" cy="300" r="30" fill="#f1c7a3"/><path d="M 830 296 Q 832 262 860 264 Q 890 262 892 294 Q 878 280 860 282 Q 842 280 830 296 Z" fill="#2a1a12"/><circle cx="850" cy="302" r="3" fill="#2a1a12"/><circle cx="870" cy="302" r="3" fill="#2a1a12"/><path d="M 851 314 Q 860 320 869 314" stroke="#7a3b2a" stroke-width="3" fill="none" stroke-linecap="round"/></g>
-    <g transform="translate(836 352)"><g class="dr-arm-l"><path d="M 0 0 L -46 40" stroke="#6b3bd6" stroke-width="18" stroke-linecap="round"/><path d="M -46 40 L -88 46" stroke="#e9d3a6" stroke-width="5" stroke-linecap="round"/></g></g>
-    <g transform="translate(884 352)"><g class="dr-arm-r"><path d="M 0 0 L 40 44" stroke="#6b3bd6" stroke-width="18" stroke-linecap="round"/><path d="M 40 44 L 70 62" stroke="#e9d3a6" stroke-width="5" stroke-linecap="round"/></g></g>
-    <!-- Becken -->
-    <g class="dr-hat"><ellipse cx="740" cy="398" rx="42" ry="8" fill="url(#bd-cymbal)"/><ellipse cx="740" cy="406" rx="42" ry="8" fill="url(#bd-cymbal)" opacity="0.8"/></g>
-    <line x1="740" y1="406" x2="740" y2="520" stroke="#888" stroke-width="4"/>
-    <g class="dr-crash"><ellipse cx="1010" cy="470" rx="58" ry="10" fill="url(#bd-cymbal)" transform="rotate(-10 1010 470)"/></g>
-    <line x1="1010" y1="470" x2="1010" y2="560" stroke="#888" stroke-width="4"/>
-    <!-- Trommeln -->
-    <rect x="792" y="420" width="44" height="30" rx="6" fill="#ff2d8a"/><ellipse cx="814" cy="420" rx="22" ry="6" fill="url(#bd-drum)"/>
-    <rect x="884" y="420" width="44" height="30" rx="6" fill="#ff2d8a"/><ellipse cx="906" cy="420" rx="22" ry="6" fill="url(#bd-drum)"/>
-    <rect x="930" y="470" width="50" height="38" rx="6" fill="#ff2d8a"/><ellipse cx="955" cy="470" rx="25" ry="7" fill="url(#bd-drum)"/>
-    <g class="dr-kick"><circle cx="860" cy="470" r="62" fill="#ff2d8a"/><circle cx="860" cy="470" r="52" fill="url(#bd-drum)"/><polygon points="860,438 890,492 830,492" fill="#ff2d8a"/><circle cx="886" cy="442" r="9" fill="#ffc23d"/></g>
-  </g>
-
-  <!-- Gitarrist (links) -->
-  <g class="guitarist">
-    <g class="gt-body">
-      <rect x="374" y="470" width="20" height="130" rx="8" fill="#1d1d2b"/><rect x="408" y="470" width="20" height="130" rx="8" fill="#1d1d2b"/>
-      <rect x="364" y="380" width="74" height="104" rx="26" fill="#e23b6f"/>
-      <g class="gt-head"><circle cx="400" cy="346" r="32" fill="#c99272"/><path d="M 366 344 Q 364 304 400 306 Q 440 304 434 352 L 428 336 Q 412 322 392 326 Q 376 330 372 360 Z" fill="#f2d16b"/><circle cx="392" cy="348" r="3" fill="#2a1a12"/><circle cx="412" cy="348" r="3" fill="#2a1a12"/><path d="M 392 362 Q 402 368 412 362" stroke="#6a2a1a" stroke-width="3" fill="none" stroke-linecap="round"/></g>
-      <!-- Gitarre -->
-      <g transform="rotate(-24 400 470)"><rect x="300" y="462" width="150" height="10" rx="3" fill="#5a3a1a"/><rect x="292" y="458" width="20" height="18" rx="3" fill="#2a1a0a"/><path d="M 440 445 C 470 430 500 440 498 462 C 520 466 522 492 500 498 C 500 520 468 524 446 506 C 426 520 410 500 420 482 C 406 470 420 450 440 445 Z" fill="#1fd6f2" stroke="#0a3c46" stroke-width="3"/><circle cx="462" cy="474" r="8" fill="#0a3c46"/></g>
-      <path d="M 380 404 L 352 450 L 318 444" stroke="#c99272" stroke-width="14" stroke-linecap="round" fill="none"/>
-      <g transform="translate(424 404)"><g class="gt-arm"><path d="M 0 0 L 36 44" stroke="#e23b6f" stroke-width="16" stroke-linecap="round"/><path d="M 36 44 L 46 70" stroke="#c99272" stroke-width="13" stroke-linecap="round"/></g></g>
-    </g>
-  </g>
-
-  <!-- Keyboarderin -->
-  <g class="keys">
-    <rect x="566" y="384" width="68" height="96" rx="24" fill="#16a3b8"/>
-    <g class="kb-head"><circle cx="600" cy="350" r="30" fill="#8d5a3c"/><path d="M 568 352 Q 560 300 600 304 Q 642 300 634 352 Q 640 392 620 396 L 622 340 Q 600 326 580 340 L 582 396 Q 560 392 568 352 Z" fill="#1a1010"/><circle cx="591" cy="352" r="3" fill="#fff"/><circle cx="609" cy="352" r="3" fill="#fff"/><path d="M 592 366 Q 600 372 608 366" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/></g>
-    <g class="kb-hand-l"><path d="M 576 410 L 548 462" stroke="#16a3b8" stroke-width="14" stroke-linecap="round"/><circle cx="548" cy="464" r="8" fill="#8d5a3c"/></g>
-    <g class="kb-hand-r"><path d="M 624 410 L 648 462" stroke="#16a3b8" stroke-width="14" stroke-linecap="round"/><circle cx="648" cy="464" r="8" fill="#8d5a3c"/></g>
-    <rect x="500" y="466" width="200" height="22" rx="4" fill="#111"/>
-    <g fill="#fff">${Array.from({ length: 14 }, (_, i) => `<rect x="${504 + i * 14}" y="470" width="12" height="14" rx="1.5"/>`).join('')}</g>
-    <line x1="530" y1="488" x2="520" y2="600" stroke="#666" stroke-width="5"/><line x1="670" y1="488" x2="680" y2="600" stroke="#666" stroke-width="5"/>
-  </g>
-
-  <!-- Bassist (rechts) -->
-  <g class="bassist">
-    <g class="bs-body">
-      <rect x="1212" y="470" width="20" height="130" rx="8" fill="#22243a"/><rect x="1246" y="470" width="20" height="130" rx="8" fill="#22243a"/>
-      <rect x="1202" y="380" width="74" height="104" rx="26" fill="#f39b2b"/>
-      <g class="bs-head"><circle cx="1240" cy="346" r="32" fill="#e8b48f"/><path d="M 1208 340 Q 1214 306 1240 308 Q 1268 306 1272 340 Q 1258 326 1240 328 Q 1222 326 1208 340 Z" fill="#7a2f14"/><rect x="1222" y="340" width="36" height="10" rx="5" fill="#111"/><path d="M 1230 362 Q 1240 368 1250 362" stroke="#6a2a1a" stroke-width="3" fill="none" stroke-linecap="round"/></g>
-      <g transform="rotate(24 1240 470)"><rect x="1250" y="462" width="170" height="10" rx="3" fill="#3a2410"/><rect x="1410" y="456" width="22" height="22" rx="3" fill="#1a1008"/><path d="M 1258 445 C 1228 428 1196 440 1200 464 C 1178 470 1178 496 1200 500 C 1200 524 1234 528 1254 508 C 1276 522 1292 500 1280 482 C 1294 470 1280 448 1258 445 Z" fill="#ff2d8a" stroke="#5a0a2e" stroke-width="3"/></g>
-      <path d="M 1262 404 L 1300 452 L 1340 470" stroke="#e8b48f" stroke-width="14" stroke-linecap="round" fill="none"/>
-      <g transform="translate(1216 404)"><g class="bs-arm"><path d="M 0 0 L -18 52" stroke="#f39b2b" stroke-width="16" stroke-linecap="round"/><path d="M -18 52 L -4 78" stroke="#e8b48f" stroke-width="13" stroke-linecap="round"/></g></g>
-    </g>
-  </g>
-
-  <!-- Hängender Bildschirm -->
-  <g class="bd-screen">
-    <rect x="610" y="0" width="380" height="24" fill="#1a1a22"/>
-    <path d="M 600 24 L 1000 24 L 1000 262 L 600 262 Z" fill="url(#bd-screen)"/>
-    <polygon points="600,24 660,24 600,120" fill="#ff8a7a"/><polygon points="1000,24 940,24 1000,120" fill="#ff8a7a"/>
-    <rect x="630" y="44" width="340" height="196" fill="#050507"/>
-    <text x="800" y="156" text-anchor="middle" class="bd-pause">PAUSE</text>
-    <text x="800" y="196" text-anchor="middle" class="bd-pause-sub">Gleich geht’s weiter</text>
-    <rect x="620" y="262" width="360" height="26" rx="4" fill="#17161e"/>
-    <g fill="#ffd7e8">${Array.from({ length: 6 }, (_, i) => `<rect x="${660 + i * 50}" y="270" width="30" height="8" rx="3"/>`).join('')}</g>
-  </g>
-
-  <!-- Equalizer am Podest -->
-  <g class="eq" fill="#1fd6f2" opacity="0.85">${Array.from({ length: 24 }, (_, i) => `<rect x="${236 + i * 48}" y="600" width="30" height="6" rx="3" fill="${i % 2 ? '#ff2d8a' : '#1fd6f2'}"/>`).join('')}</g>
-
-  <!-- Moderationspult vorne -->
-  <g class="bd-desk">
-    <ellipse cx="800" cy="872" rx="360" ry="22" fill="#000" opacity="0.6"/>
-    <polygon points="520,640 820,640 820,860 520,860" fill="url(#bd-desk-l)"/>
-    <polygon points="820,640 1080,640 1080,860 820,860" fill="url(#bd-desk-r)"/>
-    <polygon points="1080,640 1104,656 1104,852 1080,860" fill="#0a1f25"/>
-    <polygon points="600,676 800,660 1020,676 980,800 760,820 640,780" fill="url(#bd-gold)"/>
-    <polygon points="628,690 800,676 990,690 956,786 768,804 660,770" fill="#08080b"/>
-    <polygon points="520,636 1080,636 1104,650 520,650" fill="#ffe1df" opacity="0.6"/>
-  </g>
-</svg>`;
+// Szene (Bühne und Musiker in band-scene.js)
 
 export function bandScene() {
   const root = h('div', { class: 'band-scene' });
-  root.innerHTML = SCENE;
+  root.innerHTML = bandSceneSvg();
   return root;
 }

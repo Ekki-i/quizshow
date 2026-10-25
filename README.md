@@ -83,8 +83,12 @@ Umgesetzt:
   Videos unter `data/media/` ab (Ordner per `QUIZ_MEDIA_DIR`, Größe per `QUIZ_MEDIA_MAX_MB`, Standard
   1024 MB) und löscht sie, sobald keine Show mehr darauf verweist. Im Prototyp bleiben sie im Browser.
 - Die Beamer-Ansicht schaltet der Showablauf; in der Live-Regie steht nur noch die Beamer-Vorschau.
-- **Pause**: Moderationspult mit „PAUSE“-Bildschirm, dahinter eine animierte Live-Band, die im Takt
-  eines eigenen, mit WebAudio erzeugten Pausen-Songs spielt (Ton nach „Ton aktivieren“ am Beamer).
+- **Pause**: Moderationspult mit „PAUSE“-Bildschirm, dahinter eine Big-Band auf drei Podeststufen
+  (Schlagzeug, zwei Sängerinnen, Bass, Marimba, Saxofone, Gitarre, Trompete, Posaune, Keyboard) im
+  Avatar-Stil der Show, die sich im Takt bewegt. **Eigene Lieder je Pause**: im Show-Editor beim
+  Pausenschritt „♪ Lieder“ – MP3/M4A/WAV/OGG hochladen, sortieren, entfernen. Sie laufen nacheinander
+  in Schleife, die Band reagiert auf Bass, Snare und Hi-Hat der Musik, der Liedtitel steht auf dem
+  Bildschirm. Ohne eigene Lieder läuft der eingebaute Pausensong (Ton nach „Ton aktivieren“ am Beamer).
 - Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
   Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
 - **Mehrere Shows**: anlegen (optional mit den Teams der geöffneten Show), umbenennen,

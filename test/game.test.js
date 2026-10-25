@@ -614,3 +614,24 @@ test('Intro-Video: je Show austauschbar, Beamer bekommt nur den Verweis', () => 
   assert.equal(db.project.introVideo, undefined);
   assert.deepEqual([...game.referencedMedia(db)], ['media_abcdef654321']);
 });
+
+test('Pausen: eigene Lieder je Pause, Beamer bekommt die Playlist der laufenden Pause', () => {
+  const { db } = setup(1);
+  const steps = game.moderatorView(db).rundown;
+  const pauseIdx = steps.findIndex((x) => x.kind === 'pause');
+  const pause = steps[pauseIdx];
+  const song = { id: 'media_aaaaaaaaaaaa11', type: 'audio/mpeg', name: 'Pausenhit.mp3', size: 1234 };
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [{ ...song, type: 'video/mp4' }] }), /Audiodateien/);
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: steps[0].id, songs: [song] }), /Pause nicht gefunden/);
+  game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [song, { ...song, id: 'media_bbbbbbbbbbbb22', name: 'Zwei.mp3' }] });
+  const view = game.moderatorView(db);
+  assert.equal(view.rundownCustom, true);
+  assert.match(view.rundown[pauseIdx].text, /2 eigene Lieder/);
+  assert.equal(game.referencedMedia(db).size, 2);
+  game.applyAction(db, mod(), 'run.goto', { index: pauseIdx });
+  assert.deepEqual(game.beamerView(db).pauseSongs.map((m) => m.name), ['Pausenhit.mp3', 'Zwei.mp3']);
+  // Pause ohne eigene Lieder: leere Playlist (eingebauter Song)
+  game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [] });
+  assert.deepEqual(game.beamerView(db).pauseSongs, []);
+  assert.equal(game.referencedMedia(db).size, 0);
+});

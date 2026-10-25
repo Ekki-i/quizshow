@@ -216,9 +216,64 @@ function buildIntroVideo() {
     h('p', { class: 'muted', style: { fontSize: '0.85rem' } }, 'Formate: MP4 (empfohlen), WebM oder MOV. Ton läuft auf dem Beamer, sobald dort „Ton aktivieren“ geklickt wurde.'));
 }
 
+// Eigene Lieder je Pause: Playlist hochladen, sortieren, entfernen.
+let openPause = null;
+let songUpload = null; // { done, total, name }
+function buildPauseSongs(st) {
+  const songs = st.songs || [];
+  const setSongs = (list) => act('rundown.setSongs', { stepId: st.id, songs: list });
+  const move = (i, d) => { const l = [...songs]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); setSongs(l); };
+  const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+  const input = h('input', {
+    type: 'file', multiple: true, accept: 'audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/flac,.mp3,.m4a,.wav,.ogg,.flac',
+    class: 'visually-hidden', 'aria-label': 'Lieder hinzufügen',
+    onchange: async (ev) => {
+      const files = [...(ev.target.files || [])];
+      ev.target.value = '';
+      if (!files.length) return;
+      const added = [];
+      songUpload = { done: 0, total: files.length, name: files[0].name };
+      renderAll(true);
+      try {
+        for (const file of files) {
+          songUpload.name = file.name;
+          const label = document.getElementById('song-progress');
+          if (label) label.textContent = `Lied ${songUpload.done + 1} von ${songUpload.total}: „${file.name}“ wird hochgeladen …`;
+          const type = file.type || (/\.mp3$/i.test(file.name) ? 'audio/mpeg' : /\.m4a$/i.test(file.name) ? 'audio/mp4' : '');
+          const blob = type && type !== file.type ? new File([file], file.name, { type }) : file;
+          const m = await uploadMedia(blob, token);
+          added.push({ id: m.id, type: m.type, size: m.size, name: file.name });
+          songUpload.done += 1;
+        }
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        songUpload = null;
+        if (added.length) await act('rundown.setSongs', { stepId: st.id, songs: [...songs, ...added] });
+        renderAll(true);
+      }
+    },
+  });
+  return h('div', { class: 'pause-songs' },
+    h('p', { class: 'muted' }, songs.length
+      ? 'Diese Lieder laufen in dieser Pause nacheinander (danach wieder von vorn). Die Band spielt im Takt der Musik.'
+      : 'Noch keine eigenen Lieder – es läuft der eingebaute Pausensong.'),
+    songs.length ? h('ol', { class: 'song-list' }, songs.map((m, i) => h('li', {},
+      h('span', { class: 'grow' }, `♪ ${m.name}`, m.size ? h('span', { class: 'muted' }, ` · ${fmtSize(m.size)}`) : null),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach unten', disabled: i === songs.length - 1, onclick: () => move(i, 1) }, '↓'),
+      h('button', { class: 'btn small bad', 'aria-label': `${m.name} entfernen`, onclick: () => setSongs(songs.filter((_, k) => k !== i)) }, '✕')))) : null,
+    songUpload
+      ? h('p', { id: 'song-progress' }, `Lied ${songUpload.done + 1} von ${songUpload.total}: „${songUpload.name}“ wird hochgeladen …`)
+      : h('div', { class: 'row' },
+        h('label', { class: 'btn small' }, input, '+ Lieder hinzufügen'),
+        songs.length ? h('button', { class: 'btn small ghost', onclick: () => confirmAct('Alle eigenen Lieder dieser Pause entfernen? Dann läuft wieder der eingebaute Pausensong.', 'rundown.setSongs', { stepId: st.id, songs: [] }) }, 'Alle entfernen') : null),
+    h('p', { class: 'muted', style: { fontSize: '0.85rem', margin: '6px 0 0' } }, 'Formate: MP3, M4A, WAV, OGG, FLAC. Mehrere Dateien auf einmal möglich.'));
+}
+
 // Bearbeiten im Show-Editor: Schritte verschieben, löschen, Pausen einfügen.
 function buildRundownEditor() {
-  const steps = (S.rundown || []).map(({ id, kind, pos, label }) => ({ id, kind, pos, label }));
+  const steps = (S.rundown || []).map(({ id, kind, pos, label, songs }) => ({ id, kind, pos, label, songs }));
   const save = (list) => act('rundown.set', { steps: list });
   const move = (i, d) => { const l = [...steps]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); save(l); };
   const insertAt = (i, st) => { const l = [...steps]; l.splice(i, 0, st); save(l); };
@@ -239,10 +294,15 @@ function buildRundownEditor() {
       h('b', { class: 'rd-n' }, `${i + 1}.`),
       h('span', { class: 'rd-i', 'aria-hidden': 'true' }, RUN_ICON[st.kind]),
       h('span', { class: 'grow' }, st.text),
+      st.kind === 'pause' ? h('button', {
+        class: `btn small ${openPause === st.id ? 'pink' : 'ghost'}`, 'aria-expanded': String(openPause === st.id),
+        onclick: () => { openPause = openPause === st.id ? null : st.id; renderAll(true); },
+      }, `♪ Lieder (${(st.songs || []).length})`) : null,
       h('button', { class: 'btn small ghost', title: 'Pause danach einfügen', onclick: () => insertAt(i + 1, { kind: 'pause' }) }, '+ ☕'),
       h('button', { class: 'btn small ghost', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
       h('button', { class: 'btn small ghost', 'aria-label': 'Nach unten', disabled: i === steps.length - 1, onclick: () => move(i, 1) }, '↓'),
-      h('button', { class: 'btn small bad', 'aria-label': 'Schritt entfernen', onclick: () => save(steps.filter((_, k) => k !== i)) }, '✕')))),
+      h('button', { class: 'btn small bad', 'aria-label': 'Schritt entfernen', onclick: () => save(steps.filter((_, k) => k !== i)) }, '✕'),
+      st.kind === 'pause' && openPause === st.id ? buildPauseSongs(st) : null))),
     h('div', { class: 'row', style: { marginTop: '12px' } },
       kindSel, posSel, afterSel,
       h('button', { class: 'btn', onclick: () => {

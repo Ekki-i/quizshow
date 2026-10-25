@@ -278,7 +278,7 @@ function stepLabel(db, st) {
     title: `${game} – Spieltitel`,
     game: `${game} – spielen`,
     coin: `Münzvergabe nach Spiel ${st.pos}${STAGE_LABEL[st.pos] ? ` (Gewinnstufe ${STAGE_LABEL[st.pos]})` : ''}`,
-    pause: 'Pause',
+    pause: `Pause${st.songs && st.songs.length ? ` · ${st.songs.length} ${st.songs.length === 1 ? 'eigenes Lied' : 'eigene Lieder'}` : ''}`,
     ranking: 'Zwischenstand / Rangliste',
     end: 'Abschluss',
   }[st.kind];
@@ -299,7 +299,20 @@ function cleanRundown(db, steps) {
       out.pos = pos;
     } else if (RUN_NEEDS_POS.includes(st.kind)) fail('Für diesen Schritt fehlt das Spiel.');
     if (st.label) out.label = cleanText(st.label, 60);
+    if (st.kind === 'pause' && Array.isArray(st.songs) && st.songs.length) out.songs = cleanSongs(st.songs);
     return out;
+  });
+}
+
+// Playlist einer Pause: nur Verweise auf hochgeladene Lieder.
+const SONGS_MAX = 40;
+function cleanSongs(songs) {
+  if (!Array.isArray(songs)) fail('Ungültige Liederliste.');
+  if (songs.length > SONGS_MAX) fail(`Höchstens ${SONGS_MAX} Lieder pro Pause.`);
+  return songs.map((m) => {
+    if (!m || typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültiges Lied.');
+    if (typeof m.type !== 'string' || !/^audio\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte nur Audiodateien als Lieder.');
+    return { id: m.id, type: m.type, name: cleanText(String(m.name || 'Lied'), 100) || 'Lied', size: Number(m.size) || 0 };
   });
 }
 
@@ -325,6 +338,8 @@ function runStep(db, ctx, index) {
     effect(db, 'coin');
   } else {
     moderatorActions['beamer.show'](db, ctx, { view });
+    // Pause: Beamer spielt die Lieder dieses Pausenschritts.
+    if (st.kind === 'pause') db.live.beamer.data = { stepId: st.id };
   }
   log(db, ctx, 'ablauf', `Schritt ${index + 1}/${steps.length}: ${stepLabel(db, st)}`);
   return {};
@@ -663,6 +678,17 @@ const moderatorActions = {
     if (db.live.run >= db.project.rundown.length) db.live.run = db.project.rundown.length - 1;
     log(db, ctx, 'ablauf', `Showablauf geändert (${db.project.rundown.length} Schritte)`);
   },
+  // Lieder einer Pause setzen. Ein noch nicht angepasster Standardablauf wird dabei übernommen.
+  'rundown.setSongs'(db, ctx, p) {
+    const steps = rundown(db).map((x) => ({ ...x }));
+    const st = steps.find((x) => x.id === p.stepId);
+    if (!st || st.kind !== 'pause') fail('Pause nicht gefunden.');
+    const songs = cleanSongs(p.songs || []);
+    if (songs.length) st.songs = songs;
+    else delete st.songs;
+    db.project.rundown = steps;
+    log(db, ctx, 'editor', `Pause: ${songs.length} eigene Lieder hinterlegt`);
+  },
   'rundown.reset'(db, ctx) {
     db.project.rundown = null;
     log(db, ctx, 'ablauf', 'Standard-Showablauf wiederhergestellt');
@@ -698,7 +724,10 @@ function applyAction(db, ctx, name, payload, actionId) {
 // Alle Medien, auf die irgendeine Show noch verweist (für das Aufräumen).
 function referencedMedia(db) {
   const ids = new Set();
-  for (const pr of [db.project, ...db.shows.map((x) => x.project)]) if (pr.introVideo) ids.add(pr.introVideo.id);
+  for (const pr of [db.project, ...db.shows.map((x) => x.project)]) {
+    if (pr.introVideo) ids.add(pr.introVideo.id);
+    for (const st of pr.rundown || []) for (const m of st.songs || []) ids.add(m.id);
+  }
   return ids;
 }
 
@@ -773,6 +802,10 @@ function beamerView(db) {
     effect: db.live.effect,
     game: gameHeader(db),
   };
+  if (b.view === 'pause') {
+    const st = b.data && b.data.stepId ? rundown(db).find((x) => x.id === b.data.stepId) : null;
+    view.pauseSongs = st && st.songs ? st.songs.map((m) => ({ id: m.id, type: m.type, name: m.name })) : [];
+  }
   if (b.view === 'video') view.introVideo = pr.introVideo ? { id: pr.introVideo.id, type: pr.introVideo.type } : null;
   if (b.view === 'game') view.gameView = beamerGameView(db);
   if (b.view === 'ranking') view.ranking = b.data.ranking;

@@ -16,6 +16,9 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const MEDIA_DIR = process.env.QUIZ_MEDIA_DIR || path.join(path.dirname(DATA_FILE), 'media');
 const MEDIA_MAX_BYTES = Number(process.env.QUIZ_MEDIA_MAX_MB || 1024) * 1024 * 1024;
 const VIDEO_EXT = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/ogg': '.ogv', 'video/x-m4v': '.m4v' };
+// Lieder für die Pausen.
+const AUDIO_EXT = { 'audio/mpeg': '.mp3', 'audio/mp3': '.mp3', 'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a', 'audio/aac': '.aac', 'audio/wav': '.wav', 'audio/x-wav': '.wav', 'audio/ogg': '.ogg', 'audio/flac': '.flac', 'audio/webm': '.weba' };
+const MEDIA_EXT = { ...VIDEO_EXT, ...AUDIO_EXT };
 
 // ---------- Speicher und Moderator-Zugang ----------
 
@@ -107,12 +110,12 @@ function mediaPath(id) {
   return hit ? path.join(MEDIA_DIR, hit) : null;
 }
 
-// Video hochladen: roher Dateiinhalt im Body, nur mit gültiger Moderator-Sitzung.
+// Video oder Lied hochladen: roher Dateiinhalt im Body, nur mit gültiger Moderator-Sitzung.
 function uploadMedia(req, res) {
   if (!validSession(req.headers['x-token'])) return sendJson(res, 401, { error: 'Bitte als Moderation anmelden.' });
   const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
-  const ext = VIDEO_EXT[type];
-  if (!ext) return sendJson(res, 415, { error: 'Bitte ein Video als MP4, WebM oder MOV hochladen.' });
+  const ext = MEDIA_EXT[type];
+  if (!ext) return sendJson(res, 415, { error: 'Bitte ein Video (MP4, WebM, MOV) oder ein Lied (MP3, M4A, WAV, OGG) hochladen.' });
   const length = Number(req.headers['content-length'] || 0);
   if (length > MEDIA_MAX_BYTES) return sendJson(res, 413, { error: 'Das Video ist zu groß.' });
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
@@ -148,7 +151,7 @@ function uploadMedia(req, res) {
 function serveMedia(req, res, id) {
   const file = mediaPath(id);
   if (!file) return false;
-  const type = Object.entries(VIDEO_EXT).find(([, e]) => file.endsWith(e))?.[0] || 'application/octet-stream';
+  const type = Object.entries(MEDIA_EXT).find(([, e]) => file.endsWith(e))?.[0] || 'application/octet-stream';
   const { size } = fs.statSync(file);
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
   if (range && (range[1] || range[2])) {

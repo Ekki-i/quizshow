@@ -540,8 +540,8 @@ body.beamer-page { background: #05060f; }
 .band-scene { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
 .band-scene .band-svg { width: 100%; height: 100%; }
 .band-scene .bd-lights polygon { opacity: calc(0.08 + var(--kick, 0) * 0.22); mix-blend-mode: screen; }
-.band-scene .bd-pause { font-family: var(--font-display); font-weight: 800; font-size: 92px; letter-spacing: 0.06em; fill: #fff; filter: drop-shadow(0 0 calc(4px + var(--beat, 0) * 14px) #ff2d8a); }
-.band-scene .bd-pause-sub { font-family: var(--font); font-weight: 600; font-size: 24px; fill: #b9bde0; letter-spacing: 0.04em; }
+.band-scene .bd-pause { font-family: var(--font-display); font-weight: 800; font-size: 64px; letter-spacing: 0.06em; fill: #fff; filter: drop-shadow(0 0 calc(4px + var(--beat, 0) * 14px) #ff2d8a); }
+.band-scene .bd-pause-sub { font-family: var(--font); font-weight: 600; font-size: 18px; fill: #b9bde0; letter-spacing: 0.04em; }
 
 /* Teampulte aus dem Show-Bild */
 .scene-teams { width: min(94vw, 165vh); }
@@ -606,3 +606,11 @@ body.beamer-page.is-fullscreen:not(.is-idle) .conn { opacity: 1; }
 .beamer-mini .preview { width: min(100%, 400px); flex: none; box-shadow: 0 0 0 2px var(--surface-2); }
 .beamer-mini-info { flex: 1 1 260px; min-width: 0; }
 .beamer-mini-info h3 { margin-bottom: 6px; }
+
+/* Lieder je Pause im Editor */
+.rundown-list li.rd { flex-wrap: wrap; }
+.pause-songs { flex: 1 1 100%; margin: 6px 0 2px 2.2em; padding: 12px; border-radius: var(--radius-sm); background: rgba(31, 214, 242, 0.07); border: 1px solid rgba(31, 214, 242, 0.35); }
+.pause-songs p { margin: 0 0 8px; }
+.song-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.song-list li { display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: var(--radius-sm); padding: 6px 10px; }
+.song-list .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }

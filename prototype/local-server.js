@@ -65,7 +65,8 @@ async function mediaTx(mode, fn) {
   });
 }
 const mediaMem = new Map();
-const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-m4v'];
+const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-m4v',
+  'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/webm'];
 
 export function createLocalServer() {
   let data = load();
@@ -212,7 +213,7 @@ export function createLocalServer() {
     },
 
     async uploadMedia(blob) {
-      if (!blob || !VIDEO_TYPES.includes(blob.type)) throw new Error('Bitte ein Video als MP4, WebM oder MOV wählen.');
+      if (!blob || !VIDEO_TYPES.includes(blob.type)) throw new Error('Bitte ein Video (MP4, WebM, MOV) oder ein Lied (MP3, M4A, WAV, OGG) wählen.');
       if (blob.size > 1024 * 1024 * 1024) throw new Error('Das Video ist zu groß.');
       const id = `media_${Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
       mediaMem.set(id, blob);
