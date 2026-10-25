@@ -553,7 +553,8 @@ test('Avatare: nur gültige Bilder, nur auf dem Beamer bei Intro und Münze, ent
 test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze aus', () => {
   const { db, ids } = setup(2);
   const steps = game.moderatorView(db).rundown;
-  assert.deepEqual(steps.slice(0, 6).map((s) => s.kind), ['start', 'intro', 'pyramid', 'pyramid', 'title', 'game']);
+  assert.deepEqual(steps.slice(0, 5).map((s) => s.kind), ['start', 'intro', 'pyramid', 'title', 'game']);
+  assert.equal(steps.filter((s) => s.kind === 'pyramid').length, 1);
   assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
   assert.ok(steps.some((s) => s.kind === 'pause'));
   assert.equal(steps.at(-1).kind, 'end');

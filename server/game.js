@@ -255,7 +255,7 @@ function defaultRundown(project) {
   const steps = [{ kind: 'start' }, { kind: 'intro' }, { kind: 'pyramid' }];
   project.games.forEach((g, i) => {
     const pos = i + 1;
-    steps.push({ kind: 'pyramid', pos }, { kind: 'title', pos }, { kind: 'game', pos });
+    steps.push({ kind: 'title', pos }, { kind: 'game', pos });
     if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'coin', pos });
     if (pos === 4) steps.push({ kind: 'pause' });
   });
