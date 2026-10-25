@@ -1,4 +1,5 @@
-<title>Quizshow Prototyp</title>
+<title>Wer stiehlt uns die Show – Prototyp</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;600;700;800&display=swap">
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
   /* Leitstand: alle Bildschirme der Show nebeneinander, jeder in echter Größe skaliert. */
@@ -11,15 +12,20 @@
     --pink: #ff2e88;
     --yellow: #ffd400;
     --cyan: #00d1ff;
-    --font: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-    --font-display: "Arial Black", "Segoe UI Black", Impact, system-ui, sans-serif;
+    --font: "Jost", "Futura", "Century Gothic", "Segoe UI", system-ui, sans-serif;
+    --font-display: "Jost", "Futura", "Century Gothic", "Arial Black", system-ui, sans-serif;
     color-scheme: dark;
   }
   body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; }
   .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; max-width: 1600px; margin: 0 auto; }
   header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
-  h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; }
-  h1 span { color: var(--pink); }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; }
+  h1 .proto { color: var(--cyan); font-size: 0.55em; letter-spacing: 0.12em; vertical-align: 0.35em; }
+  .show-title { color: #fff; -webkit-text-stroke: 0.06em #0a0a0a; paint-order: stroke fill; text-shadow: 0.05em 0.06em 0 rgba(0,0,0,.85); }
+  .show-title .hot { color: #ff4fb0; -webkit-text-stroke: 0.045em #ffd0ea; text-shadow: 0.045em 0.05em 0 #b0125f, 0 0 0.45em rgba(255,45,138,.6); }
+  body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(rgba(5,6,15,.35), rgba(5,6,15,.65)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900' preserveAspectRatio='xMidYMid slice'%3E %3Cdefs%3E%3CradialGradient id='g' cx='0.5' cy='0.38' r='0.75'%3E%3Cstop offset='0' stop-color='%23151a3e'/%3E%3Cstop offset='0.6' stop-color='%23080919'/%3E%3Cstop offset='1' stop-color='%2303040b'/%3E%3C/radialGradient%3E %3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%237fe8ff' stop-opacity='0.32'/%3E%3Cstop offset='1' stop-color='%231fd6f2' stop-opacity='0'/%3E%3C/linearGradient%3E %3Cfilter id='n' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E %3Crect width='1600' height='900' fill='url(%23g)'/%3E %3Cpolygon points='330,0 370,0 560,700 140,700' fill='url(%23s)'/%3E%3Cpolygon points='1230,0 1270,0 1460,700 1040,700' fill='url(%23s)'/%3E %3Cg%3E%3Cpolygon points='120,116 149,167 91,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1480,116 1509,167 1451,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='212,116 241,167 183,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1388,116 1417,167 1359,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='304,116 333,167 275,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1296,116 1325,167 1267,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='396,116 425,167 367,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1204,116 1233,167 1175,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='488,116 517,167 459,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1112,116 1141,167 1083,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='580,116 609,167 551,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1020,116 1049,167 991,167' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='138,218 166,266 110,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1462,218 1490,266 1434,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='230,218 258,266 202,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1370,218 1398,266 1342,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='322,218 350,266 294,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1278,218 1306,266 1250,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='414,218 442,266 386,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1186,218 1214,266 1158,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='506,218 534,266 478,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1094,218 1122,266 1066,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='598,218 626,266 570,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1002,218 1030,266 974,266' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='156,319 183,366 129,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1444,319 1471,366 1417,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='248,319 275,366 221,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1352,319 1379,366 1325,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='340,319 367,366 313,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1260,319 1287,366 1233,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='432,319 459,366 405,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1168,319 1195,366 1141,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='524,319 551,366 497,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1076,319 1103,366 1049,366' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='174,420 200,465 148,465' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1426,420 1452,465 1400,465' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='266,420 292,465 240,465' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1334,420 1360,465 1308,465' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='358,420 384,465 332,465' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='1242,420 1268,465 1216,465' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.3'/%3E%3Cpolygon points='192,521 217,564 167,564' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3Cpolygon points='1408,521 1433,564 1383,564' fill='none' stroke='%23ff3d7f' stroke-width='2.4' opacity='0.55'/%3E%3C/g%3E %3Cg filter='url(%23n)' opacity='0.9'%3E%3Cpolygon points='0,40 34,40 300,640 262,640' fill='%23ff2d8a'/%3E%3Cpolygon points='0,250 24,250 220,700 194,700' fill='%231fd6f2'/%3E %3Cpolygon points='1600,40 1566,40 1300,640 1338,640' fill='%23ff2d8a'/%3E%3Cpolygon points='1600,250 1576,250 1380,700 1406,700' fill='%231fd6f2'/%3E%3C/g%3E %3Cpolygon points='0,40 34,40 300,640 262,640' fill='%23ff2d8a'/%3E%3Cpolygon points='0,250 24,250 220,700 194,700' fill='%231fd6f2' opacity='.9'/%3E %3Cpolygon points='1600,40 1566,40 1300,640 1338,640' fill='%23ff2d8a'/%3E%3Cpolygon points='1600,250 1576,250 1380,700 1406,700' fill='%231fd6f2' opacity='.9'/%3E %3Cellipse cx='800' cy='905' rx='980' ry='150' fill='none' stroke='%23ff2d8a' stroke-width='3'/%3E%3Cellipse cx='800' cy='905' rx='820' ry='95' fill='none' stroke='%231fd6f2' stroke-width='3'/%3E %3C/svg%3E") center / cover no-repeat; }
+  .tabs button { background: rgba(34, 9, 77, 0.85); }
   .lead { color: var(--muted); max-width: 70ch; margin: 6px 0 0; line-height: 1.5; }
   .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .fact { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 0.9rem; }
@@ -29,6 +35,12 @@
   .tabs button[aria-selected="true"] { background: var(--pink); border-color: var(--pink); }
   .tabs button:focus-visible, .reset:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
   .reset { background: transparent; }
+  .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .fs-btn { background: var(--pink); border-color: var(--pink); }
+  /* Ersatz-Vollbild, falls der Browser echtes Vollbild hier nicht erlaubt */
+  .device.pseudo-fs { position: fixed !important; inset: 0; z-index: 1000; border: 0; border-radius: 0; height: 100vh !important; background: #000; }
+  .device:fullscreen { background: #000; border: 0; border-radius: 0; }
+  .fs-exit { position: fixed; top: 12px; right: 12px; z-index: 1001; font: 700 0.95rem var(--font); color: #fff; background: rgba(0,0,0,.6); border: 1px solid #555; border-radius: 10px; padding: 8px 12px; cursor: pointer; }
   .stage { display: grid; gap: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
   .screen { grid-column: span 4; min-width: 0; }
   .screen.mod { grid-column: span 7; }
@@ -44,19 +56,23 @@
   .device { position: relative; overflow: hidden; border-radius: 12px; border: 2px solid var(--line); background: #000; }
   .device iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: var(--bg); }
   .note { color: var(--muted); font-size: 0.85rem; margin-top: 18px; }
+  .screen.mod .label .size { display: none; }
+  .local-file { background: var(--panel); border: 2px solid var(--yellow); border-radius: 14px; padding: 18px 20px; margin: 20px 0; line-height: 1.55; max-width: 70ch; }
+  .local-file h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--yellow); }
+  .local-file ol { margin: 8px 0 0; padding-left: 1.3em; }
+  .local-file code { background: var(--bg); padding: 1px 6px; border-radius: 6px; }
 </style>
 
 <div class="wrap">
   <header class="top">
     <div>
-      <h1>Quizshow <span>Prototyp</span></h1>
-      <p class="lead">Alle Bildschirme der Show laufen hier gleichzeitig und sind live verbunden. Gib als Team eine Antwort ab und bewerte sie in der Moderation – Beamer und iPads ändern sich sofort.</p>
-      <div class="facts">
-        <span class="fact">Moderator-Passwort <b>demo</b></span>
-        <span class="fact" id="codes">Teamcodes</span>
-      </div>
+      <h1><span class="show-title">Wer stiehlt <span class="hot">uns</span> die Show</span> <span class="proto">Prototyp</span></h1>
+      <p class="lead">Hier steuerst du die Show. Beamer, Team-iPads und Startseite laufen im Hintergrund mit und sind über die Reiter erreichbar.</p>
     </div>
-    <button class="reset" id="reset" type="button">Demo zurücksetzen</button>
+    <div class="top-actions">
+      <button class="reset fs-btn" id="beamer-fs" type="button">⛶ Beamer im Vollbild</button>
+      <button class="reset" id="reset" type="button">Demo zurücksetzen</button>
+    </div>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Ansicht wählen" id="tabs"></nav>
@@ -64,6 +80,22 @@
   <p class="note">Prototyp ohne Server: Alles läuft in diesem Browser und bleibt nur hier gespeichert. Für die echte Show mit iPads und Beamer startet der Node-Server aus dem Repository. Ton gibt es auf dem Beamer nach Klick auf „Ton aktivieren“.</p>
 </div>
 
+<script>
+  // Direkt per Doppelklick geöffnet (file://): Der Browser blockiert dort die
+  // Module, die Bildschirme bleiben leer. Statt dessen eine Anleitung zeigen.
+  if (location.protocol === 'file:') {
+    document.getElementById('tabs').hidden = true;
+    document.getElementById('stage').outerHTML = `<div class="local-file" role="alert">
+      <h2>So startest du den Prototyp</h2>
+      Direkt per Doppelklick auf <code>prototype.html</code> lässt der Browser den Prototyp nicht laufen. Nimm stattdessen den Starter im selben Ordner:
+      <ol>
+        <li><b>Windows:</b> Doppelklick auf <code>Prototyp starten (Windows).bat</code></li>
+        <li><b>Mac:</b> Rechtsklick auf <code>Prototyp starten (Mac).command</code> → „Öffnen“ (beim ersten Mal bestätigen)</li>
+      </ol>
+      Der Browser öffnet sich dann von selbst. Das schwarze Fenster offen lassen, solange du spielst. Benötigt wird <a href="https://nodejs.org" style="color:var(--cyan)">Node.js</a> (kostenlos, LTS-Version).
+    </div>`;
+  }
+</script>
 <script type="module">
   import { createLocalServer } from './demo/local-server.js';
 
@@ -78,8 +110,6 @@
     { id: 'start', label: 'Startseite', cls: 'start', src: 'start.html', w: 1100, h: 1100, color: '#c9b8f0' },
   ];
 
-  document.getElementById('codes').innerHTML = server.demoTeams.map((t) => `${t.name} <b>${t.code}</b>`).join(' · ');
-
   const stage = document.getElementById('stage');
   const tabs = document.getElementById('tabs');
   const frames = [];
@@ -91,23 +121,161 @@
     el.innerHTML = `<div class="label"><span class="dot" style="--c:${s.color}"></span>${s.label}<span class="size">${s.w} × ${s.h}</span></div><div class="device"><iframe title="${s.label}" width="${s.w}" height="${s.h}"></iframe></div>`;
     stage.append(el);
     const iframe = el.querySelector('iframe');
+    iframe.name = 'quiz-proto';
+    iframe.allow = 'fullscreen; autoplay; screen-wake-lock';
+    iframe.allowFullscreen = true;
     iframe.src = s.src;
     frames.push({ s, el, iframe, device: el.querySelector('.device') });
   }
 
+  // Brücke für abgeschottete Bildschirme: Kommt ein Bildschirm nicht direkt an
+  // window.__quizServer, schickt er Verbindungen und API-Aufrufe per postMessage.
+  const bridged = new Map(); // Fenster -> Map(cid -> Verbindung)
+  function bridgeConns(source) {
+    if (!bridged.has(source)) bridged.set(source, new Map());
+    return bridged.get(source);
+  }
+  window.addEventListener('message', async (ev) => {
+    const msg = ev.data;
+    const source = ev.source;
+    if (!msg || msg.quiz !== true || !source || !frames.some((f) => f.iframe.contentWindow === source)) return;
+    const reply = (m) => {
+      try {
+        source.postMessage({ quiz: true, ...m }, '*');
+      } catch {
+        // Bildschirm wurde inzwischen neu geladen.
+      }
+    };
+    const conns = bridgeConns(source);
+    if (msg.op === 'connect') {
+      const c = server.connect();
+      conns.set(msg.cid, c);
+      c.onopen = () => reply({ op: 'open', cid: msg.cid });
+      c.onmessage = (e) => reply({ op: 'message', cid: msg.cid, data: e.data });
+      const close = c.close;
+      c.close = () => {
+        conns.delete(msg.cid);
+        close();
+        reply({ op: 'close', cid: msg.cid });
+      };
+    } else if (msg.op === 'send') {
+      conns.get(msg.cid)?.send(msg.text);
+    } else if (msg.op === 'close') {
+      const c = conns.get(msg.cid);
+      conns.delete(msg.cid);
+      c?.close();
+    } else if (msg.op === 'api') {
+      const [status, data] = await server.api(msg.name, msg.body);
+      reply({ op: 'api', callId: msg.callId, status, data });
+    } else if (msg.op === 'media-put') {
+      try {
+        reply({ op: 'media', callId: msg.callId, data: await server.uploadMedia(msg.blob) });
+      } catch (err) {
+        reply({ op: 'media', callId: msg.callId, error: err.message });
+      }
+    } else if (msg.op === 'media-get') {
+      reply({ op: 'media', callId: msg.callId, data: await server.getMedia(msg.id) });
+    }
+  });
   // Jeden Bildschirm in seiner echten Größe rendern und auf die Spaltenbreite skalieren.
   function fit() {
     for (const f of frames) {
+      // Im Vollbild nicht skalieren – dort füllt der Beamer den Bildschirm.
+      if (f.device.classList.contains('pseudo-fs') || (document.fullscreenElement || document.webkitFullscreenElement) === f.device) continue;
       const width = f.device.clientWidth;
       if (!width) continue;
+      // Moderation: in Originalgröße, so hoch wie das Fenster – wie die echte Anwendung.
+      if (f.s.id === 'moderation' && stage.dataset.focus === 'moderation') {
+        const top = f.device.getBoundingClientRect().top + window.scrollY;
+        const height = Math.max(560, window.innerHeight - top - 24);
+        f.iframe.width = width;
+        f.iframe.height = height;
+        f.iframe.style.transform = 'none';
+        f.device.style.height = `${height}px`;
+        continue;
+      }
+      f.iframe.width = f.s.w;
+      f.iframe.height = f.s.h;
       const scale = Math.min(1, width / f.s.w);
       f.iframe.style.transform = `scale(${scale})`;
       f.device.style.height = `${Math.round(f.s.h * scale)}px`;
     }
   }
   new ResizeObserver(fit).observe(stage);
+  window.addEventListener('resize', fit);
 
-  const views = [{ id: 'all', label: 'Alles im Blick' }, ...screens.map((s) => ({ id: s.id, label: s.label }))];
+  // Nur eine Ansicht auf einmal (Standard: Moderation); die anderen laufen im Hintergrund weiter.
+  const views = screens.map((s) => ({ id: s.id, label: s.label }));
+  // Beamer bildschirmfüllend: echtes Vollbild, sonst Ersatz-Vollbild im Fenster.
+  // Die Beamer-Seite skaliert dann auf die volle Größe, wie auf der Leinwand.
+  let pseudoExit = null;
+  function fitBeamerTo(f, w, h) {
+    f.iframe.width = w;
+    f.iframe.height = h;
+    f.iframe.style.transform = 'none';
+  }
+  async function beamerFullscreen() {
+    const f = frames.find((x) => x.s.id === 'beamer');
+    if (!f) return;
+    const el = f.device;
+    const enter = () => {
+      f.el.style.display = 'block'; // auch wenn gerade eine andere Ansicht gewählt ist
+      fitBeamerTo(f, window.innerWidth, window.innerHeight);
+      f.iframe.width = '100%';
+      f.iframe.height = '100%';
+      f.iframe.style.width = '100%';
+      f.iframe.style.height = '100%';
+    };
+    const leave = () => {
+      f.el.style.display = '';
+      f.iframe.width = f.s.w;
+      f.iframe.height = f.s.h;
+      f.iframe.style.width = '';
+      f.iframe.style.height = '';
+      requestAnimationFrame(fit);
+    };
+    try {
+      if (!el.requestFullscreen && !el.webkitRequestFullscreen) throw new Error('kein Vollbild');
+      await (el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen());
+      enter();
+      const onChange = () => {
+        if (!(document.fullscreenElement || document.webkitFullscreenElement)) {
+          leave();
+          document.removeEventListener('fullscreenchange', onChange);
+          document.removeEventListener('webkitfullscreenchange', onChange);
+        }
+      };
+      document.addEventListener('fullscreenchange', onChange);
+      document.addEventListener('webkitfullscreenchange', onChange);
+    } catch {
+      // Echtes Vollbild nicht erlaubt (z. B. eingebettete Vorschau): Fenster füllen.
+      el.classList.add('pseudo-fs');
+      enter();
+      const btn = document.createElement('button');
+      btn.className = 'fs-exit';
+      btn.textContent = '✕ Vollbild beenden (Esc)';
+      const exit = () => {
+        el.classList.remove('pseudo-fs');
+        btn.remove();
+        leave();
+        document.removeEventListener('keydown', onKey);
+        pseudoExit = null;
+      };
+      const onKey = (ev) => { if (ev.key === 'Escape') exit(); };
+      btn.onclick = exit;
+      document.addEventListener('keydown', onKey);
+      document.body.append(btn);
+      pseudoExit = exit;
+    }
+  }
+  document.getElementById('beamer-fs').onclick = beamerFullscreen;
+  // Der Vollbild-Knopf auf der Beamer-Seite selbst leitet hierher weiter.
+  window.addEventListener('message', (ev) => {
+    if (ev.data && ev.data.quiz === true && ev.data.op === 'beamer-fullscreen') {
+      if (pseudoExit) pseudoExit(); else beamerFullscreen();
+    }
+  });
+
   function select(id) {
     if (id === 'all') delete stage.dataset.focus;
     else stage.dataset.focus = id;
@@ -124,7 +292,7 @@
     b.onclick = () => select(v.id);
     tabs.append(b);
   }
-  const initial = views.some((v) => v.id === location.hash.slice(1)) ? location.hash.slice(1) : 'all';
+  const initial = views.some((v) => v.id === location.hash.slice(1)) ? location.hash.slice(1) : 'moderation';
   select(initial);
 
   document.getElementById('reset').onclick = () => {

@@ -44,9 +44,9 @@ const TYPES = {
   dummes: {
     title: 'Dumm ist der, der Dummes kriegt',
     playable: true,
-    summary: 'Multiple Choice A–D mit Buzzer und einem Antworttausch.',
+    summary: 'Fünf Fragen A–D mit Buzzer; bei jeder Frage darf das schnellste Team tauschen.',
     schema: [
-      { key: 'questions', label: 'Fragen', type: 'list', min: 1, max: 20, itemLabel: (i) => `Frage ${i + 1}`, addLabel: 'Frage hinzufügen',
+      { key: 'questions', label: 'Fragen', type: 'list', min: 5, max: 5, itemLabel: (i) => `Frage ${i + 1}`,
         fields: [area('question', 'Frage', 300), optionsField, correctField] },
     ],
     example: {
@@ -54,6 +54,8 @@ const TYPES = {
         { question: 'Welches Tier ist das größte an Land?', options: { A: 'Giraffe', B: 'Afrikanischer Elefant', C: 'Nashorn', D: 'Flusspferd' }, correct: 'B' },
         { question: 'Wie viele Kontinente gibt es?', options: { A: '5', B: '6', C: '7', D: '8' }, correct: 'C' },
         { question: 'Welches Metall ist bei Zimmertemperatur flüssig?', options: { A: 'Quecksilber', B: 'Blei', C: 'Zinn', D: 'Aluminium' }, correct: 'A' },
+        { question: 'Wie viele Saiten hat eine klassische Gitarre?', options: { A: '4', B: '5', C: '6', D: '7' }, correct: 'C' },
+        { question: 'Welcher Planet ist der Sonne am nächsten?', options: { A: 'Venus', B: 'Merkur', C: 'Mars', D: 'Erde' }, correct: 'B' },
       ],
     },
   },

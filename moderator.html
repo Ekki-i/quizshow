@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quizshow – Show-Regie</title>
+  <title>Wer stiehlt uns die Show – Show-Regie</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -17,21 +17,25 @@
       <button role="tab" data-tab="points" aria-selected="false">Punkte &amp; Protokoll</button>
     </nav>
     <div class="row">
-      <a class="btn small ghost" href="beamer.html" target="_blank" rel="noopener">Beamer öffnen ↗</a>
+      <a class="btn small ghost" href="beamer.html" target="_blank" rel="noopener" title="Beamer-Ansicht in neuem Fenster – dort „⛶ Vollbild“">Beamer öffnen ↗</a>
       <button class="btn small ghost" id="logout">Abmelden</button>
     </div>
   </header>
   <main class="mod-main">
     <div id="warning"></div>
     <section id="tab-live" role="tabpanel">
+      <div id="run-panel"></div>
+      <!-- Kleine Beamer-Vorschau direkt unter dem Showablauf (fest im HTML, lädt bei Updates nicht neu) -->
+      <section class="card beamer-mini" aria-label="Beamer-Vorschau">
+        <iframe class="preview" src="beamer.html?preview" title="Beamer-Vorschau"></iframe>
+        <div class="beamer-mini-info">
+          <h3>Beamer</h3>
+          <div id="beamer-controls"></div>
+        </div>
+      </section>
       <div class="live-grid">
         <div id="live-left" class="grid" style="align-content:start"></div>
         <div class="grid" style="align-content:start">
-          <section class="card">
-            <h3>Beamer</h3>
-            <div id="beamer-controls"></div>
-            <iframe class="preview" src="beamer.html?preview" title="Beamer-Vorschau" style="margin-top:12px"></iframe>
-          </section>
           <div id="live-right" class="grid"></div>
         </div>
       </div>

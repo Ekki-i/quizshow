@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Quizshow – Team</title>
+  <title>Wer stiehlt uns die Show – Team</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
   </main>
 
   <script type="module">
-    import { h, connect, store, localServer } from './assets/js/client.js';
+    import { h, connect, store, localServer, setShowTitle } from './assets/js/client.js';
     import { renderPlay } from './assets/js/team-play.js';
 
     const params = new URLSearchParams(location.search);
@@ -59,7 +59,9 @@
       document.title = `${s.team.name} – ${s.show.name}`;
       document.getElementById('team-name').textContent = s.team.name;
       document.getElementById('head').style.setProperty('--team', s.team.color);
-      document.getElementById('game-name').textContent = s.game ? `Spiel ${s.game.position}: ${s.game.title}` : s.show.name;
+      const gameName = document.getElementById('game-name');
+      if (s.game) { gameName.classList.remove('show-title'); gameName.textContent = `Spiel ${s.game.position}: ${s.game.title}`; }
+      else setShowTitle(gameName, s.show.name);
 
       const parts = [];
       if (expect && expect !== s.team.id) {

@@ -2,7 +2,7 @@
 
 // Spiel „Die leichten 5“: Freitext-Antworten, Moderation bewertet, 1 Punkt pro richtiger Antwort.
 
-const { fail, log, effect, teamName, bookTarget, cleanText } = require('./core');
+const { fail, log, effect, teamName, bookTarget, cleanText, cleanInk } = require('./core');
 
 function round(st, qIndex) {
   if (!st.rounds[qIndex]) st.rounds[qIndex] = { open: false, solutionRevealed: false, answers: {} };
@@ -17,9 +17,11 @@ module.exports = {
       const r = round(st, st.qIndex);
       if (!r.open) fail('Die Frage ist nicht freigegeben.');
       if (r.answers[ctx.teamId]) fail('Eure Antwort ist bereits abgegeben und gesperrt.');
-      const text = cleanText(p.text, 200);
-      if (!text) fail('Bitte zuerst eine Antwort eingeben.');
-      r.answers[ctx.teamId] = { text, at: ctx.now, grade: null, onBeamer: false };
+      // Antwort handschriftlich (Apple Pencil) oder als Text.
+      const ink = cleanInk(p.ink);
+      const text = ink ? '' : cleanText(p.text ?? '', 200);
+      if (!ink && !text) fail('Bitte zuerst eure Antwort aufschreiben.');
+      r.answers[ctx.teamId] = { text, ink, at: ctx.now, grade: null, onBeamer: false };
       log(db, ctx, 'antwort', `${teamName(db, ctx.teamId)} hat Frage ${st.qIndex + 1} abgegeben`);
     },
   },
@@ -70,7 +72,7 @@ module.exports = {
       count: game.content.questions.length,
       question: r.open || r.solutionRevealed ? game.content.questions[st.qIndex].question : null,
       open: r.open,
-      answer: own ? { text: own.text, grade: own.grade } : null,
+      answer: own ? { text: own.text, ink: own.ink || null, grade: own.grade } : null,
     };
   },
 
@@ -83,7 +85,7 @@ module.exports = {
       question: visible ? game.content.questions[st.qIndex].question : null,
       submittedCount: Object.keys(r.answers).length,
       teamCount: db.project.teams.length,
-      answers: Object.entries(r.answers).filter(([, a]) => a.onBeamer).map(([teamId, a]) => ({ teamId, text: a.text, grade: a.grade })),
+      answers: Object.entries(r.answers).filter(([, a]) => a.onBeamer).map(([teamId, a]) => ({ teamId, text: a.text, ink: a.ink || null, grade: a.grade })),
       solution: r.solutionRevealed ? game.content.questions[st.qIndex].solution : null,
     };
   },

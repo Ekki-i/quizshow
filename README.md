@@ -38,13 +38,20 @@ Die Übersichtsseite `prototype.html` zeigt Moderation, Beamer, drei Team-iPads 
 die Startseite nebeneinander. Die Spiellogik läuft dabei im Browser, alles bleibt in
 diesem einen Browser gespeichert. Moderator-Passwort im Prototyp: `demo`.
 
+`npm run build:single` erzeugt zusätzlich `dist-single/quizshow-prototyp.html`: den
+kompletten Prototyp als **eine** eigenständige Datei ohne nachgeladene Dateien. Sie läuft
+per Doppelklick direkt von der Festplatte und auch in abgeschotteten Vorschauen.
+
 ## Ablauf in Kürze
 
 1. Als Moderator anmelden, unter **Teams** die Teams anlegen (Standard: sechs).
    Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.
 2. Auf jedem iPad die Startseite öffnen, Team wählen und Code eingeben (oder den Link öffnen).
    Bei Verbindungsabbruch oder Neuladen verbindet sich das Gerät automatisch wieder.
-3. Auf dem Beamer-Rechner `beamer.html` öffnen und einmal „Ton aktivieren“ klicken.
+3. Auf dem Gerät an der Leinwand `http://<IP-des-Laptops>:3000/beamer.html` öffnen und „⛶ Vollbild“
+   tippen (startet Vollbild und Ton; Taste F oder Doppelklick schaltet um). Bedienelemente und Mauszeiger
+   blenden sich aus, der Bildschirm bleibt an. iPhone/iPad: Seite über Teilen → „Zum Home-Bildschirm“
+   öffnen, dann läuft sie ohne Browserleisten. Die Adresse steht auch in der Live-Regie beim Beamer.
 4. In der **Live-Regie** ein Spiel aktivieren, den Beamer steuern, Fragen freigeben und bewerten.
 
 ## Stand der Umsetzung (erste Phase)
@@ -62,7 +69,27 @@ Umgesetzt:
 - Punktebuch mit Begründung, „Rückgängig“ als Gegenbuchung, Änderungsprotokoll.
 - Showablauf mit acht Positionen, „Die leichten 5“ fest auf Position 1,
   Münzen nach Position 4, 6 und 8 inkl. Gleichstandswarnung und Schätzfrage-Entscheid.
-- Beamer: Startbild, Intro mit Teams, Pyramide 4–2–2, Spieltitel-Animation, Spielansicht,
+- Teampulte auf dem Beamer in Originaloptik und -anordnung (Show-Bild, Bögen leer, erzeugt mit
+  `scripts/build-podiums.py`); je Team lässt sich unter **Teams** ein 3D-Avatar (am besten
+  freigestelltes PNG) hochladen, der im Bogen hinter dem Pult steht. Ohne Avatar bleibt das Pult leer.
+- **Showablauf wie eine Präsentation**: In der Live-Regie führt „Weiter“ (oder Pfeil rechts,
+  Leertaste, Presenter-Klicker) Schritt für Schritt durch die Show – Startbild, Vorstellung der
+  Teams, Intro-Video, einmal die Übersicht Kategorien, je Spiel Spieltitel und Spiel, Münzvergaben nach 4, 6 und 8, Pause,
+  Rangliste und Abschluss. Jeder Schritt schaltet Spiel und Beamer automatisch. Nach einer offenen
+  Münzvergabe (Gleichstand) geht es erst weiter, wenn die Münze vergeben ist. Im Show-Editor lässt
+  sich der Ablauf ändern (Pausen einfügen, verschieben, löschen, Standard wiederherstellen).
+- **Intro-Video je Show**: im Show-Editor hochladen oder austauschen (MP4, WebM, MOV). Es läuft im
+  Showablauf direkt nach dem Startbild bildschirmfüllend, danach erscheint das Logo. Der Server legt
+  Videos unter `data/media/` ab (Ordner per `QUIZ_MEDIA_DIR`, Größe per `QUIZ_MEDIA_MAX_MB`, Standard
+  1024 MB) und löscht sie, sobald keine Show mehr darauf verweist. Im Prototyp bleiben sie im Browser.
+- Die Beamer-Ansicht schaltet der Showablauf; in der Live-Regie steht nur noch die Beamer-Vorschau.
+- **Pause**: Moderationspult mit „PAUSE“-Bildschirm, dahinter eine Big-Band auf drei Podeststufen
+  (Schlagzeug, zwei Sängerinnen, Bass, Marimba, Saxofone, Gitarre, Trompete, Posaune, Keyboard) im
+  Avatar-Stil der Show, die sich im Takt bewegt. **Eigene Lieder je Pause**: im Show-Editor beim
+  Pausenschritt „♪ Lieder“ – MP3/M4A/WAV/OGG hochladen, sortieren, entfernen. Sie laufen nacheinander
+  in Schleife, die Band reagiert auf Bass, Snare und Hi-Hat der Musik, der Liedtitel steht auf dem
+  Bildschirm. Ohne eigene Lieder läuft der eingebaute Pausensong (Ton nach „Ton aktivieren“ am Beamer).
+- Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
   Ranglisten-Enthüllung, Münzanimation, eigene synthetische Soundeffekte.
 - **Mehrere Shows**: anlegen (optional mit den Teams der geöffneten Show), umbenennen,
   mit Datum versehen, öffnen, duplizieren und löschen. Jede Show hat eigene Spiele, Teams und Punkte.
@@ -75,7 +102,8 @@ Umgesetzt:
 - **Alle acht Spiele live spielbar** mit Team-iPad, Beamer und Moderation:
   - *Die leichten 5*: Freitext, Bewertung pro Antwort.
   - *Dumm ist der, der Dummes kriegt*: A–D, Buzzer nach dem Sperren, 10-Sekunden-Fenster
-    (serverseitig), Nachabgabe durch die Moderation, ein Antworttausch im ganzen Spiel.
+    (serverseitig), Nachabgabe durch die Moderation, fünf Fragen, bei jeder Frage ein Antworttausch
+    für das schnellste Team.
   - *Ich sehe ein Land, das du nicht siehst*: Karte (Welt, Europa, Deutschland) zum Antippen,
     erst Tipps, dann Zielort enthüllen, Entfernung in km, manuelle Korrektur.
   - *Das ist ein echter Kassenschlager*: private Paywall mit zehn Hinweisen, 20 $ Start,

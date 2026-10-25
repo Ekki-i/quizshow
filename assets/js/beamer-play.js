@@ -1,6 +1,7 @@
 // Beamer: Spielansichten für alle acht Spiele. Es kommen nur freigegebene Daten an.
 
 import { h } from './client.js';
+import { answerContent } from './ink.js';
 import { mapView } from './map.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -36,7 +37,7 @@ function leichte5(v, teamOf) {
   out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
     const t = teamOf(a.teamId);
     const mark = a.grade === true ? h('span', { class: 'mark ok', 'aria-label': 'richtig' }, '✓') : a.grade === false ? h('span', { class: 'mark bad', 'aria-label': 'falsch' }, '✗') : null;
-    return h('div', { class: 'answer', '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), a.text), mark);
+    return h('div', { class: `answer${a.ink ? ' has-ink' : ''}`, '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), answerContent(a, 'beamer')), mark);
   })));
   if (v.solution) out.push(h('div', { class: 'solution' }, `Lösung: ${v.solution}`));
   return out;
@@ -58,7 +59,7 @@ function land(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, 'Ich sehe ein Land …'), h('div', { class: 'map-box beamer-map' }, mapView(v.map))];
   const markers = (v.guesses || []).map((g) => ({ lat: g.lat, lng: g.lng, color: teamOf(g.teamId).color, label: teamOf(g.teamId).name, showLabel: true }));
   if (v.target) markers.push({ lat: v.target.lat, lng: v.target.lng, kind: 'target', label: v.target.name });
-  const out = [h('div', { class: 'q', style: { fontSize: 'clamp(1.4rem,3vw,3rem)' } }, v.question), h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers }))];
+  const out = [h('div', { class: 'q compact' }, v.question), h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers }))];
   if (!v.guesses) out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben ihren Punkt gesetzt`, { marginTop: '2vh' }));
   if (v.target) {
     const w = v.winners.map((id) => teamOf(id).name).join(', ');
@@ -89,12 +90,23 @@ function kassenschlager(v, teamOf) {
 // ---------- 5 ----------
 function trumpf5(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, '5 ist Trümpf')];
-  const out = [sub(`Begriff ${v.termIndex + 1} · Kategorie`), h('div', { class: 'q' }, v.category)];
-  out.push(h('ol', { class: 'hints' }, v.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}`), t))));
-  if (!v.resolved && v.hints.length) out.push(sub(`Jetzt noch ${pts(v.value)}`, { marginTop: '2vh' }));
-  out.push(buzzRow(v, teamOf, v.buzzOrder, v.answering));
-  if (v.term) out.push(h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(v.winner).name}` : ''}`));
-  return out;
+  // Kompakt: alles muss auf einen Beamer-Bildschirm passen. Noch verdeckte
+  // Hinweise stehen als Platzhalter da, damit nichts springt.
+  const slots = Array.from({ length: 5 }, (_, i) => {
+    const text = v.hints[i];
+    const value = 5 - i;
+    return h('li', { class: text === undefined ? 'empty' : '' },
+      h('span', { class: 'pv', 'aria-label': `${value} ${value === 1 ? 'Punkt' : 'Punkte'}` }, String(value)),
+      h('span', { class: 'tx' }, text === undefined ? '' : text));
+  });
+  const foot = [];
+  if (!v.resolved && v.hints.length) foot.push(h('span', { class: 't5-value' }, `Jetzt noch ${pts(v.value)}`));
+  const buzz = buzzRow(v, teamOf, v.buzzOrder, v.answering);
+  return [h('div', { class: 't5' },
+    h('div', { class: 't5-cat' }, h('small', {}, `Begriff ${v.termIndex + 1} · Kategorie`), v.category),
+    h('ol', { class: 'hints' }, slots),
+    foot.length || buzz ? h('div', { class: 't5-foot' }, ...foot, buzz) : null,
+    v.term ? h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(v.winner).name}` : ''}`) : null)];
 }
 
 // ---------- 6 ----------

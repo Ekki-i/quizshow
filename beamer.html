@@ -2,18 +2,28 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quizshow – Beamer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- iPad/iPhone: vom Home-Bildschirm aus ohne Browserleisten (Vollbild-Ersatz) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Wer stiehlt uns die Show – Beamer</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
-  <div class="shapes" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+<body class="beamer-page">
+  <div class="studio-bg" id="studio-bg" aria-hidden="true"></div>
   <main class="beamer"><div class="stage" id="stage"></div></main>
-  <button id="sound-on" class="btn small ghost" style="position:fixed;left:12px;bottom:12px">🔊 Ton aktivieren</button>
+  <div class="beamer-controls" id="beamer-controls">
+    <button id="fullscreen" class="btn small pink" type="button" title="Vollbild (Taste F)">⛶ Vollbild</button>
+    <button id="sound-on" class="btn small ghost" type="button">🔊 Ton aktivieren</button>
+  </div>
 
   <script type="module">
-    import { h, connect } from './assets/js/client.js';
+    import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
+    import { podiumRow } from './assets/js/studio.js';
+    import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
     const embedded = new URLSearchParams(location.search).has('preview');
@@ -22,6 +32,7 @@
     let titleTimer = null;
     let audio = null;
     let clockOffset = 0;
+    let lastState = null;
 
     setInterval(() => {
       for (const el of document.querySelectorAll('[data-deadline]')) {
@@ -30,11 +41,91 @@
     }, 250);
 
     // Eigene, synthetisch erzeugte Effekte – keine fremde Musik.
-    document.getElementById('sound-on').onclick = (ev) => {
+    function enableSound() {
+      if (audio) return;
       audio = new AudioContext();
-      ev.currentTarget.remove();
-    };
-    if (embedded) document.getElementById('sound-on').remove();
+      document.getElementById('sound-on')?.remove();
+      // Läuft gerade die Pause, setzt die Musik jetzt ein.
+      if (lastState && lastState.view === 'pause' && lastState.settings.sound) startPause(audio, lastState.pauseSongs || []);
+      // Ein laufendes Intro-Video bekommt jetzt Ton.
+      const v = document.querySelector('video.intro-video');
+      if (v) v.muted = false;
+    }
+    document.getElementById('sound-on').onclick = enableSound;
+
+    // ---------- Vollbild für Leinwand/Beamer ----------
+    // Ein Klick startet Vollbild und Ton zugleich (Browser erlauben beides nur nach einer Nutzeraktion).
+    const root = document.documentElement;
+    const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    let wakeLock = null;
+    async function keepAwake(on) {
+      try {
+        if (on && 'wakeLock' in navigator && !wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => (wakeLock = null));
+        } else if (!on && wakeLock) {
+          await wakeLock.release();
+        }
+      } catch {
+        // Nicht unterstützt oder abgelehnt – dann eben ohne.
+      }
+    }
+    // Im Prototyp (eingebettet) übernimmt die Übersichtsseite das Vollbild.
+    const inPrototype = window.parent !== window && (window.name === 'quiz-proto' || typeof __search !== 'undefined');
+    async function toggleFullscreen() {
+      enableSound();
+      if (inPrototype) {
+        window.parent.postMessage({ quiz: true, op: 'beamer-fullscreen' }, '*');
+        return;
+      }
+      if (fsElement()) {
+        await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        return;
+      }
+      if (!canFullscreen) {
+        alertNoFullscreen();
+        return;
+      }
+      try {
+        await (root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen());
+      } catch {
+        alertNoFullscreen();
+      }
+    }
+    function alertNoFullscreen() {
+      const box = h('div', { class: 'fs-hint', role: 'alert' },
+        h('b', {}, 'Vollbild wird von diesem Browser nicht unterstützt.'),
+        h('p', {}, 'iPhone/iPad: Teilen → „Zum Home-Bildschirm“ und den Beamer von dort öffnen – dann läuft er ohne Browserleisten. ',
+          'Oder Bildschirmsynchronisierung bzw. AirPlay/Chromecast auf die Leinwand nutzen.'),
+        h('button', { class: 'btn small', type: 'button', onclick: () => box.remove() }, 'OK'));
+      document.body.append(box);
+    }
+    function onFullscreenChange() {
+      const on = !!fsElement();
+      document.body.classList.toggle('is-fullscreen', on);
+      document.getElementById('fullscreen').textContent = on ? '✕ Vollbild beenden' : '⛶ Vollbild';
+      keepAwake(on);
+      showControls();
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && fsElement()) keepAwake(true); });
+    document.getElementById('fullscreen').onclick = toggleFullscreen;
+    document.addEventListener('dblclick', toggleFullscreen);
+    document.addEventListener('keydown', (ev) => {
+      if ((ev.key === 'f' || ev.key === 'F') && !ev.ctrlKey && !ev.metaKey && !ev.altKey) toggleFullscreen();
+    });
+    // Bedienelemente und Mauszeiger blenden sich nach kurzer Zeit aus.
+    let idleTimer = null;
+    function showControls() {
+      document.body.classList.remove('is-idle');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => document.body.classList.add('is-idle'), fsElement() ? 2500 : 8000);
+    }
+    for (const ev of ['mousemove', 'pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, showControls, { passive: true });
+    showControls();
+    if (embedded) document.getElementById('beamer-controls').remove();
 
     function tone(freqs, dur = 0.18, type = 'square') {
       if (!audio) return;
@@ -81,67 +172,191 @@
       if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games]);
-      const replayTitle = fresh && s.effect.kind === 'title';
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo]);
+      const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
       clearTimeout(titleTimer);
 
-      const views = { start, intro, pyramid, title, game, ranking, coin, blank: () => [] };
+      lastState = s;
+      // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
+      if (s.view !== 'pause') stopPause();
+      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, blank: () => [] };
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
 
+    // ---- Neon-Studiobühne als Hintergrund (SVG, skaliert mit dem Bildschirm) ----
+    (function studio() {
+      const W = 1600, H = 900;
+      const tri = (x, y, size, dim) => `<polygon class="tri${dim ? ' dim' : ''}" points="${x},${y - size * 0.58} ${x + size / 2},${y + size * 0.29} ${x - size / 2},${y + size * 0.29}"/>`;
+      let tris = '';
+      const rows = [[150, 6], [250, 6], [350, 5], [450, 3], [550, 1]];
+      rows.forEach(([y, n], r) => {
+        for (let i = 0; i < n; i++) {
+          const x = 120 + i * 92 + r * 18;
+          const size = 58 - r * 2;
+          tris += tri(x, y, size, (i + r) % 3 === 2) + tri(W - x, y, size, (i + r) % 3 === 1);
+        }
+      });
+      const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="neon" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <linearGradient id="spot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fe8ff" stop-opacity="0.55"/><stop offset="1" stop-color="#1fd6f2" stop-opacity="0"/></linearGradient>
+          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff2d8a" stop-opacity="0"/><stop offset="0.5" stop-color="#ff2d8a" stop-opacity="0.18"/><stop offset="1" stop-color="#1fd6f2" stop-opacity="0.12"/></linearGradient>
+        </defs>
+        <polygon class="spot" points="330,0 370,0 560,700 140,700"/>
+        <polygon class="spot" points="${W - 370},0 ${W - 330},0 ${W - 140},700 ${W - 560},700"/>
+        <polygon class="spot" points="640,0 660,0 760,560 540,560" opacity="0.5"/>
+        <polygon class="spot" points="${W - 660},0 ${W - 640},0 ${W - 540},560 ${W - 760},560" opacity="0.5"/>
+        <g>${tris}</g>
+        <polygon class="beam-pink" points="0,40 34,40 300,640 262,640"/>
+        <polygon class="beam-cyan" points="0,250 24,250 220,700 194,700" opacity="0.9"/>
+        <polygon class="beam-pink" points="${W},40 ${W - 34},40 ${W - 300},640 ${W - 262},640"/>
+        <polygon class="beam-cyan" points="${W},250 ${W - 24},250 ${W - 220},700 ${W - 194},700" opacity="0.9"/>
+        <rect x="0" y="640" width="${W}" height="${H - 640}" fill="url(#floor)"/>
+        <ellipse class="floor-line" cx="800" cy="905" rx="980" ry="150" stroke="#ff2d8a"/>
+        <ellipse class="floor-line" cx="800" cy="905" rx="820" ry="95" stroke="#1fd6f2"/>
+        <ellipse class="floor-line" cx="800" cy="660" rx="700" ry="18" stroke="#1fd6f2" opacity="0.7"/>
+      </svg>`;
+      document.getElementById('studio-bg').innerHTML = svg;
+    })();
+
+    // Show-Logo: Wörter gestapelt, „uns“ hervorgehoben.
+    function showLogo(name, small) {
+      const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+      return h('div', { class: `show-logo${small ? ' small' : ''}`, role: 'heading', 'aria-level': '1', 'aria-label': name },
+        words.map((w, i) => h('span', { class: /^uns$/i.test(w) ? 'hot' : '', style: { animationDelay: `${i * 0.12}s` } }, w)));
+    }
+
+    // Gewinnstufe zur Münzposition (nach Spiel 4, 6, 8).
+    const STAGE_OF = { 4: 1, 6: 2, 8: 3 };
+
     function start(s) {
       return [
-        h('div', { class: 'logo', 'aria-hidden': 'true' }, h('span', { class: 'logo-mark', style: { width: '14vh', height: '14vh' } }, h('i', { class: 'a' }), h('i', { class: 'b' }))),
-        h('div', { class: 'mega' }, s.show.name),
-        h('div', { class: 'sub' }, s.show.subtitle),
+        showLogo(s.show.name),
+        s.show.subtitle ? h('div', { class: 'sub', style: { marginTop: '3vh' } }, s.show.subtitle) : '',
       ];
+    }
+
+    // Teampulte (gezeichnet), Avatar im Bogen. Punkte nur, wenn opts.points (Münzvergabe).
+    function teamsScene(s, opts = {}) {
+      return podiumRow(s.teams, opts);
     }
 
     function intro(s) {
       return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, `Willkommen bei ${s.show.name}!`),
-        h('div', { class: 'sub' }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
-        h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '5vh', gap: '1.5vw' } },
-          s.teams.map((t, i) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}`, animation: `pop .5s ${i * 0.25}s both` } }, h('span', { class: 'dot', style: { background: t.color } }), t.name))),
+        h('div', { class: 'kicker' }, 'Willkommen bei'),
+        h('div', { style: { margin: '1vh 0 2.5vh' } }, showLogo(s.show.name, true)),
+        teamsScene(s),
+        h('div', { class: 'sub', style: { marginTop: '2.5vh' } }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
       ];
     }
 
+    // Übersicht Kategorien (4-2-2): Kategorien 1–4, Gewinnstufe 1, Kategorien 5–6,
+    // Gewinnstufe 2, Kategorien 7–8, Gewinnstufe 3, ganz oben das Finale.
     function pyramid(s) {
-      const g = s.games || [];
-      const tier = (from, to, label, delay) => h('div', { class: 'tier' },
-        g.slice(from, to).map((x, i) => h('div', { style: { animationDelay: `${delay + i * 0.15}s` } }, `${x.position}. ${x.title}`)),
-        h('div', { class: 'coin-label', style: { animationDelay: `${delay + 0.6}s` } }, label));
-      return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, '4 – 2 – 2'),
-        h('div', { class: 'sub' }, 'Drei Preisstufen, drei Münzen'),
-        h('div', { class: 'pyramid' }, tier(0, 4, '🪙 Münze 1', 0), tier(4, 6, '🪙 Münze 2', 0.8), tier(6, 8, '🪙 Münze 3', 1.4)),
+      const NS = 'http://www.w3.org/2000/svg';
+      const el = (tag, attrs, text) => {
+        const n = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+        if (text !== undefined) n.textContent = text;
+        return n;
+      };
+      const W = 1000, apexY = 0, baseY = 880, baseHalf = 430, gap = 6;
+      const half = (y) => baseHalf * ((y - apexY) / (baseY - apexY));
+      // Bänder von oben nach unten: [Art, Beschriftung, Höhe]
+      const bands = [
+        ['finale', 'FINALE', 250],
+        ['k3', 'KATEGORIE 8', 50], ['k3', 'KATEGORIE 7', 50],
+        ['stage', 'GEWINNSTUFE 3', 48],
+        ['k2', 'KATEGORIE 6', 60], ['k2', 'KATEGORIE 5', 60],
+        ['stage', 'GEWINNSTUFE 2', 48],
+        ['k1', 'KATEGORIE 4', 50], ['k1', 'KATEGORIE 3', 50], ['k1', 'KATEGORIE 2', 50], ['k1', 'KATEGORIE 1', 50],
+        ['stage', 'GEWINNSTUFE 1', 48],
       ];
+      const total = bands.reduce((a, b) => a + b[2], 0) + gap * (bands.length - 1);
+      const scale = (baseY - apexY) / total;
+      const svg = el('svg', { viewBox: `-40 -10 ${W + 80} ${baseY + 30}`, role: 'img', 'aria-label': 'Übersicht Kategorien bis zum Finale' });
+      const defs = el('defs', {});
+      const grad = (id, stops) => {
+        const g = el('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
+        stops.forEach(([o, c]) => g.append(el('stop', { offset: o, 'stop-color': c })));
+        defs.append(g);
+      };
+      grad('g-finale', [[0, '#f0b45a'], [0.55, '#c9802c'], [1, '#8f5317']]);
+      grad('g-k3', [[0, '#b9d2e8'], [1, '#86a6c4']]);
+      grad('g-k2', [[0, '#7a848f'], [1, '#55606b']]);
+      grad('g-k1', [[0, '#5b7287'], [1, '#3f5367']]);
+      grad('g-stage', [[0, '#ffffff'], [0.5, '#e9e9ee'], [1, '#cfd0d8']]);
+      svg.append(defs);
+      const current = s.game ? s.game.position : null;
+      let y = apexY;
+      const order = [];
+      bands.forEach((b, idx) => {
+        const hgt = b[2] * scale;
+        const y0 = y, y1 = y + hgt;
+        const ext = b[0] === 'stage' ? 26 : 0;
+        const h0 = b[0] === 'finale' ? 0 : half(y0) + ext, h1 = half(y1) + ext;
+        const pts = `${W / 2 - h0},${y0} ${W / 2 + h0},${y0} ${W / 2 + h1},${y1} ${W / 2 - h1},${y1}`;
+        const g = el('g', { class: 'pyr-band' });
+        const num = /KATEGORIE (\d)/.exec(b[1]);
+        if (num && Number(num[1]) === current) g.setAttribute('class', 'pyr-band pyr-current');
+        const isCurrent = num && Number(num[1]) === current;
+        g.append(el('polygon', isCurrent
+          ? { points: pts, fill: `url(#g-${b[0]})`, stroke: '#ff2d8a', 'stroke-width': 7, 'stroke-linejoin': 'round' }
+          : { points: pts, fill: `url(#g-${b[0]})` }));
+        if (b[0] !== 'finale' && b[0] !== 'stage') g.append(el('line', { x1: W / 2 - h0 + 4, y1: y0 + 1, x2: W / 2 + h0 - 4, y2: y0 + 1, stroke: 'rgba(255,255,255,0.25)', 'stroke-width': 1.5 }));
+        const cls = b[0] === 'stage' ? 'pyr-stage' : b[0] === 'finale' ? 'pyr-finale' : 'pyr-label';
+        const fs = b[0] === 'finale' ? 52 : b[0] === 'stage' ? 30 : 26;
+        const ty = b[0] === 'finale' ? y1 - hgt * 0.22 : (y0 + y1) / 2 + fs * 0.36;
+        g.append(el('text', { x: W / 2, y: ty, 'text-anchor': 'middle', class: cls, 'font-size': fs }, b[1]));
+        // Gewinnstufen mit der Münze der Show markieren.
+        if (b[0] === 'stage') {
+          const cs = 54;
+          for (const side of [-1, 1]) g.append(el('image', { href: 'assets/img/muenze.webp', x: W / 2 + side * (h1 + 14) - cs / 2, y: (y0 + y1) / 2 - cs * 0.43, width: cs, height: cs * 0.87, class: 'pyr-coin' }));
+        }
+        if (num && s.games) {
+          const gm = s.games[Number(num[1]) - 1];
+          if (gm) g.append(el('title', {}, gm.title));
+        }
+        order.unshift(g);
+        svg.append(g);
+        y = y1 + gap * scale;
+      });
+      // Von unten nach oben einblenden.
+      order.forEach((g, i) => { g.style.animationDelay = `${i * 0.12}s`; });
+      return [h('div', { class: 'pyr-wrap' }, svg)];
     }
 
-    // Titelanimation: Buchstaben tanzen, dann Titelkarte, dann Ausblenden.
-    function title(s, replay) {
-      const total = (s.settings.titleDurationSec || 7) * 1000;
-      const card = () => h('div', { class: 'title-card' },
-        h('div', { class: 'num' }, s.game.position),
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title));
-      if (!replay || s.settings.reducedMotion) return [card()];
-      const letters = h('div', { class: 'letters' }, [...s.game.title].map((ch, i) =>
-        h('span', { style: { animationDelay: `${(i % 7) * -0.1}s` } }, ch === ' ' ? ' ' : ch)));
-      const wrap = h('div', { class: 'title-anim' }, letters);
-      titleTimer = setTimeout(() => {
-        wrap.classList.add('phase-card');
-        wrap.replaceChildren(card());
-        titleTimer = setTimeout(() => wrap.replaceWith(card()), total * 0.4);
-      }, total * 0.6);
-      return [wrap];
+    // Spieltitel: Fernseher mit Kachelschrift „KATEGORIE n“ und großem Titel.
+    // Jedes Spiel (Position 1–8) bekommt eine eigene Farbe.
+    const GAME_COLORS = ['#ff8a7a', '#3fd3ea', '#ff63b1', '#f4b740', '#ab8dff', '#4fdca4', '#ff9d45', '#7fb0ff'];
+    function titleCard(s, opts = {}) {
+      const pos = s.game.position;
+      const label = `Kategorie ${pos}`;
+      const color = GAME_COLORS[(pos - 1) % GAME_COLORS.length];
+      const line = Array(14).fill(label).join(' ');
+      const tiles = h('div', { class: 'tv-tiles', 'aria-hidden': 'true' },
+        Array.from({ length: 10 }, (_, i) => h('div', { class: i % 3 === 1 ? 'ghost' : '' }, `${line} ${line}`)));
+      // Buchstaben einzeln animieren, aber je Wort zusammenhalten: Umbruch nur zwischen Wörtern.
+      let n = 0;
+      const words = s.game.title.split(/\s+/).filter(Boolean).map((w) =>
+        h('span', { class: 'word' }, [...w].map((ch) => h('span', { style: { animationDelay: `${0.3 + n++ * 0.04}s` } }, ch))));
+      const title = h('div', { class: 'tv-title', 'aria-label': s.game.title });
+      words.forEach((w, i) => { if (i) title.append(' '); title.append(w); });
+      return h('div', { class: `tv${opts.compact ? ' compact' : ''}`, '--tv': color },
+        h('div', { class: 'tv-screen' }, tiles,
+          h('div', { class: 'tv-plate' }, h('span', { class: 'tv-num' }, label), title)));
+    }
+
+    function title(s) {
+      return [titleCard(s)];
     }
 
     function game(s) {
       const v = s.gameView;
       if (!v) return start(s);
-      if (v.waiting && v.type !== 'land') return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, s.game.title)];
+      if (v.waiting && v.type !== 'land') return [titleCard(s, { compact: true })];
       return renderGame(v, s, (id) => teamOf(s, id));
     }
 
@@ -149,19 +364,61 @@
     function ranking(s) {
       const list = s.ranking || [];
       return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)', marginBottom: '4vh' } }, 'Zwischenstand'),
+        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)', marginBottom: '4vh' } }, 'Zwischenstand'),
         h('ol', { class: 'rank' }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
           h('span', {}, `${i + 1}.`), h('span', {}, r.name), h('span', { class: 'pts' }, r.points)))),
       ];
     }
 
+    // Intro-Video der Show, bildschirmfüllend. Ohne Video (oder am Ende) das Logo.
+    // Ton nur auf dem echten Beamer nach „Ton aktivieren“, die Vorschau bleibt stumm.
+    function video(s) {
+      const box = h('div', { class: 'video-stage' });
+      const logo = () => box.replaceChildren(h('div', { class: 'video-end' }, ...start(s)));
+      if (!s.introVideo) { logo(); return [box]; }
+      const v = h('video', { class: 'intro-video', playsinline: true, preload: 'auto' });
+      v.muted = embedded || !audio;
+      v.onended = logo;
+      box.append(v);
+      mediaUrl(s.introVideo.id).then((url) => {
+        if (!url) return logo();
+        v.src = url;
+        v.currentTime = 0;
+        v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+      });
+      return [box];
+    }
+
+    // Pause: Moderationspult, dahinter die Live-Band im Takt der Pausenmusik.
+    // Ton nur auf dem echten Beamer, wenn er aktiviert und erlaubt ist.
+    function pause(s) {
+      // Eigene Lieder der Pause (aus dem Show-Editor), sonst der eingebaute Song.
+      startPause(!embedded && s.settings.sound && audioReady(audio) ? audio : null, s.pauseSongs || []);
+      return [bandScene()];
+    }
+
+    // Münze / Gewinnstufe: erst das Moderationspult mit der Stufe auf dem Bildschirm,
+    // dann werden die Teampulte mit den aktuellen Punkten wieder eingeblendet.
     function coin(s) {
       const t = teamOf(s, s.coin.teamId);
-      return [
-        h('div', { class: 'coin-stage' }, h('div', { class: 'coin' }, '★')),
-        h('div', { class: 'sub', style: { marginTop: 0 } }, `Münze nach Spiel ${s.coin.position}`),
-        h('div', { class: 'mega', style: { color: t.color, marginTop: '3vh', animation: 'pop .6s 2.6s both' } }, t.name),
-      ];
+      const stage = STAGE_OF[s.coin.position];
+      const W = 938, H = 530, scr = [389, 34, 547, 157];
+      const pct = (v, total) => `${(v / total) * 100}%`;
+      const pult = h('div', { class: 'scene scene-pult' },
+        h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
+        h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
+          stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
+        h('img', { class: 'scene-coin', src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true' }));
+      const wrap = h('div', { class: 'coin-sequence' }, pult);
+      const showTeams = () => {
+        wrap.replaceChildren(
+          h('div', { class: 'kicker' }, stage ? `Gewinnstufe ${stage} · Zwischenstand` : 'Zwischenstand'),
+          h('div', { class: 'coin-teams' },
+            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, coinImg('banner-coin'), ` Münze an ${t.name}`) })));
+      };
+      if (s.settings.reducedMotion) showTeams();
+      else titleTimer = setTimeout(showTeams, 3400 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
+      return [wrap];
     }
   </script>
 </body>

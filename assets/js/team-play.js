@@ -1,7 +1,8 @@
 // Team-iPad: Darstellung und Eingaben für alle acht Spiele. Die Sicht kommt
 // bereits gefiltert vom Server; hier wird nichts Geheimes ausgeblendet.
 
-import { h, run, ask } from './client.js';
+import { h, run, ask, toast } from './client.js';
+import { inkPad, answerContent } from './ink.js';
 import { mapView } from './map.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -27,13 +28,20 @@ function textForm(ui, { draftKey, label, placeholder, max, button, confirm, acti
       ev.preventDefault();
       const text = document.getElementById('answer').value.trim();
       if (!text) return;
-      if (!(await ask(confirm(text), { confirmLabel: 'Ja, abgeben' }))) return;
       if (await run(ui.conn, action, payload(text))) ui.clearDraft();
     },
   },
   h('label', { for: 'answer' }, label),
   h('textarea', { id: 'answer', class: 'answer-box', maxlength: String(max), autocomplete: 'off', placeholder }),
   h('p', {}, h('button', { class: 'btn pink huge', type: 'submit', style: { width: '100%' } }, button)));
+}
+
+// Großes Schreibfeld für den Apple Pencil statt Tastatur.
+function inkForm(ui, { draftKey, label, button, action }) {
+  return inkPad({
+    draftKey, label, button, ask, toast,
+    onSubmit: (ink) => run(ui.conn, action, { ink }),
+  });
 }
 
 function choiceButtons(options, { selected = null, correct = null, removed = [], onPick = null, disabled = false }) {
@@ -63,16 +71,15 @@ function leichte5(g, ui) {
   if (!g.question) return wait(`Frage ${g.qIndex + 1} kommt gleich …`);
   const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von ${g.count}`), h('p', { class: 'question' }, g.question)];
   if (g.answer) {
-    out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('p', { style: { fontSize: '1.6rem', margin: 0 } }, g.answer.text)));
+    out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('div', { style: { fontSize: '1.6rem', margin: 0 } }, answerContent(g.answer))));
     if (g.answer.grade === true) out.push(stateBox('ok', '✓', 'Richtig! +1 Punkt'));
     else if (g.answer.grade === false) out.push(stateBox('bad', '✗', 'Leider falsch'));
     else out.push(stateBox('', '🔒', 'Abgegeben und gesperrt – wartet auf die Bewertung'));
     return out;
   }
   if (!g.open) return [...out, stateBox('', '🔒', 'Gesperrt – keine Abgabe mehr möglich')];
-  out.push(textForm(ui, {
-    draftKey: `quiz.draft.g1.${g.qIndex}`, label: 'Antwort eingeben', placeholder: 'Eure Antwort …', max: 200, button: 'Abgeben',
-    confirm: (t) => `Antwort „${t}“ endgültig abgeben? Danach könnt ihr sie nicht mehr ändern.`, action: 'play.submit',
+  out.push(inkForm(ui, {
+    draftKey: `g1.${g.qIndex}`, label: 'Eure Antwort', button: 'Abgeben', action: 'play.submit',
   }));
   return out;
 }
@@ -93,7 +100,7 @@ function dummes(g, ui) {
     selected: g.choice,
     disabled: !canAnswer,
     onPick: canAnswer ? async (l) => {
-      if (await ask(`Antwort ${l} „${g.options[l]}“ sperren?`, { confirmLabel: 'Ja, sperren' })) run(ui.conn, 'play.answer', { choice: l });
+      run(ui.conn, 'play.answer', { choice: l }); // sofort absenden, ohne Rückfrage
     } : null,
   }));
   if (!g.choice) {
@@ -106,7 +113,7 @@ function dummes(g, ui) {
     out.push(stateBox('ok', '🔔', 'Ihr wart am schnellsten! Mit wem tauscht ihr eure Antwort?'));
     out.push(h('div', { class: 'row' }, g.swapTargets.map((t) => h('button', {
       class: 'btn huge', onclick: async () => {
-        if (await ask(`Antwort mit ${t.name} tauschen? Das geht nur einmal im ganzen Spiel.`, { confirmLabel: 'Ja, tauschen' })) run(ui.conn, 'play.swap', { teamId: t.id });
+        run(ui.conn, 'play.swap', { teamId: t.id }); // sofort, ohne Rückfrage
       },
     }, t.name))));
     return out;
@@ -114,7 +121,7 @@ function dummes(g, ui) {
   if (g.swapDone) return [...out, stateBox('ok', '🔁', 'Tausch erledigt – gleich wird aufgelöst.')];
   if (g.swapWaiting) return [...out, stateBox('ok', '🔔', h('span', {}, 'Ihr wart am schnellsten! Gleich dürft ihr tauschen … ', g.windowEnds ? countdown(g.windowEnds) : null))];
   out.push(stateBox('', '🔒', `Antwort ${g.choice} gesperrt`));
-  if (!g.swapUsed && !g.buzzTaken) out.push(h('p', { class: 'muted', style: { textAlign: 'center' } }, 'Wer zuerst buzzert, darf seine Antwort mit einem anderen Team tauschen.'), buzzer(ui, g.canBuzz));
+  if (!g.buzzTaken) out.push(h('p', { class: 'muted', style: { textAlign: 'center' } }, 'Wer zuerst buzzert, darf seine Antwort mit einem anderen Team tauschen.'), buzzer(ui, g.canBuzz));
   else if (g.buzzTaken && !g.isBuzzer) out.push(h('p', { class: 'muted' }, 'Ein anderes Team war schneller am Buzzer.'));
   return out;
 }
@@ -150,7 +157,6 @@ function land(g, ui) {
     class: 'btn pink huge', style: { width: '100%' }, disabled: !landPending,
     onclick: async () => {
       if (!landPending) return;
-      if (!(await ask('Punkt an dieser Stelle setzen und sperren?', { confirmLabel: 'Ja, sperren' }))) return;
       if (await run(ui.conn, 'play.guess', { lat: landPending.lat, lng: landPending.lng })) landPending = null;
     },
   }, 'Punkt sperren');
@@ -178,7 +184,10 @@ function kassenschlager(g, ui) {
   const out = [head];
   if (g.finished) out.push(h('p', { class: 'question' }, `Der Film war: ${g.title}`));
   if (g.solved) out.push(stateBox('ok', '✓', 'Richtig! +5 $ – für diesen Film seid ihr fertig.'));
-  else if (g.lastAnswer?.grade === false) out.push(stateBox('bad', '✗', `„${g.lastAnswer.text}“ war leider falsch.`));
+  else if (g.lastAnswer?.grade === false) {
+    out.push(stateBox('bad', '✗', g.lastAnswer.ink ? 'Eure Antwort war leider falsch.' : `„${g.lastAnswer.text}“ war leider falsch.`));
+    if (g.lastAnswer.ink) out.push(answerContent(g.lastAnswer, 'small'));
+  }
   const buying = g.myTurn && g.phase === 'buy';
   const left = g.maxBuys - g.boughtCount;
   out.push(h('p', { class: 'muted' }, `Paywall · ${g.boughtCount} von ${g.maxBuys} Hinweisen gekauft`));
@@ -199,9 +208,8 @@ function kassenschlager(g, ui) {
   else if (g.phase === 'grading') out.push(stateBox('', '🔒', 'Antwort abgegeben – die Moderation prüft.'));
   else {
     out.push(stateBox('ok', '✍', 'Ihr seid dran: Schreibt den Filmtitel.'));
-    out.push(textForm(ui, {
-      draftKey: `quiz.draft.kassen.${g.movieIndex}`, label: 'Filmtitel', placeholder: 'Titel des Films oder der Serie …', max: 120, button: 'Antwort abgeben',
-      confirm: (t) => `„${t}“ als Antwort abgeben?`, action: 'play.answer',
+    out.push(inkForm(ui, {
+      draftKey: `kassen.${g.movieIndex}.${g.cycle}`, label: 'Filmtitel', button: 'Antwort abgeben', action: 'play.answer',
     }));
   }
   return out;
@@ -262,7 +270,7 @@ function jauch(g, ui) {
   out.push(choiceButtons(g.options, {
     selected: g.choice, correct: g.correct, removed: g.removed, disabled: !canAnswer,
     onPick: canAnswer ? async (l) => {
-      if (await ask(`Antwort ${l} „${g.options[l]}“ endgültig sperren?`, { confirmLabel: 'Ja, sperren' })) run(ui.conn, 'play.answer', { choice: l });
+      run(ui.conn, 'play.answer', { choice: l }); // sofort absenden, ohne Rückfrage
     } : null,
   }));
   if (g.revealed) {
@@ -271,7 +279,7 @@ function jauch(g, ui) {
       out.push(h('button', {
         class: 'btn ghost huge', style: { width: '100%' },
         onclick: async () => {
-          if (await ask(`Jetzt aussteigen und ${pts(g.secured)} sichern?`, { confirmLabel: 'Ja, aussteigen' })) run(ui.conn, 'play.quit');
+          run(ui.conn, 'play.quit'); // sofort, ohne Rückfrage
         },
       }, `Aussteigen und ${pts(g.secured)} sichern`));
     }
@@ -284,7 +292,7 @@ function jauch(g, ui) {
     const jokerBtn = (kind, label) => h('button', {
       class: 'btn', disabled: !g.jokers[kind] || g.jokerBlocked || g.removed.length > 0,
       onclick: async () => {
-        if (await ask(`${label} jetzt einsetzen? Pro Frage darf nur ein Team einen Joker nutzen, und ihr müsst ihn dann auch einsetzen.`, { confirmLabel: 'Ja, einsetzen' })) run(ui.conn, 'play.joker', { kind });
+        run(ui.conn, 'play.joker', { kind }); // sofort, ohne Rückfrage
       },
     }, label);
     out.push(h('div', { class: 'row', style: { marginTop: '12px' } }, jokerBtn('fifty', '50:50-Joker'), jokerBtn('phone', '📞 Telefonjoker'),
@@ -307,7 +315,7 @@ function nerd(g, ui) {
         ev.preventDefault();
         const bid = Number(input.value);
         if (!Number.isInteger(bid) || bid < 1) return;
-        if (await ask(`Gebot ${bid} geheim abgeben und sperren?`, { confirmLabel: 'Ja, bieten' })) run(ui.conn, 'play.bid', { bid });
+        run(ui.conn, 'play.bid', { bid }); // sofort absenden, ohne Rückfrage
       },
     }, input, h('button', { class: 'btn pink huge', type: 'submit' }, 'Gebot abgeben')));
     return out;

@@ -1,4 +1,4 @@
-import { h, connect, run, store, toast, ask, localServer } from './client.js';
+import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
@@ -39,7 +39,7 @@ for (const b of document.querySelectorAll('[role=tab]')) {
 
 function renderAll(force = false) {
   if (!S) return;
-  document.getElementById('show-name').textContent = S.project.name;
+  setShowTitle(document.getElementById('show-name'), S.project.name);
   for (const b of document.querySelectorAll('[role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   for (const id of ['live', 'teams', 'editor', 'library', 'points']) document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tab);
   renderWarning();
@@ -99,6 +99,7 @@ async function confirmAct(message, name, payload) {
 // Die Beamer-Vorschau steht fest im HTML, damit sie bei Updates nicht neu lädt.
 function renderLive() {
   const scroll = window.scrollY;
+  document.getElementById('run-panel').replaceChildren(buildRun());
   document.getElementById('live-left').replaceChildren(buildFlow(), buildGameControl());
   document.getElementById('beamer-controls').replaceChildren(...buildBeamerControls());
   document.getElementById('live-right').replaceChildren(buildTeamsLive(), buildCoins());
@@ -107,7 +108,7 @@ function renderLive() {
 
 function buildFlow() {
   const active = S.live.activeGame;
-  return card('Showablauf',
+  return card('Spiele (direkt aktivieren)',
     h('ul', { class: 'list' }, S.project.games.map((g, i) => {
       const pos = i + 1;
       const playable = S.types[g.type].playable;
@@ -122,6 +123,200 @@ function buildFlow() {
     S.project.games.length < S.showSize ? h('p', { class: 'muted' }, `Noch ${S.showSize - S.project.games.length} Plätze frei. Spiele setzt du im Show-Editor ein.`) : null);
 }
 
+// ---------- Showablauf wie eine Präsentation ----------
+
+const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', end: '🏁' };
+const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', end: 'Abschluss' };
+
+// Symbol eines Schritts; die Münzvergabe zeigt die Münze der Show.
+const runIcon = (kind) => (kind === 'coin' ? coinImg('run-coin') : RUN_ICON[kind]);
+
+function runNext() { return act('run.next'); }
+function runPrev() { return act('run.prev'); }
+
+function buildRun() {
+  const steps = S.rundown || [];
+  const cur = S.live.run ?? -1;
+  const now = steps[cur];
+  const next = steps[cur + 1];
+  const started = cur >= 0;
+  const head = h('div', { class: 'run-head' },
+    h('div', { class: 'run-now' },
+      h('span', { class: 'run-count' }, started ? `Schritt ${cur + 1} von ${steps.length}` : `${steps.length} Schritte`),
+      h('div', { class: 'run-title' }, started ? [h('span', { class: 'run-ico' }, runIcon(now.kind)), now.text] : 'Show noch nicht gestartet'),
+      h('div', { class: 'run-next muted' }, next ? ['Als Nächstes: ', h('b', {}, runIcon(next.kind), ' ', next.text)] : 'Letzter Schritt erreicht')),
+    h('div', { class: 'run-buttons' },
+      now && now.kind === 'video' && S.project.introVideo ? h('button', { class: 'btn ghost', onclick: () => act('run.goto', { index: cur }) }, '⟲ Video von vorn') : null,
+      h('button', { class: 'btn ghost', disabled: cur <= 0, onclick: runPrev, title: 'Zurück (Pfeil links)' }, '◀ Zurück'),
+      h('button', { class: 'btn pink run-go', disabled: cur >= steps.length - 1, onclick: runNext, title: 'Weiter (Pfeil rechts, Leertaste)' }, started ? 'Weiter ▶' : 'Show starten ▶')));
+  const strip = h('ol', { class: 'run-strip', 'aria-label': 'Alle Schritte' }, steps.map((st, i) => h('li', {},
+    h('button', {
+      class: `run-step k-${st.kind} ${i === cur ? 'current' : ''} ${i < cur ? 'done' : ''}`,
+      'aria-current': i === cur ? 'step' : null,
+      title: `${i + 1}. ${st.text}`,
+      onclick: () => act('run.goto', { index: i }),
+    }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
+  const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
+    h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Show-Editor.'));
+  // Aktuellen Schritt in der Leiste sichtbar halten.
+  requestAnimationFrame(() => panel.querySelector('.run-step.current')?.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  return panel;
+}
+
+// Tastatur und Presenter-Klicker (senden meist Bild↓/Bild↑ oder Pfeiltasten).
+document.addEventListener('keydown', (ev) => {
+  if (tab !== 'live' || !S || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  const t = ev.target;
+  if (t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable)) return;
+  if (document.querySelector('.modal-backdrop, dialog[open]')) return;
+  if (['ArrowRight', 'PageDown', ' '].includes(ev.key)) { ev.preventDefault(); runNext(); }
+  else if (['ArrowLeft', 'PageUp'].includes(ev.key)) { ev.preventDefault(); runPrev(); }
+});
+
+// Intro-Video je Show: läuft im Showablauf direkt nach dem Startbild.
+let introUpload = null; // { name, progress } während des Hochladens
+function buildIntroVideo() {
+  const v = S.project.introVideo;
+  const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+  const input = h('input', {
+    type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/x-m4v', class: 'visually-hidden', 'aria-label': 'Intro-Video wählen',
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      introUpload = { name: file.name, progress: 0 };
+      renderAll(true);
+      try {
+        const m = await uploadMedia(file, token, (p) => {
+          introUpload.progress = p;
+          const bar = document.getElementById('intro-progress');
+          if (bar) bar.value = p;
+        });
+        await act('intro.set', { media: { id: m.id, type: m.type, size: m.size, name: file.name } });
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        introUpload = null;
+        renderAll(true);
+      }
+    },
+  });
+  const preview = h('video', { class: 'intro-preview', controls: true, preload: 'metadata', playsinline: true });
+  if (v) mediaUrl(v.id).then((url) => {
+    if (url) preview.src = url;
+    else preview.replaceWith(h('p', { class: 'notice warn' }, 'Das Video ist auf diesem Gerät nicht mehr vorhanden – bitte neu hochladen.'));
+  });
+  return card('Intro-Video',
+    h('p', { class: 'muted' }, 'Läuft im Showablauf direkt nach dem Startbild. Jede Show hat ihr eigenes Video – einfach austauschen.'),
+    introUpload
+      ? h('div', {}, h('p', {}, `„${introUpload.name}“ wird hochgeladen …`), h('progress', { id: 'intro-progress', max: '1', value: String(introUpload.progress), style: { width: '100%' } }))
+      : v
+        ? h('div', { class: 'intro-box' }, preview, h('p', {}, h('b', {}, v.name), v.size ? h('span', { class: 'muted' }, ` · ${fmtSize(v.size)}`) : null))
+        : h('p', { class: 'muted' }, 'Noch kein Video hinterlegt. Ohne Video zeigt der Beamer an dieser Stelle das Show-Logo.'),
+    introUpload ? null : h('div', { class: 'row' },
+      h('label', { class: 'btn' }, input, v ? 'Video austauschen' : '+ Video hochladen'),
+      v ? h('button', { class: 'btn ghost', onclick: () => confirmAct('Intro-Video aus dieser Show entfernen?', 'intro.set', { media: null }) }, 'Entfernen') : null),
+    h('p', { class: 'muted', style: { fontSize: '0.85rem' } }, 'Formate: MP4 (empfohlen), WebM oder MOV. Ton läuft auf dem Beamer, sobald dort „Ton aktivieren“ geklickt wurde.'));
+}
+
+// Eigene Lieder je Pause: Playlist hochladen, sortieren, entfernen.
+let openPause = null;
+let songUpload = null; // { done, total, name }
+function buildPauseSongs(st) {
+  const songs = st.songs || [];
+  const setSongs = (list) => act('rundown.setSongs', { stepId: st.id, songs: list });
+  const move = (i, d) => { const l = [...songs]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); setSongs(l); };
+  const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+  const input = h('input', {
+    type: 'file', multiple: true, accept: 'audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/flac,.mp3,.m4a,.wav,.ogg,.flac',
+    class: 'visually-hidden', 'aria-label': 'Lieder hinzufügen',
+    onchange: async (ev) => {
+      const files = [...(ev.target.files || [])];
+      ev.target.value = '';
+      if (!files.length) return;
+      const added = [];
+      songUpload = { done: 0, total: files.length, name: files[0].name };
+      renderAll(true);
+      try {
+        for (const file of files) {
+          songUpload.name = file.name;
+          const label = document.getElementById('song-progress');
+          if (label) label.textContent = `Lied ${songUpload.done + 1} von ${songUpload.total}: „${file.name}“ wird hochgeladen …`;
+          const type = file.type || (/\.mp3$/i.test(file.name) ? 'audio/mpeg' : /\.m4a$/i.test(file.name) ? 'audio/mp4' : '');
+          const blob = type && type !== file.type ? new File([file], file.name, { type }) : file;
+          const m = await uploadMedia(blob, token);
+          added.push({ id: m.id, type: m.type, size: m.size, name: file.name });
+          songUpload.done += 1;
+        }
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        songUpload = null;
+        if (added.length) await act('rundown.setSongs', { stepId: st.id, songs: [...songs, ...added] });
+        renderAll(true);
+      }
+    },
+  });
+  return h('div', { class: 'pause-songs' },
+    h('p', { class: 'muted' }, songs.length
+      ? 'Diese Lieder laufen in dieser Pause nacheinander (danach wieder von vorn). Die Band spielt im Takt der Musik.'
+      : 'Noch keine eigenen Lieder – es läuft der eingebaute Pausensong.'),
+    songs.length ? h('ol', { class: 'song-list' }, songs.map((m, i) => h('li', {},
+      h('span', { class: 'grow' }, `♪ ${m.name}`, m.size ? h('span', { class: 'muted' }, ` · ${fmtSize(m.size)}`) : null),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach unten', disabled: i === songs.length - 1, onclick: () => move(i, 1) }, '↓'),
+      h('button', { class: 'btn small bad', 'aria-label': `${m.name} entfernen`, onclick: () => setSongs(songs.filter((_, k) => k !== i)) }, '✕')))) : null,
+    songUpload
+      ? h('p', { id: 'song-progress' }, `Lied ${songUpload.done + 1} von ${songUpload.total}: „${songUpload.name}“ wird hochgeladen …`)
+      : h('div', { class: 'row' },
+        h('label', { class: 'btn small' }, input, '+ Lieder hinzufügen'),
+        songs.length ? h('button', { class: 'btn small ghost', onclick: () => confirmAct('Alle eigenen Lieder dieser Pause entfernen? Dann läuft wieder der eingebaute Pausensong.', 'rundown.setSongs', { stepId: st.id, songs: [] }) }, 'Alle entfernen') : null),
+    h('p', { class: 'muted', style: { fontSize: '0.85rem', margin: '6px 0 0' } }, 'Formate: MP3, M4A, WAV, OGG, FLAC. Mehrere Dateien auf einmal möglich.'));
+}
+
+// Bearbeiten im Show-Editor: Schritte verschieben, löschen, Pausen einfügen.
+function buildRundownEditor() {
+  const steps = (S.rundown || []).map(({ id, kind, pos, label, songs }) => ({ id, kind, pos, label, songs }));
+  const save = (list) => act('rundown.set', { steps: list });
+  const move = (i, d) => { const l = [...steps]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); save(l); };
+  const insertAt = (i, st) => { const l = [...steps]; l.splice(i, 0, st); save(l); };
+  const kindSel = h('select', { 'aria-label': 'Art des Schritts' },
+    Object.entries(RUN_KIND_LABEL).map(([k, label]) => h('option', { value: k }, k === 'coin' ? label : `${RUN_ICON[k]} ${label}`)));
+  const posSel = h('select', { 'aria-label': 'Spiel' }, S.project.games.map((g, i) => h('option', { value: String(i + 1) }, `Spiel ${i + 1} · ${g.title}`)));
+  const afterSel = h('select', { 'aria-label': 'Einfügen nach' },
+    h('option', { value: '0' }, 'ganz am Anfang'),
+    steps.map((st, i) => h('option', { value: String(i + 1), selected: i === steps.length - 1 }, `nach ${i + 1}. ${S.rundown[i].text}`)));
+  const updatePos = () => { posSel.hidden = !['title', 'game', 'coin', 'pyramid'].includes(kindSel.value); };
+  kindSel.onchange = updatePos;
+  kindSel.value = 'pause';
+  updatePos();
+  return card('Showablauf (Reihenfolge der Show)',
+    h('p', { class: 'muted' }, 'So läuft die Show in der Live-Regie ab – Schritt für Schritt mit „Weiter“, wie eine Präsentation.',
+      S.rundownCustom ? ' Du hast den Ablauf angepasst.' : ' Das ist der Standardablauf aus deinen Spielen.'),
+    h('ol', { class: 'list rundown-list' }, S.rundown.map((st, i) => h('li', { class: `rd k-${st.kind}` },
+      h('b', { class: 'rd-n' }, `${i + 1}.`),
+      h('span', { class: 'rd-i', 'aria-hidden': 'true' }, runIcon(st.kind)),
+      h('span', { class: 'grow' }, st.text),
+      st.kind === 'pause' ? h('button', {
+        class: `btn small ${openPause === st.id ? 'pink' : 'ghost'}`, 'aria-expanded': String(openPause === st.id),
+        onclick: () => { openPause = openPause === st.id ? null : st.id; renderAll(true); },
+      }, `♪ Lieder (${(st.songs || []).length})`) : null,
+      h('button', { class: 'btn small ghost', title: 'Pause danach einfügen', onclick: () => insertAt(i + 1, { kind: 'pause' }) }, '+ ☕'),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach unten', disabled: i === steps.length - 1, onclick: () => move(i, 1) }, '↓'),
+      h('button', { class: 'btn small bad', 'aria-label': 'Schritt entfernen', onclick: () => save(steps.filter((_, k) => k !== i)) }, '✕'),
+      st.kind === 'pause' && openPause === st.id ? buildPauseSongs(st) : null))),
+    h('div', { class: 'row', style: { marginTop: '12px' } },
+      kindSel, posSel, afterSel,
+      h('button', { class: 'btn', onclick: () => {
+        const st = { kind: kindSel.value };
+        if (!posSel.hidden) st.pos = Number(posSel.value);
+        if (st.kind === 'pyramid' && st.pos === undefined) delete st.pos;
+        insertAt(Number(afterSel.value), st);
+      } }, '+ Schritt einfügen'),
+      S.rundownCustom ? h('button', { class: 'btn ghost', onclick: () => confirmAct('Eigene Änderungen am Ablauf verwerfen und den Standardablauf wiederherstellen?', 'rundown.reset') }, 'Standardablauf wiederherstellen') : null));
+}
+
 function activeGameOf() {
   return S.project.games.find((g) => g.id === S.live.activeGame) || null;
 }
@@ -134,22 +329,23 @@ function buildGameControl() {
   return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor }, g, st, pos);
 }
 
+// Beamer: Umschalten übernimmt der Showablauf – hier nur, was gerade läuft.
+const BEAMER_VIEW_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', pause: 'Pause', title: 'Spieltitel', game: 'Spiel', ranking: 'Rangliste', coin: 'Münzvergabe', blank: 'Schwarz' };
 function buildBeamerControls() {
-  const views = [
-    ['start', 'Startbild'], ['intro', 'Intro & Teams'], ['pyramid', 'Pyramide 4–2–2'], ['title', 'Spieltitel'],
-    ['game', 'Spiel'], ['ranking', 'Rangliste enthüllen'], ['coin', 'Münze zeigen'], ['blank', 'Schwarz'],
-  ];
   const current = S.live.beamer.view;
-  return [
-    h('p', { class: 'muted' }, `Zeigt jetzt: `, h('b', {}, views.find((v) => v[0] === current)?.[1] || current),
-      ` · ${S.connections.beamers || 0} Beamer verbunden`),
-    h('div', { class: 'row' }, views.map(([v, label]) => h('button', {
-      class: `btn small ${v === current ? 'pink' : 'ghost'}`,
-      onclick: () => v === 'ranking'
-        ? confirmAct('Kumulierte Rangliste jetzt auf dem Beamer enthüllen?', 'beamer.show', { view: v })
-        : act('beamer.show', { view: v }),
-    }, label))),
-  ];
+  const status = h('p', { class: 'muted' }, 'Zeigt jetzt: ', h('b', {}, BEAMER_VIEW_LABEL[current] || current),
+    ` · ${S.connections.beamers || 0} Beamer verbunden`);
+  // Adresse für das zweite Gerät an der Leinwand.
+  const url = `${location.origin}${location.pathname.replace(/moderator\.html$/, '')}beamer.html`;
+  const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+  const second = localServer
+    ? h('p', { class: 'muted beamer-url' }, 'Im Prototyp läuft alles in diesem Browser: Vollbild über „⛶ Beamer im Vollbild“ oben auf der Seite. Für ein zweites Gerät an der Leinwand den Show-Server starten.')
+    : h('div', { class: 'beamer-url' },
+      h('p', { class: 'muted' }, 'Auf dem Gerät an der Leinwand öffnen, „⛶ Vollbild“ tippen:'),
+      h('div', { class: 'row' }, h('code', {}, url),
+        h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(url)).then(() => toast('Adresse kopiert', 'info'), () => toast(`Adresse: ${url}`, 'info')) }, 'Kopieren')),
+      local ? h('p', { class: 'notice warn' }, 'Diese Adresse zeigt auf diesen Rechner selbst. Auf dem zweiten Gerät statt „localhost“ die IP-Adresse dieses Rechners im WLAN verwenden, z. B. http://192.168.1.20:3000/beamer.html') : null);
+  return [status, second];
 }
 
 function buildTeamsLive() {
@@ -168,17 +364,63 @@ function buildCoins() {
   return card('Münzen',
     h('ul', { class: 'list' }, S.coinPositions.map((pos) => {
       const c = S.live.coins.find((x) => x.position === pos);
-      if (c) return h('li', {}, h('span', { class: 'grow' }, `Nach Position ${pos}`), dot(teamColor(c.teamId)), h('b', {}, teamName(c.teamId)), h('span', { class: 'muted' }, `(${c.method})`));
+      if (c) return h('li', {}, coinImg(), h('span', { class: 'grow' }, `Nach Position ${pos}`), dot(teamColor(c.teamId)), h('b', {}, teamName(c.teamId)), h('span', { class: 'muted' }, `(${c.method})`));
       const tie = w?.kind === 'coinTie' && w.position === pos;
-      return h('li', {}, h('span', { class: 'grow' }, `Nach Position ${pos}`),
+      return h('li', {}, coinImg('coin-open'), h('span', { class: 'grow' }, `Nach Position ${pos}`),
         tie
           ? w.teamIds.map((id) => h('button', { class: 'btn small', onclick: () => confirmAct(`${teamName(id)} hat die Schätzfrage gewonnen und bekommt die Münze?`, 'coin.awardTie', { teamId: id }) }, `${teamName(id)} gewinnt Schätzfrage`))
           : h('button', { class: 'btn small', onclick: () => confirmAct(`Münzgewinner nach Position ${pos} aus dem kumulierten Punktestand ermitteln?`, 'coin.determine', { position: pos }) }, 'Gewinner ermitteln'));
     })),
-    h('p', { class: 'muted' }, 'Danach „Münze zeigen“ beim Beamer wählen.'));
+    h('p', { class: 'muted' }, 'Die Münze erscheint auf dem Beamer beim Schritt „Münzvergabe“ im Showablauf.'));
 }
 
 // ---------- Teams ----------
+
+// 3D-Avatar eines Teams: steht auf dem Beamer im Bogen hinter dem Pult.
+// Das Bild wird vor dem Speichern verkleinert (max. 480 px hoch).
+async function shrinkImage(file) {
+  if (!/^image\/(png|webp|jpeg)$/.test(file.type)) throw new Error('Bitte ein PNG-, WebP- oder JPEG-Bild wählen.');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Bild konnte nicht gelesen werden.'));
+      i.src = url;
+    });
+    const scale = Math.min(1, 480 / img.naturalHeight, 480 / img.naturalWidth);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    // WebP behält Transparenz und ist klein; Safari kann es nicht erzeugen → PNG.
+    let data = c.toDataURL('image/webp', 0.86);
+    if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
+    return data;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function avatarCell(t) {
+  const input = h('input', {
+    type: 'file', accept: 'image/png,image/webp,image/jpeg', class: 'visually-hidden', 'aria-label': `3D-Avatar für ${t.name} wählen`,
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      try {
+        act('team.update', { teamId: t.id, avatar: await shrinkImage(file) });
+      } catch (err) {
+        toast(err.message);
+      }
+    },
+  });
+  return h('div', { class: 'avatar-cell' },
+    t.avatar ? h('img', { class: 'avatar-thumb', src: t.avatar, alt: `Avatar von ${t.name}` }) : h('span', { class: 'avatar-empty', title: 'Kein Avatar – das Pult bleibt leer' }, '–'),
+    h('label', { class: 'btn small ghost' }, input, t.avatar ? 'Ändern' : 'Avatar wählen'),
+    t.avatar ? h('button', { class: 'btn small ghost', onclick: () => act('team.update', { teamId: t.id, avatar: null }) }, 'Entfernen') : null);
+}
 
 function buildTeams() {
   const base = `${location.origin}${location.pathname.replace(/moderator\.html$/, '')}team.html?code=`;
@@ -193,13 +435,15 @@ function buildTeams() {
         },
       }, h('input', { name: 'name', placeholder: 'Teamname', maxlength: '40', style: { flex: '1 1 220px', width: 'auto' } }),
       h('button', { class: 'btn', type: 'submit' }, '+ Team hinzufügen')),
-      h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.')),
+      h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.'),
+      h('p', { class: 'muted' }, '3D-Avatar: am besten ein freigestelltes PNG (transparenter Hintergrund), hochkant. Er steht auf dem Beamer im Bogen hinter dem Pult; ohne Avatar bleibt das Pult leer.')),
     card(`Teams (${S.project.teams.length})`,
       S.project.teams.length ? h('table', {},
-        h('thead', {}, h('tr', {}, h('th', {}, 'Farbe'), h('th', {}, 'Name'), h('th', {}, 'Zugangscode / Link'), h('th', {}, ''))),
+        h('thead', {}, h('tr', {}, h('th', {}, 'Farbe'), h('th', {}, 'Name'), h('th', {}, '3D-Avatar'), h('th', {}, 'Zugangscode / Link'), h('th', {}, ''))),
         h('tbody', {}, S.project.teams.map((t) => h('tr', {},
           h('td', {}, h('input', { type: 'color', value: t.color, 'aria-label': `Farbe ${t.name}`, style: { width: '56px', padding: '2px' }, onchange: (ev) => act('team.update', { teamId: t.id, color: ev.target.value }) })),
           h('td', {}, h('input', { value: t.name, maxlength: '40', 'aria-label': 'Teamname', onchange: (ev) => act('team.update', { teamId: t.id, name: ev.target.value }) })),
+          h('td', {}, avatarCell(t)),
           h('td', {}, h('div', { class: 'code' }, t.code),
             h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(base + t.code)).then(() => toast('Link kopiert', 'info'), () => toast(`Kopieren nicht möglich. Link: ${base + t.code}`, 'info')) }, 'Link kopieren')),
           h('td', {}, h('div', { class: 'row' },
@@ -262,6 +506,8 @@ function buildEditor() {
     h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '12px' } }, h('h2', { style: { margin: 0 } }, 'Show-Editor'), saveIndicator()),
     buildShows(),
     buildBoard(),
+    buildIntroVideo(),
+    buildRundownEditor(),
     sel ? buildGameEditor('game', sel) : null,
     h('div', { class: 'grid two', style: { marginTop: '16px' } },
       card('Show', field('Showname', 'name', 80),
@@ -382,7 +628,7 @@ function buildSlot(g, i, running) {
     h('div', { class: 'row', style: { gap: '6px' } },
       type.playable ? h('span', { class: 'badge ok' }, 'spielbar') : h('span', { class: 'badge' }, 'Inhalte bearbeitbar'),
       g.locked ? h('span', { class: 'badge warn' }, '🔒 Eröffnungsspiel') : null,
-      S.coinPositions.includes(pos) ? h('span', { class: 'badge coin-badge' }, '🪙 danach Münze') : null)),
+      S.coinPositions.includes(pos) ? h('span', { class: 'badge coin-badge' }, coinImg(), ' danach Münze') : null)),
   h('div', { class: 'slot-actions' },
     h('button', { class: `btn small ${g.id === selectedGame ? 'pink' : 'ghost'}`, onclick: () => { selectedGame = g.id; renderAll(true); } }, 'Bearbeiten'),
     h('button', { class: 'btn small ghost', disabled: running || g.locked || i === 0 || (i === 1 && S.project.games[0]?.locked), 'aria-label': `${g.title} nach oben`, onclick: () => act('game.moveTo', { gameId: g.id, index: i - 1 }) }, '↑'),

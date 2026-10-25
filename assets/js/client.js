@@ -18,18 +18,172 @@ function findLocalServer() {
   return null;
 }
 
-export const localServer = findLocalServer();
+// Ist die umgebende Seite abgeschottet (anderer Ursprung, z. B. in einer
+// eingebetteten Vorschau), geht kein direkter Zugriff. Die Prototyp-Seite gibt
+// ihren Bildschirmen dann den Fensternamen „quiz-proto“ mit, und Verbindung und
+// API laufen über postMessage zur umgebende Seite.
+// Der Prototyp-Build setzt PROTOTYPE_BUILD auf true; in der echten Anwendung
+// bleibt die Brücke aus.
+const PROTOTYPE_BUILD = false;
+
+function messageProxy() {
+  if (window.parent === window || !(PROTOTYPE_BUILD || window.name === 'quiz-proto')) return null;
+  const conns = new Map();
+  const calls = new Map();
+  let seq = 0;
+  const post = (msg) => window.parent.postMessage({ quiz: true, ...msg }, '*');
+  // Verschachtelte Bildschirme (z. B. die Beamer-Vorschau in der Moderation)
+  // schicken ihre Nachrichten hierher; sie werden nach oben weitergereicht und
+  // die Antworten anhand der IDs zurück nach unten.
+  const children = new Map();
+  window.addEventListener('message', (ev) => {
+    const msg = ev.data;
+    if (!msg || msg.quiz !== true) return;
+    if (ev.source !== window.parent) {
+      const key = msg.cid || msg.callId;
+      if (ev.source && key) {
+        children.set(key, ev.source);
+        window.parent.postMessage(msg, '*');
+      }
+      return;
+    }
+    const child = children.get(msg.cid || msg.callId);
+    if (child) {
+      if (msg.op === 'api' || msg.op === 'media' || msg.op === 'close') children.delete(msg.cid || msg.callId);
+      try {
+        child.postMessage(msg, '*');
+      } catch {
+        // Verschachtelter Bildschirm existiert nicht mehr.
+      }
+      return;
+    }
+    if (msg.op === 'api' || msg.op === 'media') {
+      const done = calls.get(msg.callId);
+      calls.delete(msg.callId);
+      return done?.(msg.op === 'api' ? [msg.status, msg.data] : msg);
+    }
+    const c = conns.get(msg.cid);
+    if (!c) return;
+    if (msg.op === 'open') {
+      c.readyState = 1;
+      c.onopen?.();
+    } else if (msg.op === 'message') {
+      c.onmessage?.({ data: msg.data });
+    } else if (msg.op === 'close') {
+      conns.delete(msg.cid);
+      if (c.readyState !== 3) {
+        c.readyState = 3;
+        c.onclose?.();
+      }
+    }
+  });
+  return {
+    demoToken: 'demo-token',
+    connect() {
+      const cid = `c${++seq}_${Math.random().toString(36).slice(2)}`;
+      const c = {
+        readyState: 0,
+        send: (text) => post({ op: 'send', cid, text }),
+        close: () => {
+          if (c.readyState === 3) return;
+          c.readyState = 3;
+          conns.delete(cid);
+          post({ op: 'close', cid });
+        },
+      };
+      conns.set(cid, c);
+      post({ op: 'connect', cid });
+      return c;
+    },
+    api(name, body) {
+      const callId = `a${++seq}`;
+      return new Promise((resolve) => {
+        calls.set(callId, resolve);
+        post({ op: 'api', callId, name, body });
+      });
+    },
+    // Videos als Blob über postMessage (strukturiert kopiert, kein Base64).
+    uploadMedia(blob) {
+      const callId = `m${++seq}`;
+      return new Promise((resolve, reject) => {
+        calls.set(callId, (m) => (m.error ? reject(new Error(m.error)) : resolve(m.data)));
+        post({ op: 'media-put', callId, blob });
+      });
+    },
+    getMedia(id) {
+      const callId = `m${++seq}`;
+      return new Promise((resolve) => {
+        calls.set(callId, (m) => resolve(m.data || null));
+        post({ op: 'media-get', callId, id });
+      });
+    },
+  };
+}
+
+export const localServer = findLocalServer() || messageProxy();
 
 if (localServer) {
   const realFetch = window.fetch.bind(window);
-  window.fetch = (input, init) => {
-    const url = new URL(typeof input === 'string' ? input : input.url, location.href);
-    const m = url.pathname.match(/\/api\/(teams|login|logout)$/);
+  window.fetch = async (input, init) => {
+    // Ohne new URL(): In eingebetteten Einzeldatei-Seiten (srcdoc) gibt es keine
+    // auflösbare Seitenadresse.
+    const raw = typeof input === 'string' ? input : input.url;
+    const m = raw.split(/[?#]/)[0].match(/(?:^|\/)api\/(teams|login|logout)$/);
     if (!m) return realFetch(input, init);
     const body = init?.body ? JSON.parse(init.body) : {};
-    const [status, data] = localServer.api(m[1], body);
-    return Promise.resolve(new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }));
+    const [status, data] = await localServer.api(m[1], body);
+    return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
   };
+}
+
+// ---------- Medien (Intro-Video) ----------
+
+// Video hochladen. onProgress(0…1) meldet den Fortschritt (echter Server).
+export function uploadMedia(file, token, onProgress) {
+  if (localServer) return localServer.uploadMedia(file);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'api/media');
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.setRequestHeader('X-Token', token);
+    xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress?.(ev.loaded / ev.total);
+    xhr.onload = () => {
+      let body = {};
+      try { body = JSON.parse(xhr.responseText); } catch { /* leer */ }
+      xhr.status === 200 ? resolve(body) : reject(new Error(body.error || 'Upload fehlgeschlagen.'));
+    };
+    xhr.onerror = () => reject(new Error('Upload fehlgeschlagen. Ist der Server erreichbar?'));
+    xhr.send(file);
+  });
+}
+
+// Abspielbare Adresse eines Videos (oder null, wenn es nicht mehr da ist).
+const mediaUrls = new Map();
+export async function mediaUrl(id) {
+  if (!id) return null;
+  if (!localServer) return `media/${id}`;
+  if (mediaUrls.has(id)) return mediaUrls.get(id);
+  const blob = await localServer.getMedia(id);
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  mediaUrls.set(id, url);
+  return url;
+}
+
+// Show-Titel in der Logo-Schrift; das Wort „uns“ wird hervorgehoben.
+export function showTitle(name, tag = 'span', cls = '') {
+  const words = String(name || '').trim().split(/(\s+)/);
+  return h(tag, { class: `show-title ${cls}`.trim() }, words.map((w) => (/^uns$/i.test(w) ? h('span', { class: 'hot' }, w) : w)));
+}
+export function setShowTitle(el, name) {
+  if (!el) return;
+  el.classList.add('show-title');
+  el.replaceChildren(...showTitle(name).childNodes);
+}
+
+// Münze der Show (Bild), z. B. in Listen und Bannern.
+export function coinImg(cls = '') {
+  return h('img', { class: `coin-img ${cls}`.trim(), src: 'assets/img/muenze.webp', alt: 'Münze', draggable: 'false' });
 }
 
 export function h(tag, attrs = {}, ...children) {
@@ -203,7 +357,9 @@ export function connect({ hello, onState, onAuthFailed, onKicked, quiet = false 
 // Aktion ausführen und Fehler verständlich anzeigen.
 export async function run(conn, name, payload) {
   try {
-    return await conn.action(name, payload);
+    const res = await conn.action(name, payload);
+    if (res && res.notice) toast(res.notice, 'info');
+    return res;
   } catch (err) {
     toast(err.message || 'Aktion fehlgeschlagen.');
     return null;

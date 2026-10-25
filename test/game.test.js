@@ -76,6 +76,8 @@ test('Privatsphäre: Teams sehen keine fremden Antworten, Beamer nur freigegeben
   // Beamer und Teams sehen nie Zugangscodes oder Punktestände.
   const beamer = JSON.stringify(game.beamerView(db));
   for (const t of db.project.teams) assert.ok(!beamer.includes(t.code));
+  // Punkte erscheinen auf dem Beamer nur in der Münzansicht.
+  assert.ok(game.beamerView(db).teams.every((t) => !('points' in t)));
   assert.equal(game.teamView(db, ids[1]).ranking, undefined);
 });
 
@@ -309,7 +311,7 @@ test('Jauch: Telefonjoker wartet, bis alle anderen gesperrt haben; Antworten ble
   assert.equal(game.totals(db)[ids[0]], 1);
 });
 
-test('Dummes: Buzzer, 10-Sekunden-Fenster, ein Tausch im ganzen Spiel', () => {
+test('Dummes: Buzzer, 10-Sekunden-Fenster, Tausch bei jeder Frage', () => {
   const { db, ids } = setup(3);
   const [a, b, c] = ids;
   activate(db, 'dummes');
@@ -333,14 +335,23 @@ test('Dummes: Buzzer, 10-Sekunden-Fenster, ein Tausch im ganzen Spiel', () => {
   assert.deepEqual([a, b, c].map((t) => game.totals(db)[t]), [1, 0, 0]);
   assert.equal(game.teamView(db, b, 72000).play.final, 'A');
   assert.equal(game.teamView(db, b, 72000).play.swappedWith, db.project.teams[0].name);
-  // Der Tausch ist verbraucht: in Frage 2 gibt es keinen Buzzer mehr.
-  game.applyAction(db, mod(), 'play.open', { qIndex: 1 });
-  play(b, 'answer', { choice: 'C' });
-  assert.throws(() => play(b, 'buzz'), /schon genutzt/);
+  assert.throws(() => play(a, 'swap', { teamId: c }, 72500), /schon getauscht|ausgewertet/);
+  // Frage 2: wieder Buzzer und Tausch möglich – diesmal für ein anderes Team.
+  game.applyAction(db, mod(), 'play.open', { qIndex: 1 }); // richtig: C
+  play(a, 'answer', { choice: 'C' }, 80000);
+  play(b, 'answer', { choice: 'A' }, 80100);
+  assert.equal(game.teamView(db, b, 80100).play.canBuzz, true);
+  play(b, 'buzz', {}, 80200);
+  play(c, 'answer', { choice: 'D' }, 80300);
+  play(b, 'swap', { teamId: a }, 80400);
   game.applyAction(db, mod(), 'play.evaluate');
+  assert.equal(game.totals(db)[b], 1);
+  assert.equal(game.totals(db)[a], 1);
+  // fünf Fragen im Beispiel
+  assert.equal(db.project.games.find((x) => x.type === 'dummes').content.questions.length, 5);
   game.applyAction(db, mod(), 'play.grade', { teamId: b, correct: false });
   assert.equal(game.totals(db)[b], 0);
-  assert.equal(game.nextWake(db, 0), null);
+  assert.equal(game.nextWake(db, 100000), null);
 });
 
 test('Musik: Feld wählen, Buzzer, falsch sperrt, richtig gibt Feldpunkte', () => {
@@ -504,4 +515,123 @@ test('Mehrere Shows: anlegen, umbenennen, wechseln, duplizieren, löschen', () =
   game.applyAction(db, mod(), 'shows.remove', { showId: d.created });
   assert.equal(db.shows.length, 1);
   assert.throws(() => game.applyAction(db, mod(), 'shows.rename', { showId: first, date: '12.11.2026' }), /Datum/);
+});
+
+test('Handschrift: Spiel 1 und Kassenschlager nehmen PNG-Antworten an und prüfen sie', () => {
+  const INK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { db, ids } = setup(2);
+  const [a, b] = ids;
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
+  game.applyAction(db, mod(), 'play.open', { qIndex: 0 });
+  assert.throws(() => game.applyAction(db, team(a), 'play.submit', { ink: 'data:text/html;base64,PHNjcmlwdD4=' }), /Ungültige Handschrift/);
+  assert.throws(() => game.applyAction(db, team(a), 'play.submit', { ink: `data:image/png;base64,${'A'.repeat(400001)}` }), /zu groß/);
+  assert.throws(() => game.applyAction(db, team(a), 'play.submit', {}), /aufschreiben/);
+  game.applyAction(db, team(a), 'play.submit', { ink: INK });
+  assert.equal(game.teamView(db, a).play.answer.ink, INK);
+  game.applyAction(db, mod(), 'play.showAnswer', { teamId: a, visible: true });
+  game.applyAction(db, mod(), 'beamer.show', { view: 'game' });
+  assert.equal(game.beamerView(db).gameView.answers[0].ink, INK);
+  assert.equal(game.teamView(db, b).play.answer, null);
+
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'kassenschlager') });
+  game.applyAction(db, mod(), 'play.startMovie', { movieIndex: 0 });
+  game.applyAction(db, team(a), 'play.buy', { hint: 3 });
+  game.applyAction(db, team(a), 'play.answer', { ink: INK });
+  game.applyAction(db, mod(), 'play.grade', { correct: false });
+  assert.equal(game.teamView(db, a).play.lastAnswer.ink, INK);
+  assert.ok(!JSON.stringify(game.beamerView(db)).includes(INK));
+});
+
+test('Avatare: nur gültige Bilder, nur auf dem Beamer bei Intro und Münze, entfernbar', () => {
+  const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { db, ids } = setup(2);
+  assert.throws(() => game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: 'data:image/svg+xml;base64,PHN2Zz4=' }), /Ungültiges Bild/);
+  assert.throws(() => game.applyAction(db, team(ids[0]), 'team.update', { teamId: ids[0], avatar: IMG }), /nicht erlaubt/);
+  game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: IMG });
+  assert.ok(!JSON.stringify(game.beamerView(db)).includes(IMG));
+  assert.ok(!JSON.stringify(game.teamView(db, ids[1])).includes(IMG));
+  game.applyAction(db, mod(), 'beamer.show', { view: 'intro' });
+  assert.equal(game.beamerView(db).teams[0].avatar, IMG);
+  assert.equal(game.beamerView(db).teams[1].avatar, undefined);
+  game.applyAction(db, mod(), 'beamer.show', { view: 'pause' });
+  assert.equal(game.beamerView(db).view, 'pause');
+  game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: null });
+  assert.equal(db.project.teams[0].avatar, null);
+});
+
+test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze aus', () => {
+  const { db, ids } = setup(2);
+  const steps = game.moderatorView(db).rundown;
+  assert.deepEqual(steps.slice(0, 6).map((s) => s.kind), ['start', 'video', 'intro', 'pyramid', 'title', 'game']);
+  assert.equal(steps.filter((s) => s.kind === 'pyramid').length, 1);
+  assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
+  assert.ok(steps.some((s) => s.kind === 'pause'));
+  assert.equal(steps.at(-1).kind, 'end');
+  assert.throws(() => game.applyAction(db, mod(), 'run.prev', {}), /erste Schritt/);
+  game.applyAction(db, mod(), 'run.next', {});
+  assert.equal(db.live.beamer.view, 'start');
+  const titleIdx = steps.findIndex((s) => s.kind === 'title' && s.pos === 2);
+  game.applyAction(db, mod(), 'run.goto', { index: titleIdx });
+  assert.equal(db.live.activeGame, db.project.games[1].id);
+  assert.equal(db.live.beamer.view, 'title');
+  // Münze: Gleichstand → Hinweis, kein Beamerwechsel zur Münze
+  const coinIdx = steps.findIndex((s) => s.kind === 'coin' && s.pos === 4);
+  const r = game.applyAction(db, mod(), 'run.goto', { index: coinIdx });
+  assert.ok(r.notice);
+  assert.equal(db.live.warning.kind, 'coinTie');
+  assert.throws(() => game.applyAction(db, mod(), 'run.next', {}), /noch nicht vergeben/);
+  game.applyAction(db, mod(), 'coin.awardTie', { teamId: ids[1] });
+  assert.equal(db.live.beamer.view, 'coin');
+  assert.equal(db.live.coins[0].teamId, ids[1]);
+  game.applyAction(db, mod(), 'run.next', {});
+  assert.equal(db.live.beamer.view, 'pause');
+  // eigener Ablauf mit zusätzlicher Pause; ungültige Schritte werden abgelehnt
+  const custom = steps.map(({ id, kind, pos }) => ({ id, kind, pos }));
+  custom.splice(2, 0, { kind: 'pause' });
+  game.applyAction(db, mod(), 'rundown.set', { steps: custom });
+  assert.equal(game.moderatorView(db).rundown[2].kind, 'pause');
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.set', { steps: [{ kind: 'coin', pos: 3 }] }), /4, 6 und 8/);
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.set', { steps: [{ kind: 'quatsch' }] }), /Unbekannter/);
+  game.applyAction(db, mod(), 'rundown.reset', {});
+  assert.equal(game.moderatorView(db).rundownCustom, false);
+});
+
+test('Intro-Video: je Show austauschbar, Beamer bekommt nur den Verweis', () => {
+  const { db } = setup(1);
+  assert.throws(() => game.applyAction(db, mod(), 'intro.set', { media: { id: '../etc/passwd', type: 'video/mp4' } }), /Ungültiges Video/);
+  assert.throws(() => game.applyAction(db, mod(), 'intro.set', { media: { id: 'media_abcdef123456', type: 'text/html' } }), /Videodatei/);
+  game.applyAction(db, mod(), 'intro.set', { media: { id: 'media_abcdef123456', type: 'video/mp4', name: 'Intro 2026.mp4', size: 1000 } });
+  assert.match(game.moderatorView(db).rundown[1].text, /Intro 2026\.mp4/);
+  game.applyAction(db, mod(), 'run.goto', { index: 1 });
+  assert.equal(db.live.beamer.view, 'video');
+  assert.deepEqual(game.beamerView(db).introVideo, { id: 'media_abcdef123456', type: 'video/mp4' });
+  const r = game.applyAction(db, mod(), 'intro.set', { media: { id: 'media_abcdef654321', type: 'video/webm', name: 'Neu' } });
+  assert.equal(r.releasedMedia, 'media_abcdef123456');
+  assert.deepEqual([...game.referencedMedia(db)], ['media_abcdef654321']);
+  // Neue Show startet ohne Intro-Video, die alte behält ihres.
+  game.applyAction(db, mod(), 'run.goto', { index: 0 });
+  game.applyAction(db, mod(), 'shows.create', { name: 'Show 2' });
+  assert.equal(db.project.introVideo, undefined);
+  assert.deepEqual([...game.referencedMedia(db)], ['media_abcdef654321']);
+});
+
+test('Pausen: eigene Lieder je Pause, Beamer bekommt die Playlist der laufenden Pause', () => {
+  const { db } = setup(1);
+  const steps = game.moderatorView(db).rundown;
+  const pauseIdx = steps.findIndex((x) => x.kind === 'pause');
+  const pause = steps[pauseIdx];
+  const song = { id: 'media_aaaaaaaaaaaa11', type: 'audio/mpeg', name: 'Pausenhit.mp3', size: 1234 };
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [{ ...song, type: 'video/mp4' }] }), /Audiodateien/);
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: steps[0].id, songs: [song] }), /Pause nicht gefunden/);
+  game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [song, { ...song, id: 'media_bbbbbbbbbbbb22', name: 'Zwei.mp3' }] });
+  const view = game.moderatorView(db);
+  assert.equal(view.rundownCustom, true);
+  assert.match(view.rundown[pauseIdx].text, /2 eigene Lieder/);
+  assert.equal(game.referencedMedia(db).size, 2);
+  game.applyAction(db, mod(), 'run.goto', { index: pauseIdx });
+  assert.deepEqual(game.beamerView(db).pauseSongs.map((m) => m.name), ['Pausenhit.mp3', 'Zwei.mp3']);
+  // Pause ohne eigene Lieder: leere Playlist (eingebauter Song)
+  game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [] });
+  assert.deepEqual(game.beamerView(db).pauseSongs, []);
+  assert.equal(game.referencedMedia(db).size, 0);
 });

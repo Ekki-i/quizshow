@@ -5,7 +5,7 @@
 
 const crypto = require('crypto');
 const { TYPES, DEFAULT_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
-const { QuizError, fail, newId, log, effect, teamName, totals, cleanText } = require('./core');
+const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage } = require('./core');
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
 // Moderationsaktionen sowie die Sichten für Teams und Beamer.
@@ -22,7 +22,7 @@ const PLAY = {
 
 const STATE_VERSION = 2;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const BEAMER_VIEWS = ['start', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'blank'];
+const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'blank'];
 const MAX_PROCESSED = 5000;
 
 // 10 Zeichen aus 32 Symbolen ≈ 50 Bit: nicht erratbar, aber noch abtippbar.
@@ -40,6 +40,7 @@ function freshLive() {
     coins: [],
     warning: null,
     effect: { seq: 0, kind: null },
+    run: -1, // aktueller Schritt im Showablauf (-1 = noch nicht gestartet)
   };
 }
 
@@ -57,7 +58,7 @@ function instanceFrom(entry) {
 }
 
 // Eine neue Show mit der Standardreihenfolge, je Spieltyp der erste Eintrag der Datenbank.
-function newProject(library, name = 'Quizshow') {
+function newProject(library, name = 'Wer stiehlt uns die Show') {
   const games = DEFAULT_ORDER.map((type) => library.find((e) => e.type === type)).filter(Boolean).map(instanceFrom);
   if (games[0]?.type === 'leichte5') games[0].locked = true; // „Die leichten 5“ als festes Eröffnungsspiel
   return {
@@ -94,6 +95,7 @@ function migrate(db) {
   if (db.version === STATE_VERSION) {
     if (!db.shows) db.shows = [];
     if (db.project.date === undefined) db.project.date = '';
+    if (db.live.run === undefined) db.live.run = -1;
     return db;
   }
   const fresh = createState();
@@ -241,12 +243,114 @@ function requireEditable(db) {
   if (db.live.activeGame !== null) fail('Während ein Spiel aktiv ist, bleibt der Showablauf fest. Zuerst das Spiel beenden.');
 }
 
+// ---------- Showablauf (wie eine Präsentation) ----------
+// Jeder Schritt ist eine „Folie“: Beamer-Ansicht plus nötige Spielaktion.
+// Ohne eigenen Ablauf gilt der Standardablauf aus den Spielen der Show.
+
+const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'end'];
+const RUN_NEEDS_POS = ['title', 'game', 'coin'];
+const RUN_MAX = 120;
+
+function defaultRundown(project) {
+  const steps = [{ kind: 'start' }, { kind: 'video' }, { kind: 'intro' }, { kind: 'pyramid' }];
+  project.games.forEach((g, i) => {
+    const pos = i + 1;
+    steps.push({ kind: 'title', pos }, { kind: 'game', pos });
+    if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'coin', pos });
+    if (pos === 4) steps.push({ kind: 'pause' });
+  });
+  steps.push({ kind: 'ranking' }, { kind: 'end' });
+  return steps.map((st, i) => ({ id: `std${i}`, ...st }));
+}
+
+function rundown(db) {
+  return Array.isArray(db.project.rundown) && db.project.rundown.length ? db.project.rundown : defaultRundown(db.project);
+}
+
+function stepLabel(db, st) {
+  const g = st.pos ? db.project.games[st.pos - 1] : null;
+  const game = g ? `Spiel ${st.pos} · ${g.title}` : st.pos ? `Spiel ${st.pos} (fehlt)` : '';
+  const base = {
+    start: 'Startbild',
+    video: `Intro-Video${db.project.introVideo ? ` (${db.project.introVideo.name})` : ' – noch keins hinterlegt'}`,
+    intro: 'Vorstellung der Teams',
+    pyramid: st.pos ? `Übersicht Kategorien → ${game}` : 'Übersicht Kategorien',
+    title: `${game} – Spieltitel`,
+    game: `${game} – spielen`,
+    coin: `Münzvergabe nach Spiel ${st.pos}${STAGE_LABEL[st.pos] ? ` (Gewinnstufe ${STAGE_LABEL[st.pos]})` : ''}`,
+    pause: `Pause${st.songs && st.songs.length ? ` · ${st.songs.length} ${st.songs.length === 1 ? 'eigenes Lied' : 'eigene Lieder'}` : ''}`,
+    ranking: 'Zwischenstand / Rangliste',
+    end: 'Abschluss',
+  }[st.kind];
+  return st.label ? `${st.label}` : base;
+}
+const STAGE_LABEL = { 4: 1, 6: 2, 8: 3 };
+
+function cleanRundown(db, steps) {
+  if (!Array.isArray(steps)) fail('Ungültiger Ablauf.');
+  if (steps.length > RUN_MAX) fail(`Höchstens ${RUN_MAX} Schritte.`);
+  return steps.map((st) => {
+    if (!st || !RUN_KINDS.includes(st.kind)) fail('Unbekannter Schritt im Ablauf.');
+    const out = { id: typeof st.id === 'string' && /^[\w-]{1,40}$/.test(st.id) ? st.id : newId('step'), kind: st.kind };
+    if (st.pos !== undefined && st.pos !== null) {
+      const pos = Number(st.pos);
+      if (!Number.isInteger(pos) || pos < 1 || pos > SHOW_SIZE) fail('Ungültige Spielposition im Ablauf.');
+      if (st.kind === 'coin' && !COIN_POSITIONS.includes(pos)) fail('Münzvergabe gibt es nur nach Spiel 4, 6 und 8.');
+      out.pos = pos;
+    } else if (RUN_NEEDS_POS.includes(st.kind)) fail('Für diesen Schritt fehlt das Spiel.');
+    if (st.label) out.label = cleanText(st.label, 60);
+    if (st.kind === 'pause' && Array.isArray(st.songs) && st.songs.length) out.songs = cleanSongs(st.songs);
+    return out;
+  });
+}
+
+// Playlist einer Pause: nur Verweise auf hochgeladene Lieder.
+const SONGS_MAX = 40;
+function cleanSongs(songs) {
+  if (!Array.isArray(songs)) fail('Ungültige Liederliste.');
+  if (songs.length > SONGS_MAX) fail(`Höchstens ${SONGS_MAX} Lieder pro Pause.`);
+  return songs.map((m) => {
+    if (!m || typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültiges Lied.');
+    if (typeof m.type !== 'string' || !/^audio\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte nur Audiodateien als Lieder.');
+    return { id: m.id, type: m.type, name: cleanText(String(m.name || 'Lied'), 100) || 'Lied', size: Number(m.size) || 0 };
+  });
+}
+
+// Schritt ausführen: Spiel aktivieren, Münze ermitteln, Beamer umschalten.
+function runStep(db, ctx, index) {
+  const steps = rundown(db);
+  if (!Number.isInteger(index) || index < 0 || index >= steps.length) fail('Diesen Schritt gibt es nicht.');
+  const st = steps[index];
+  const game = st.pos ? db.project.games[st.pos - 1] : null;
+  if (st.pos && !game) fail(`Auf Position ${st.pos} steht kein Spiel.`);
+  db.live.run = index;
+  if (game && db.live.activeGame !== game.id) moderatorActions['show.activate'](db, ctx, { gameId: game.id });
+  const view = { start: 'start', end: 'start', video: 'video', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin' }[st.kind];
+  if (st.kind === 'coin') {
+    if (!db.live.coins.some((c) => c.position === st.pos)) moderatorActions['coin.determine'](db, ctx, { position: st.pos });
+    const coin = db.live.coins.find((c) => c.position === st.pos);
+    if (!coin) {
+      log(db, ctx, 'ablauf', `Schritt ${index + 1}: ${stepLabel(db, st)} – Gleichstand, Schätzfrage nötig`);
+      return { notice: 'Gleichstand: Bitte zuerst die Schätzfrage entscheiden, dann den Schritt erneut auslösen.' };
+    }
+    // Münze der richtigen Position zeigen (auch beim Zurückblättern).
+    db.live.beamer = { view: 'coin', data: { position: coin.position, teamId: coin.teamId } };
+    effect(db, 'coin');
+  } else {
+    moderatorActions['beamer.show'](db, ctx, { view });
+    // Pause: Beamer spielt die Lieder dieses Pausenschritts.
+    if (st.kind === 'pause') db.live.beamer.data = { stepId: st.id };
+  }
+  log(db, ctx, 'ablauf', `Schritt ${index + 1}/${steps.length}: ${stepLabel(db, st)}`);
+  return {};
+}
+
 // ---------- Aktionen ----------
 
 const moderatorActions = {
   'project.update'(db, ctx, p) {
     const pr = db.project;
-    if ('name' in p) pr.name = cleanText(p.name, 80) || 'Quizshow';
+    if ('name' in p) pr.name = cleanText(p.name, 80) || 'Wer stiehlt uns die Show';
     if ('subtitle' in p) pr.subtitle = cleanText(p.subtitle, 160);
     if ('host' in p) pr.host = cleanText(p.host, 80);
     if ('coHost' in p) pr.coHost = cleanText(p.coHost, 80);
@@ -264,6 +368,22 @@ const moderatorActions = {
     log(db, ctx, 'editor', 'Showdaten gespeichert');
   },
 
+  // Intro-Video der Show (Datei liegt im Medienspeicher, hier nur der Verweis).
+  'intro.set'(db, ctx, p) {
+    const old = db.project.introVideo || null;
+    if (p.media === null) {
+      db.project.introVideo = null;
+      log(db, ctx, 'editor', 'Intro-Video entfernt');
+      return { releasedMedia: old ? old.id : null };
+    }
+    const m = p.media || {};
+    if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültiges Video.');
+    if (typeof m.type !== 'string' || !/^video\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine Videodatei wählen.');
+    db.project.introVideo = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro-Video'), 80) || 'Intro-Video', size: Number(m.size) || 0 };
+    log(db, ctx, 'editor', `Intro-Video „${db.project.introVideo.name}“ gesetzt`);
+    return { releasedMedia: old && old.id !== m.id ? old.id : null };
+  },
+
   'team.add'(db, ctx, p) {
     const teams = db.project.teams;
     if (teams.length >= 12) fail('Maximal 12 Teams.');
@@ -278,7 +398,9 @@ const moderatorActions = {
     const team = findTeam(db, p.teamId);
     if ('name' in p) team.name = cleanText(p.name, 40) || team.name;
     if ('color' in p) team.color = cleanColor(p.color);
-    log(db, ctx, 'team', `Team „${team.name}“ geändert`);
+    // 3D-Avatar hinter dem Pult; null entfernt ihn (Pult bleibt dann leer).
+    if ('avatar' in p) team.avatar = p.avatar ? cleanImage(p.avatar) : null;
+    log(db, ctx, 'team', `Team „${team.name}“ geändert${'avatar' in p ? (p.avatar ? ' (Avatar gesetzt)' : ' (Avatar entfernt)') : ''}`);
   },
 
   'team.regenCode'(db, ctx, p) {
@@ -421,6 +543,7 @@ const moderatorActions = {
     }
     db.live.beamer = { view: p.view, data: {} };
     if (p.view === 'title') effect(db, 'title');
+    if (p.view === 'video') effect(db, 'video'); // Video startet (erneut) von vorn
     log(db, ctx, 'beamer', `Beamer zeigt „${p.view}“`);
   },
 
@@ -471,6 +594,12 @@ const moderatorActions = {
     db.live.coins.push({ position: w.position, teamId: p.teamId, at: ctx.now, method: 'Schätzfrage', points: w.points });
     db.live.warning = null;
     log(db, ctx, 'muenze', `Münze nach Position ${w.position} per Schätzfrage an ${teamName(db, p.teamId)}`);
+    // Steht der Ablauf gerade auf dieser Münzvergabe, sofort die Münze zeigen.
+    const cur = rundown(db)[db.live.run ?? -1];
+    if (cur && cur.kind === 'coin' && cur.pos === w.position) {
+      db.live.beamer = { view: 'coin', data: { position: w.position, teamId: p.teamId } };
+      effect(db, 'coin');
+    }
   },
 
   // ----- Mehrere Shows -----
@@ -525,6 +654,46 @@ const moderatorActions = {
     log(db, ctx, 'show', `Show „${s.project.name}“ gelöscht`);
   },
 
+  // ----- Showablauf -----
+  'run.goto'(db, ctx, p) {
+    return runStep(db, ctx, Number(p.index));
+  },
+  'run.next'(db, ctx) {
+    const cur = rundown(db)[db.live.run ?? -1];
+    // Nichts vergessen: Nach einer Münzvergabe erst weiter, wenn die Münze vergeben ist.
+    if (cur && cur.kind === 'coin' && !db.live.coins.some((c) => c.position === cur.pos)) {
+      fail(`Die Münze nach Spiel ${cur.pos} ist noch nicht vergeben – erst die Schätzfrage entscheiden.`);
+    }
+    const next = (db.live.run ?? -1) + 1;
+    if (next >= rundown(db).length) fail('Das war der letzte Schritt.');
+    return runStep(db, ctx, next);
+  },
+  'run.prev'(db, ctx) {
+    const prev = (db.live.run ?? -1) - 1;
+    if (prev < 0) fail('Das ist der erste Schritt.');
+    return runStep(db, ctx, prev);
+  },
+  'rundown.set'(db, ctx, p) {
+    db.project.rundown = cleanRundown(db, p.steps);
+    if (db.live.run >= db.project.rundown.length) db.live.run = db.project.rundown.length - 1;
+    log(db, ctx, 'ablauf', `Showablauf geändert (${db.project.rundown.length} Schritte)`);
+  },
+  // Lieder einer Pause setzen. Ein noch nicht angepasster Standardablauf wird dabei übernommen.
+  'rundown.setSongs'(db, ctx, p) {
+    const steps = rundown(db).map((x) => ({ ...x }));
+    const st = steps.find((x) => x.id === p.stepId);
+    if (!st || st.kind !== 'pause') fail('Pause nicht gefunden.');
+    const songs = cleanSongs(p.songs || []);
+    if (songs.length) st.songs = songs;
+    else delete st.songs;
+    db.project.rundown = steps;
+    log(db, ctx, 'editor', `Pause: ${songs.length} eigene Lieder hinterlegt`);
+  },
+  'rundown.reset'(db, ctx) {
+    db.project.rundown = null;
+    log(db, ctx, 'ablauf', 'Standard-Showablauf wiederhergestellt');
+  },
+
   'live.reset'(db, ctx, p) {
     if (p.confirm !== 'NEUSTART') fail('Neustart nicht bestätigt.');
     db.live = freshLive();
@@ -550,6 +719,16 @@ function applyAction(db, ctx, name, payload, actionId) {
     if (db.processed.length > MAX_PROCESSED) db.processed.splice(0, db.processed.length - MAX_PROCESSED);
   }
   return result;
+}
+
+// Alle Medien, auf die irgendeine Show noch verweist (für das Aufräumen).
+function referencedMedia(db) {
+  const ids = new Set();
+  for (const pr of [db.project, ...db.shows.map((x) => x.project)]) {
+    if (pr.introVideo) ids.add(pr.introVideo.id);
+    for (const st of pr.rundown || []) for (const m of st.songs || []) ids.add(m.id);
+  }
+  return ids;
 }
 
 function findTeamByCode(db, code) {
@@ -605,15 +784,29 @@ function beamerGameView(db) {
 function beamerView(db) {
   const pr = db.project;
   const b = db.live.beamer;
+  // Punktestände zeigt der Beamer nur bei der Münzvergabe auf den Teampulten;
+  // sonst bleiben sie geheim (Team-iPads sehen nie fremde Punkte).
+  const sums = b.view === 'coin' ? totals(db) : null;
   const view = {
     role: 'beamer',
     show: { name: pr.name, subtitle: pr.subtitle, host: pr.host, coHost: pr.coHost },
-    teams: publicTeams(db),
+    teams: publicTeams(db).map((t, i) => {
+      const out = sums ? { ...t, points: sums[t.id] || 0 } : { ...t };
+      // Avatare nur in den Ansichten mit Teampulten mitschicken (große Bilder).
+      const avatar = db.project.teams[i].avatar;
+      if (avatar && (b.view === 'intro' || b.view === 'coin')) out.avatar = avatar;
+      return out;
+    }),
     settings: { reducedMotion: pr.settings.reducedMotion, sound: pr.settings.sound, titleDurationSec: pr.settings.titleDurationSec },
     view: b.view,
     effect: db.live.effect,
     game: gameHeader(db),
   };
+  if (b.view === 'pause') {
+    const st = b.data && b.data.stepId ? rundown(db).find((x) => x.id === b.data.stepId) : null;
+    view.pauseSongs = st && st.songs ? st.songs.map((m) => ({ id: m.id, type: m.type, name: m.name })) : [];
+  }
+  if (b.view === 'video') view.introVideo = pr.introVideo ? { id: pr.introVideo.id, type: pr.introVideo.type } : null;
   if (b.view === 'game') view.gameView = beamerGameView(db);
   if (b.view === 'ranking') view.ranking = b.data.ranking;
   if (b.view === 'coin') view.coin = b.data;
@@ -636,6 +829,8 @@ function moderatorView(db, connections) {
     ledger: db.ledger.slice(-100),
     log: db.log.slice(-60),
     coinPositions: COIN_POSITIONS,
+    rundown: rundown(db).map((st) => ({ ...st, text: stepLabel(db, st) })),
+    rundownCustom: Array.isArray(db.project.rundown) && db.project.rundown.length > 0,
     connections: connections || {},
     beamerPreview: beamerView(db),
   };
@@ -643,6 +838,7 @@ function moderatorView(db, connections) {
 
 module.exports = {
   QuizError,
+  referencedMedia,
   createState,
   migrate,
   applyAction,
