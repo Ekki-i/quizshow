@@ -993,3 +993,6 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .pult-av img { filter: brightness(0.9) contrast(1.04) drop-shadow(-2px 0 3px rgba(31, 214, 242, 0.45)) drop-shadow(2px 0 3px rgba(255, 45, 138, 0.4)); }
 /* Handschrift groß und kräftig, vollständig sichtbar */
 .fb-stage.fx .fx-ink { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; filter: url(#ink-bold) invert(1); mix-blend-mode: screen; background: transparent !important; border-radius: 0; }
+.fb-stage.fx .fx-board { overflow: visible; }
+.fb-stage.fx .fx-ink { width: 100%; height: 100%; object-fit: contain; filter: none; mix-blend-mode: normal; background: transparent !important; }
+.fb-stage.fx .fx-side .fb-stamp { top: -2vh; right: -2vh; width: 9vh; height: 9vh; font-size: 5.6vh; z-index: 5; }
