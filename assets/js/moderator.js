@@ -1,5 +1,6 @@
 import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
+import { buildFinaleLive, buildFinaleEditor } from './mod-finale.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
 if (!token) location.href = 'index.html';
@@ -117,11 +118,17 @@ async function confirmAct(message, name, payload) {
 function renderLive() {
   const scroll = window.scrollY;
   document.getElementById('run-panel').replaceChildren(buildRun());
-  document.getElementById('live-left').replaceChildren(buildGameControl());
+  const step = (S.rundown || [])[S.live.run ?? -1];
+  const finaleOn = !S.live.activeGame && (S.live.finale || step?.kind === 'finale');
+  document.getElementById('live-left').replaceChildren(finaleOn ? buildFinaleLive(finaleUi()) : buildGameControl());
   document.getElementById('live-bottom').replaceChildren(buildFlow());
   document.getElementById('beamer-controls').replaceChildren(...buildBeamerControls());
   document.getElementById('live-right').replaceChildren(buildTeamsLive(), buildCoins());
   window.scrollTo(0, scroll);
+}
+
+function finaleUi() {
+  return { S, card, act, confirmAct, autosave, rerender: () => renderAll(true) };
 }
 
 function buildFlow() {
@@ -143,8 +150,8 @@ function buildFlow() {
 
 // ---------- Showablauf wie eine Präsentation ----------
 
-const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', end: '🏁' };
-const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', end: 'Abschluss' };
+const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', finale: '★', end: '🏁' };
+const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', finale: 'Finale gegen die Moderation', end: 'Abschluss' };
 
 // Symbol eines Schritts; die Münzvergabe zeigt die Münze der Show.
 const runIcon = (kind) => (kind === 'coin' ? coinImg('run-coin') : RUN_ICON[kind]);
@@ -526,6 +533,7 @@ function buildEditor() {
     buildBoard(),
     buildIntroVideo(),
     buildRundownEditor(),
+    buildFinaleEditor({ ...finaleUi(), reset: !saveState.dirty }),
     sel ? buildGameEditor('game', sel) : null,
     h('div', { class: 'grid two', style: { marginTop: '16px' } },
       card('Show', field('Showname', 'name', 80),

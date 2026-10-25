@@ -9,6 +9,8 @@ const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanI
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
 // Moderationsaktionen sowie die Sichten für Teams und Beamer.
+const FINALE = require('./finale');
+
 const PLAY = {
   leichte5: require('./play-leichte5'),
   dummes: require('./play-dummes'),
@@ -22,7 +24,7 @@ const PLAY = {
 
 const STATE_VERSION = 2;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'blank'];
+const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'finale', 'blank'];
 const MAX_PROCESSED = 5000;
 
 // 10 Zeichen aus 32 Symbolen ≈ 50 Bit: nicht erratbar, aber noch abtippbar.
@@ -41,6 +43,7 @@ function freshLive() {
     warning: null,
     effect: { seq: 0, kind: null },
     run: -1, // aktueller Schritt im Showablauf (-1 = noch nicht gestartet)
+    finale: null, // Finale gegen die Moderation (server/finale.js)
   };
 }
 
@@ -72,6 +75,7 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
     settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
     teams: [],
     games,
+    finale: clone(FINALE.EXAMPLE),
   };
 }
 
@@ -96,6 +100,12 @@ function migrate(db) {
     if (!db.shows) db.shows = [];
     if (db.project.date === undefined) db.project.date = '';
     if (db.live.run === undefined) db.live.run = -1;
+    if (db.live.finale === undefined) db.live.finale = null;
+    if (!db.project.finale) db.project.finale = clone(FINALE.EXAMPLE);
+    for (const sh of db.shows) {
+      if (!sh.project.finale) sh.project.finale = clone(FINALE.EXAMPLE);
+      if (sh.live.finale === undefined) sh.live.finale = null;
+    }
     return db;
   }
   const fresh = createState();
@@ -247,7 +257,7 @@ function requireEditable(db) {
 // Jeder Schritt ist eine „Folie“: Beamer-Ansicht plus nötige Spielaktion.
 // Ohne eigenen Ablauf gilt der Standardablauf aus den Spielen der Show.
 
-const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'end'];
+const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'finale', 'end'];
 const RUN_NEEDS_POS = ['title', 'game', 'coin'];
 const RUN_MAX = 120;
 
@@ -259,7 +269,7 @@ function defaultRundown(project) {
     // Nach Spiel 4, 6 und 8 erst eine Pause, dann die Münzvergabe (mehr Spannung).
     if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'pause' }, { kind: 'coin', pos });
   });
-  steps.push({ kind: 'ranking' }, { kind: 'end' });
+  steps.push({ kind: 'ranking' }, { kind: 'finale' }, { kind: 'end' });
   return steps.map((st, i) => ({ id: `std${i}`, ...st }));
 }
 
@@ -280,6 +290,7 @@ function stepLabel(db, st) {
     coin: `Münzvergabe nach Spiel ${st.pos}${STAGE_LABEL[st.pos] ? ` (Gewinnstufe ${STAGE_LABEL[st.pos]})` : ''}`,
     pause: `Pause${st.songs && st.songs.length ? ` · ${st.songs.length} ${st.songs.length === 1 ? 'eigenes Lied' : 'eigene Lieder'}` : ''}`,
     ranking: 'Zwischenstand / Rangliste',
+    finale: 'Finale gegen die Moderation',
     end: 'Abschluss',
   }[st.kind];
   return st.label ? `${st.label}` : base;
@@ -325,8 +336,13 @@ function runStep(db, ctx, index) {
   if (st.pos && !game) fail(`Auf Position ${st.pos} steht kein Spiel.`);
   db.live.run = index;
   if (game && db.live.activeGame !== game.id) moderatorActions['show.activate'](db, ctx, { gameId: game.id });
-  const view = { start: 'start', end: 'start', video: 'video', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin' }[st.kind];
-  if (st.kind === 'coin') {
+  const view = { start: 'start', end: 'start', video: 'video', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin', finale: 'finale' }[st.kind];
+  if (st.kind === 'finale') {
+    if (db.live.activeGame) moderatorActions['show.activate'](db, ctx, { gameId: null });
+    if (!db.live.finale) FINALE.start(db, ctx, null);
+    db.live.beamer = { view: 'finale', data: {} };
+    effect(db, 'title');
+  } else if (st.kind === 'coin') {
     if (!db.live.coins.some((c) => c.position === st.pos)) moderatorActions['coin.determine'](db, ctx, { position: st.pos });
     const coin = db.live.coins.find((c) => c.position === st.pos);
     if (!coin) {
@@ -348,6 +364,8 @@ function runStep(db, ctx, index) {
 // ---------- Aktionen ----------
 
 const moderatorActions = {
+  ...FINALE.mod,
+
   'project.update'(db, ctx, p) {
     const pr = db.project;
     if ('name' in p) pr.name = cleanText(p.name, 80) || 'Wer stiehlt uns die Show';
@@ -709,6 +727,8 @@ function applyAction(db, ctx, name, payload, actionId) {
   let result;
   if (typeof name === 'string' && name.startsWith('play.') && (ctx.role === 'moderator' || ctx.role === 'team')) {
     result = playAction(db, ctx, name.slice(5), payload || {}) || {};
+  } else if (ctx.role === 'team' && Object.prototype.hasOwnProperty.call(FINALE.team, name)) {
+    result = FINALE.team[name](db, ctx, payload || {}) || {};
   } else {
     const fn = ctx.role === 'moderator' && Object.prototype.hasOwnProperty.call(moderatorActions, name) ? moderatorActions[name] : null;
     if (!fn) fail('Diese Aktion ist für diese Rolle nicht erlaubt.');
@@ -759,6 +779,8 @@ function teamView(db, teamId, now = Date.now()) {
   if (g) {
     const play = PLAY[g.type].teamView(db, g, gameState(db, g), teamId, now);
     if (play) view.play = { type: g.type, ...play };
+  } else if (db.live.finale) {
+    view.finale = FINALE.teamView(db, teamId);
   }
   return view;
 }
@@ -812,6 +834,7 @@ function beamerView(db) {
   if (b.view === 'game') view.gameView = beamerGameView(db);
   if (b.view === 'ranking') view.ranking = b.data.ranking;
   if (b.view === 'coin') view.coin = b.data;
+  if (b.view === 'finale') view.finale = FINALE.beamerView(db);
   if (b.view === 'pyramid' || b.view === 'intro') {
     view.games = pr.games.map((g, i) => ({ title: g.title, position: i + 1 }));
   }
@@ -835,6 +858,7 @@ function moderatorView(db, connections) {
     rundownCustom: Array.isArray(db.project.rundown) && db.project.rundown.length > 0,
     connections: connections || {},
     beamerPreview: beamerView(db),
+    finale: FINALE.moderatorView(db),
   };
 }
 

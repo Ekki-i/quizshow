@@ -118,9 +118,16 @@ Umgesetzt:
 - Spiellogik je Spiel in `server/play-*.js`, gemeinsame Bausteine in `server/core.js`.
   Kartenumrisse: Natural Earth (gemeinfrei), erzeugt mit `scripts/build-maps.mjs`.
 
+- **Finale gegen die Moderation** (Showablauf: nach der Rangliste): Das Team mit den meisten Punkten
+  spielt gegen die Moderation. Beide schreiben jede Frage gleichzeitig ohne Zeitdruck auf. Das Team
+  bekommt pro richtiger Antwort einen Punkt, die Moderation bei jeder Frage, ohne ihre Antwort zu zeigen.
+  Mit einer Münze zwingt das Team sie zum Aufdecken: richtig → Münze weg, Punkt bleibt; falsch → kein
+  Punkt, Münze zurück. Wer zuerst das Ziel erreicht (Editor, Standard 5), gewinnt; erreichen es beide
+  gleichzeitig, folgt Sudden Death bis zum ersten Fehler oder bis die letzte Münze verloren ist. Der
+  Sieger bekommt ein Ticket für die große Finalshow. Fragen und Ziel im Editor unter „Show-Editor“.
+
 Noch offen (nächste Phasen laut Masterprompt):
 
-- Das Finale gegen die Moderation.
 - Versionen und Archiv-Snapshots von Shows.
 - QR-Codes, Co-Moderator-Rechte, Test-/Vorschaumodus ohne echte Punkte.
 - Medien-Uploads, Musik, editierbare Design-Tokens im Editor, Handschrift-Eingabe mit Stylus.
