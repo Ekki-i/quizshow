@@ -255,7 +255,7 @@ function musik(g, ui) {
 // ---------- 7 · Ein Hauch von Günther Jauch ----------
 
 function ladder(g) {
-  return h('div', { class: 'ladder' }, g.ladder.map((v, i) => h('span', { class: `step ${i === g.qIndex ? 'current' : ''} ${i === 3 ? 'safe' : ''}` }, `${i + 1}: ${v}`)));
+  return h('div', { class: 'ladder' }, g.ladder.map((v, i) => h('span', { class: `step ${i === g.qIndex ? 'current' : ''} ${i === 3 ? 'safe' : ''}` }, `${i + 1}: ${v} P`)));
 }
 
 function jauch(g, ui) {

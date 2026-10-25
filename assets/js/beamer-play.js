@@ -11,6 +11,7 @@ const chip = (t, extra = '', ...rest) => h('span', { class: `chip ${extra}` }, h
 
 export function renderGame(v, s, teamOf) {
   const fn = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd }[v.type];
+  if (v.type === 'jauch') return jauch(v, teamOf, s); // eigenes, bildschirmfüllendes Design
   const head = sub(`Spiel ${s.game.position} · ${s.game.title}`, { marginBottom: '3vh' });
   return fn ? [head, ...fn(v, teamOf)].filter(Boolean) : [h('div', { class: 'mega' }, s.game.title)];
 }
@@ -124,21 +125,56 @@ function musik(v, teamOf) {
 }
 
 // ---------- 7 ----------
-function jauch(v, teamOf) {
-  if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, 'Ein Hauch von Günther Jauch')];
-  const ladder = h('div', { class: 'ladder big' }, v.ladder.map((p, i) => h('span', { class: `step ${i === v.qIndex ? 'current' : ''} ${i === 3 ? 'safe' : ''}` }, `${i + 1} · ${p}`)));
+// Im Stil einer klassischen Millionen-Quizshow: blaue Bühne, Joker links, Leiter mit
+// Punkten rechts, Frage und Antworten in sechseckigen Leisten.
+const PHONE_ICON = '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M33 6c-2 0-3 1-4 3l-2 6c-.5 2 0 3 1.5 4l2.5 2c-2 5-6 9-11 11l-2-2.5c-1-1.5-2-2-4-1.5l-6 2c-2 1-3 2-3 4 0 5 5 9 11 9C30 43 43 30 43 16c0-6-4-10-10-10z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><path d="M6 14l4 4-4 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function hexBar(cls, ...children) {
+  return h('div', { class: `wwm-line ${cls}` }, h('div', { class: 'wwm-hex' }, h('div', { class: 'wwm-hex-in' }, ...children)));
+}
+
+function jauch(v, teamOf, s) {
+  const title = s ? s.game.title : 'Ein Hauch von Günther Jauch';
+  const top = h('div', { class: 'wwm-top' }, h('span', {}, `Spiel ${s ? s.game.position : 7} · ${title}`));
+  const ladder = h('div', { class: 'wwm-ladder' }, v.ladder.map((p, i) => ({ p, i })).reverse().map(({ p, i }) =>
+    h('div', { class: `wwm-step${i === v.qIndex ? ' current' : ''}${i === (v.safeIndex ?? 3) || i === v.ladder.length - 1 ? ' safe' : ''}${v.qIndex !== undefined && i < v.qIndex ? ' done' : ''}` },
+      h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'dotsep' }, '◆'), h('span', { class: 'p' }, `${p} P`))));
+  if (v.waiting) {
+    return [h('div', { class: 'wwm' }, top,
+      h('div', { class: 'wwm-mid' }, h('div'), h('div', { class: 'wwm-ring idle' }, h('b', {}, '?')), ladder),
+      hexBar('wwm-q', title))];
+  }
+  const jokers = v.jokers || { fifty: [], phone: [] };
+  const live = !v.revealed && v.phoneRunning ? 'phone' : null;
+  const jokerBtn = (kind, content) => {
+    const used = jokers[kind] || [];
+    const allUsed = v.teams ? v.teams.filter((t) => t.status === 'active').every((t) => used.includes(t.teamId)) && used.length > 0 : false;
+    const now = (v.joker && v.joker.kind === kind) || live === kind;
+    const btn = h('div', { class: `wwm-joker${now ? ' now' : ''}${allUsed ? ' gone' : ''}`, title: kind === 'fifty' ? '50:50-Joker' : 'Telefonjoker' });
+    if (typeof content === 'string' && content.startsWith('<svg')) btn.innerHTML = content; else btn.append(content);
+    return h('div', { class: 'wwm-joker-wrap' }, btn,
+      used.length ? h('div', { class: 'wwm-joker-teams' }, used.map((id) => dot(teamOf(id)))) : null,
+      v.joker && v.joker.kind === kind ? h('div', { class: 'wwm-joker-who' }, teamOf(v.joker.teamId).name) : live === kind ? h('div', { class: 'wwm-joker-who' }, 'läuft …') : null);
+  };
+  const ring = v.revealed
+    ? h('div', { class: 'wwm-ring done' }, h('b', {}, v.correct), h('small', {}, 'richtig'))
+    : h('div', { class: 'wwm-ring' }, h('b', {}, `${v.lockedCount}/${v.activeCount}`), h('small', {}, 'gesperrt'));
   const marks = {};
   for (const a of v.answers) (marks[a.choice] ||= []).push(dot(teamOf(a.teamId)));
-  const out = [ladder, sub(`Frage ${v.qIndex + 1} · ${pts(v.ladder[v.qIndex])}`, { marginTop: '1vh' }), h('div', { class: 'q compact' }, v.question), options(v, { correct: v.correct, marks, compact: v.revealed })];
-  if (!v.revealed) {
-    out.push(sub(`${v.lockedCount} von ${v.activeCount} Teams haben gesperrt${v.phoneRunning ? ' · 📞 Telefonjoker läuft' : ''}`, { marginTop: '2vh' }));
-    return out;
+  const opt = (l) => hexBar(`wwm-a${v.correct === l ? ' correct' : ''}${v.correct && v.correct !== l ? ' dim' : ''}`,
+    h('span', { class: 'wwm-diamond' }, '◆'), h('b', {}, `${l}:`), h('span', { class: 'grow' }, v.options[l]), h('span', { class: 'marks' }, ...(marks[l] || [])));
+  const out = [top,
+    h('div', { class: 'wwm-mid' },
+      h('div', { class: 'wwm-jokers' }, jokerBtn('fifty', h('b', {}, '50:50')), jokerBtn('phone', PHONE_ICON)),
+      h('div', { class: 'wwm-center' }, ring, h('div', { class: 'wwm-value' }, `Frage ${v.qIndex + 1} · ${v.ladder[v.qIndex]} P`)),
+      ladder),
+    hexBar('wwm-q', v.question),
+    h('div', { class: 'wwm-answers' }, opt('A'), opt('B'), opt('C'), opt('D'))];
+  if (v.revealed && v.teams) {
+    const label = { active: 'im Spiel', quit: 'ausgestiegen', out: 'raus', done: 'geschafft' };
+    out.push(h('div', { class: 'wwm-teams' }, v.teams.map((t) => chip(teamOf(t.teamId), t.status === 'out' ? 'wrong' : '', ` · ${label[t.status]} · ${t.secured} P`))));
   }
-  if (v.joker) out.push(sub(`🃏 ${teamOf(v.joker.teamId).name}: ${v.joker.kind === 'fifty' ? '50:50' : 'Telefonjoker'}`, { marginTop: '2vh' }));
-  const label = { active: 'im Spiel', quit: 'ausgestiegen', out: 'ausgeschieden', done: 'alles geschafft' };
-  out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '2vh' } }, v.teams.map((t) => chip(teamOf(t.teamId), t.status === 'out' ? 'wrong' : '',
-    ` · ${label[t.status]}${t.outAt && t.status !== 'done' ? ` (Frage ${t.outAt})` : ''} · ${pts(t.secured)}`))));
-  return out;
+  return [h('div', { class: `wwm${v.revealed ? ' revealed' : ''}` }, ...out)];
 }
 
 // ---------- 8 ----------

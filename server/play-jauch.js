@@ -164,8 +164,19 @@ module.exports = {
       const ts = teamState(st, id);
       return { teamId: id, status: ts.status, secured: ts.secured, outAt: ts.outAt };
     });
-    if (st.qIndex < 0) return { waiting: true };
+    if (st.qIndex < 0) return { waiting: true, ladder: JAUCH_LADDER };
     const r = round(st, st.qIndex);
+    // Eingesetzte Joker je Art (ein Joker der laufenden Frage erst nach der Auflösung,
+    // damit der Beamer nichts verrät; der Telefonjoker läuft offen über phoneRunning).
+    const jokers = {};
+    for (const kind of ['fifty', 'phone']) {
+      jokers[kind] = teamIds(db).filter((id) => {
+        const ts = teamState(st, id);
+        if (!ts.jokers[kind]) return false;
+        const hidden = !r.revealed && r.joker && r.joker.teamId === id && r.joker.kind === kind && kind !== 'phone';
+        return !hidden;
+      });
+    }
     const q = game.content.questions[st.qIndex];
     const active = teams.filter((t) => t.status === 'active' || r.answers[t.teamId]);
     return {
@@ -181,6 +192,8 @@ module.exports = {
       answers: r.revealed ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, choice: a.choice })) : [],
       joker: r.revealed && r.joker ? { teamId: r.joker.teamId, kind: r.joker.kind } : null,
       teams: r.revealed ? teams : null,
+      jokers,
+      safeIndex: SAFETY_INDEX,
     };
   },
 };
