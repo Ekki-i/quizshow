@@ -256,9 +256,8 @@ function defaultRundown(project) {
   project.games.forEach((g, i) => {
     const pos = i + 1;
     steps.push({ kind: 'title', pos }, { kind: 'game', pos });
-    // Nach Spiel 4 erst die Pause, dann die Münzvergabe (mehr Spannung).
-    if (pos === 4) steps.push({ kind: 'pause' });
-    if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'coin', pos });
+    // Nach Spiel 4, 6 und 8 erst eine Pause, dann die Münzvergabe (mehr Spannung).
+    if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'pause' }, { kind: 'coin', pos });
   });
   steps.push({ kind: 'ranking' }, { kind: 'end' });
   return steps.map((st, i) => ({ id: `std${i}`, ...st }));
