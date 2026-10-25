@@ -61,13 +61,20 @@ export function buildFinaleLive(ui) {
     // Antwort des Teams
     out.push(h('div', { class: 'fin-answer' }, h('span', { class: 'muted' }, `${st.team.name}: `),
       r.team ? answerContent(r.team) : badge('', '… schreibt noch'),
-      r.team ? h('span', { class: 'row' },
+      r.team && !r.revealed ? h('span', { class: 'row' },
         btn(`small ${r.teamGrade === true ? 'ok' : 'ghost'}`, '✓ Richtig', () => act('finale.gradeTeam', { correct: true })),
-        btn(`small ${r.teamGrade === false ? 'bad' : 'ghost'}`, '✗ Falsch', () => act('finale.gradeTeam', { correct: false }))) : null));
+        btn(`small ${r.teamGrade === false ? 'bad' : 'ghost'}`, '✗ Falsch', () => act('finale.gradeTeam', { correct: false })))
+        : r.revealed ? badge(r.teamGrade ? 'ok' : 'bad', r.teamGrade ? '✓ richtig · +1 Punkt' : '✗ falsch · kein Punkt') : null));
 
-    const ready = r.team && r.mod && r.teamGrade !== null && (!r.challenged || r.modGrade !== null);
-    out.push(row(btn('pink', 'Frage auflösen', () => act('finale.resolve'), !ready),
-      !r.challenged && r.team && r.mod ? h('span', { class: 'muted' }, st.coins ? `Das Team kann jetzt eine Münze einsetzen (${st.coins} übrig).` : 'Das Team hat keine Münze mehr.') : null));
+    // 1. Auflösen (Team bekommt seinen Punkt) → 2. Team entscheidet über die Münze
+    if (!r.revealed) {
+      const ready = r.team && r.mod && r.teamGrade !== null;
+      out.push(row(btn('pink', 'Frage auflösen (Lösung + Teampunkt)', () => act('finale.reveal'), !ready),
+        !ready ? h('span', { class: 'muted' }, 'Erst müssen beide antworten und die Teamantwort bewertet sein.') : null));
+    } else if (!r.decided) {
+      out.push(row(badge('warn', `${st.team.name} entscheidet: Münze einsetzen? (${st.coins} übrig)`),
+        btn('small ghost', 'Ohne Münze weiter', () => act('finale.resolve'))));
+    }
   }
   out.push(h('details', { style: { marginTop: '12px' } }, h('summary', { class: 'muted' }, 'Notfall'),
     row(btn('small ghost', `Sieg für ${st.team.name}`, () => confirmAct(`${st.team.name} zum Sieger erklären?`, 'finale.decide', { winner: 'team' })),

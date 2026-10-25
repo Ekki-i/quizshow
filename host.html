@@ -43,7 +43,7 @@
       setShowTitle(document.getElementById('show-name'), s.project.name);
       const st = s.finale && s.finale.state;
       // Nur öffentliche Teile – die Lösung bleibt hier ausgeblendet.
-      const view = st ? { ...st, round: st.round ? { ...st.round, answer: undefined, solution: st.round.resolved ? st.round.solution : null } : null } : null;
+      const view = st ? { ...st, round: st.round ? { ...st.round, answer: undefined, solution: st.round.revealed ? st.round.solution : null } : null } : null;
       const key = JSON.stringify(view);
       if (key === lastKey) return;
       lastKey = key;
@@ -65,8 +65,14 @@
         return main.replaceChildren(...out);
       }
       const r = st.round;
+      if (r && r.revealed && !r.resolved) {
+        out.push(h('p', { class: 'question' }, r.question));
+        out.push(stateBox('', 'ℹ', `Lösung: ${r.solution} · Team ${r.teamPoint ? '+1' : 'kein Punkt'}`));
+        out.push(stateBox('', r.challenged ? '🪙' : '⏳', r.challenged ? 'Das Team setzt eine Münze ein – deine Antwort wird aufgedeckt!' : 'Das Team entscheidet, ob es eine Münze einsetzt …'));
+        return main.replaceChildren(...out);
+      }
       if (!r || r.resolved) {
-        if (r && r.resolved) out.push(stateBox('', 'ℹ', `Lösung: ${r.solution}${r.challenged ? (r.coinLost ? ' · deine Antwort war richtig, das Team verliert die Münze' : ' · deine Antwort war falsch, kein Punkt') : ''}`));
+        if (r && r.resolved) out.push(stateBox('', 'ℹ', `Lösung: ${r.solution}${r.challenged ? (r.coinLost ? ' · deine Antwort war richtig, das Team verliert die Münze' : ' · deine Antwort war falsch, kein Punkt') : ' · keine Münze eingesetzt, du bekommst deinen Punkt'}`));
         out.push(wait(r ? 'Gleich kommt die nächste Frage …' : 'Gleich kommt die erste Finalfrage …'));
         return main.replaceChildren(...out);
       }
