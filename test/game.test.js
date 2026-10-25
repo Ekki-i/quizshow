@@ -649,7 +649,7 @@ test('Finale: Moderation punktet immer, Münze erzwingt Aufdecken, Sudden Death'
   const { db, ids } = setup(2);
   game.applyAction(db, mod(), 'points.adjust', { teamId: ids[1], points: 9, reason: 'x' });
   db.live.coins.push({ position: 4, teamId: ids[1] }, { position: 6, teamId: ids[1] });
-  game.applyAction(db, mod(), 'finale.config', { target: 2, questions: [1, 2, 3, 4, 5].map((n) => ({ question: `F${n}?`, answer: `A${n}` })) });
+  game.applyAction(db, mod(), 'finale.config', { target: 2, questions: [1, 2, 3, 4, 5, 6].map((n) => ({ question: `F${n}?`, answer: `A${n}` })) });
   // Ablaufschritt startet das Finale mit dem Team mit den meisten Punkten
   const idx = game.moderatorView(db).rundown.findIndex((s) => s.kind === 'finale');
   game.applyAction(db, mod(), 'run.goto', { index: idx });
@@ -681,7 +681,15 @@ test('Finale: Moderation punktet immer, Münze erzwingt Aufdecken, Sudden Death'
   answer(true, false); // beide erreichen 2 → Sudden Death
   assert.equal(db.live.finale.sudden, true);
   assert.equal(db.live.finale.result, null);
-  answer(true, true, true); // letzte Münze verloren → Moderation gewinnt
+  answer(true, false); // Sudden Death: Team richtig, keine Münze eingesetzt → weiter
+  assert.equal(db.live.finale.result, null);
+  answer(true, true, true); // letzte Münze verloren → Team hat automatisch verloren
+  assert.equal(db.live.finale.result, 'mod');
+  // auch außerhalb des Sudden Death: letzte Münze weg = verloren
+  db.live.finale = null;
+  db.live.coins = [{ position: 4, teamId: ids[1] }];
+  game.applyAction(db, mod(), 'finale.start', {});
+  answer(true, true, true);
   assert.equal(db.live.finale.result, 'mod');
   assert.throws(() => game.applyAction(db, mod(), 'finale.next', {}), /entschieden/);
 });

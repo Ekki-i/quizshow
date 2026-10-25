@@ -23,7 +23,7 @@
     import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
     import { answerContent } from './assets/js/ink.js';
-    import { podiumRow, INTRO_START, INTRO_STEP } from './assets/js/studio.js';
+    import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
@@ -419,19 +419,6 @@
       prevFin = f;
       const an = (cond, cls) => (cond ? ` ${cls}` : '');
 
-      const pips = (n) => h('div', { class: 'fb-pips' }, Array.from({ length: f.target }, (_, i) => h('i', { class: i < n ? 'on' : '' })));
-      const coins = h('div', { class: 'fb-coins' }, f.coinsTotal
-        ? Array.from({ length: f.coinsTotal }, (_, i) => coinImg(`fb-coin${i < f.coins ? '' : ' lost'}${an(isNew.resolved && r.coinLost && i === f.coins, 'just-lost')}`))
-        : h('span', { class: 'fb-nocoin' }, 'keine Münze'));
-      const teamPanel = h('div', { class: `fb-panel team${an(isNew.resolved && r.teamPoint, 'scored')}`, '--team': f.team.color },
-        f.team.avatar ? h('img', { class: 'fb-avatar', src: f.team.avatar, alt: '' }) : h('div', { class: 'fb-avatar empty' }, f.team.name.slice(0, 1)),
-        h('div', { class: 'fb-name' }, f.team.name),
-        h('div', { class: 'fb-score' }, String(f.score.team)), pips(f.score.team), coins);
-      const modPanel = h('div', { class: `fb-panel mod${an(isNew.resolved && r.modPoint, 'scored')}` },
-        h('div', { class: 'fb-avatar mic' }, '🎤'),
-        h('div', { class: 'fb-name' }, f.host || 'Moderation'),
-        h('div', { class: 'fb-score' }, String(f.score.mod)), pips(f.score.mod),
-        h('div', { class: 'fb-coins' }, h('span', { class: 'fb-nocoin' }, 'Moderation')));
       const top = h('div', { class: 'fb-top' },
         h('div', { class: `fb-title${an(isNew.start, 'enter')}` }, '★ FINALE ★'),
         f.sudden ? h('div', { class: `fb-sudden${an(isNew.sudden, 'enter')}` }, 'SUDDEN DEATH') : h('div', { class: 'fb-sub' }, `Wer zuerst ${f.target} Punkte hat, gewinnt`));
@@ -447,34 +434,92 @@
                 : h('div', { class: 'fb-sub' }, `Endstand ${f.score.team} : ${f.score.mod}`)))];
       }
 
-      let center;
-      if (!r) {
-        center = h('div', { class: 'fb-center' }, h('div', { class: 'fb-intro' },
-          h('span', { style: { color: f.team.color } }, f.team.name), h('em', {}, 'gegen'), h('span', {}, f.host || 'die Moderation')),
-          h('div', { class: 'fb-rules' }, 'Beide antworten gleichzeitig. Die Moderation punktet immer – außer das Team zwingt sie mit einer Münze zum Aufdecken und sie liegt falsch.'));
-      } else {
-        const stamp = (g, isn) => (g === null ? null : h('div', { class: `fb-stamp ${g ? 'ok' : 'bad'}${an(isn, 'enter')}` }, g ? '✓' : '✗'));
-        const teamCard = h('div', { class: `fb-card team${an(isNew.teamAnswered, 'pop')}`, '--team': f.team.color },
-          h('div', { class: 'fb-card-label' }, f.team.name),
-          r.teamAnswer ? h('div', { class: 'fb-card-body' }, answerContent(r.teamAnswer, 'fb-ink'))
-            : h('div', { class: 'fb-card-body wait' }, r.teamAnswered ? h('span', { class: 'fb-locked' }, '🔒 abgegeben') : h('span', { class: 'fb-dots' }, h('i'), h('i'), h('i'))),
-          stamp(r.teamGrade, isNew.teamGrade));
-        const flipped = r.challenged && r.modAnswer;
-        const modCard = h('div', { class: `fb-card mod${flipped ? ' flipped' : ''}${an(isNew.modAnswered, 'pop')}${an(isNew.challenge, 'flip')}` },
-          h('div', { class: 'fb-card-label' }, f.host || 'Moderation'),
-          h('div', { class: 'fb-card-inner' },
-            h('div', { class: 'fb-card-back' }, r.modAnswered ? h('span', { class: 'fb-q' }, '?') : h('span', { class: 'fb-dots' }, h('i'), h('i'), h('i')), r.modAnswered ? h('small', {}, 'verdeckt') : null),
-            h('div', { class: 'fb-card-front' }, flipped ? answerContent(r.modAnswer, 'fb-ink') : null)),
-          isNew.challenge ? coinImg('fb-flycoin') : null,
-          stamp(r.modGrade, isNew.modGrade));
-        const verdict = r.resolved ? h('div', { class: `fb-verdict${an(isNew.resolved, 'enter')}` },
-          h('span', {}, `Lösung: `, h('b', {}, r.solution || '–')),
-          r.challenged ? h('span', { class: r.coinLost ? 'bad' : 'ok' }, r.coinLost ? ' · Münze verloren' : ' · Münze zurück, kein Punkt für die Moderation') : null) : null;
-        center = h('div', { class: 'fb-center' },
-          h('div', { class: `q compact fb-q-box${an(isNew.question, 'enter')}` }, h('small', {}, `Finalfrage ${f.qIndex + 1}`), r.question),
-          h('div', { class: 'fb-cards' }, teamCard, h('div', { class: 'fb-vs' }, 'VS'), modCard), verdict);
+      // Layout wie im TV-Finale: in der Mitte das Moderationspult mit der Co-Moderation,
+      // links das Pult des Teams, rechts das Pult der Moderation (je mit 3D-Avatar),
+      // darunter die schwarzen Antworttafeln, dazwischen die Frage. Punkte = Dreiecke.
+      const tris = (n, cls) => h('div', { class: `fx-tris ${cls}` }, Array.from({ length: f.target }, (_, i) =>
+        h('span', { class: `fx-tri${i < n ? ' on' : ''}${an(isNew.resolved && i === n - 1 && (cls === 'team' ? r.teamPoint : r.modPoint), 'new')}` })));
+      const stamp = (g, isn) => (g === null || g === undefined ? null : h('div', { class: `fb-stamp ${g ? 'ok' : 'bad'}${an(isn, 'enter')}` }, g ? '✓' : '✗'));
+      const waitDots = () => h('span', { class: 'fb-dots' }, h('i'), h('i'), h('i'));
+      const inPlay = !!(r && r.challenged && !r.resolved);
+      const lostCount = f.coinsTotal - f.coins;
+      const avail = f.coins - (inPlay ? 1 : 0);
+      const teamBoard = !r ? h('div', { class: 'fx-board-body idle' }, h('span', { class: 'fx-big' }, '?'))
+        : r.teamAnswer ? h('div', { class: 'fx-board-body' }, answerContent(r.teamAnswer, 'fx-ink'))
+        : h('div', { class: 'fx-board-body' }, r.teamAnswered ? h('span', { class: 'fx-locked' }, '🔒 abgegeben') : waitDots());
+      const flipped = !!(r && r.challenged && r.modAnswer);
+      const modBoard = h('div', { class: `fx-flip${flipped ? ' flipped' : ''}${an(isNew.challenge, 'go')}` },
+        h('div', { class: 'fx-face back' }, !r ? h('span', { class: 'fx-big' }, '?') : r.modAnswered ? [h('span', { class: 'fx-big' }, '?'), h('small', {}, 'verdeckt')] : waitDots()),
+        h('div', { class: 'fx-face front' }, flipped ? answerContent(r.modAnswer, 'fx-ink') : null));
+      // Münzen des Teams: verfügbar, gerade im Einsatz (Platzhalter), verloren (leerer Platz)
+      const coinRow = h('div', { class: 'fx-coins' }, f.coinsTotal
+        ? Array.from({ length: f.coinsTotal }, (_, i) => i < avail ? coinImg('fx-coin') : i < avail + (inPlay ? 1 : 0) ? coinImg('fx-coin used') : h('span', { class: 'fx-coin-slot' }))
+        : h('span', { class: 'fx-nocoin' }, 'keine Münze'));
+      const hostAvatar = s.show.hostAvatar || 'assets/img/avatar-host.webp';
+      const side = (who, name, color, board, score, grade, isn, podium) => h('div', { class: `fx-side ${who}${an(isNew.start, 'enter')}`, '--side': color },
+        podium,
+        who === 'team' ? coinRow : null,
+        h('div', { class: `fx-board${an(who === 'team' ? isNew.teamAnswered : isNew.modAnswered, 'pop')}` }, board, stamp(grade, isn)),
+        h('div', { class: 'fx-name' }, name),
+        tris(Math.min(score, f.target), who));
+      const question = !r
+        ? h('div', { class: 'fx-q' }, h('span', {}, `${f.team.name} gegen ${f.host || 'die Moderation'}`), h('b', {}, `Wer zuerst ${f.target} Punkte hat, gewinnt`))
+        : h('div', { class: `fx-q${an(isNew.question, 'enter')}` }, h('span', {}, r.question),
+          r.resolved ? h('b', { class: an(isNew.resolved, 'enter').trim() }, r.solution || '–') : null,
+          r.resolved && r.challenged ? h('em', { class: r.coinLost ? 'bad' : 'ok' }, r.coinLost ? 'Münze verloren' : 'Münze zurück · kein Punkt für die Moderation') : null);
+      // Münzfeld auf der Pultfront: verlorene Münzen bleiben liegen, die eingesetzte glänzt.
+      const deskCoins = [];
+      for (let i = 0; i < lostCount; i++) deskCoins.push(coinImg(`fx-desk-coin${an(isNew.resolved && r.coinLost && i === lostCount - 1, 'target')}`));
+      if (inPlay) deskCoins.push(coinImg(`fx-desk-coin inplay${an(isNew.challenge, 'target')}`));
+      const { W: PW, H: PH, pc } = PULT;
+      const pult = h('div', { class: 'fx-pultwrap' }, h('div', { class: 'scene fx-pult' },
+        ...pultLayers(s.show, 'cohost'),
+        h('div', { class: 'fx-field', style: { left: pc(392, PW), top: pc(318, PH), width: pc(150, PW), height: pc(82, PH) } },
+          h('span', { class: 'fx-glitch' }, 'FINALE'), h('div', { class: 'fx-field-coins' }, deskCoins))));
+      const out = [h('div', { class: 'fb-stage fx' },
+        h('div', { class: 'fx-top' }, f.sudden ? h('div', { class: `fb-sudden${an(isNew.sudden, 'enter')}` }, 'SUDDEN DEATH') : null),
+        h('div', { class: 'fx-bottom' },
+          side('team', f.team.name, f.team.color, teamBoard, f.score.team, r ? r.teamGrade : null, isNew.teamGrade,
+            singlePodium({ avatar: f.team.avatar, color: f.team.color, label: `Pult ${f.team.name}` })),
+          h('div', { class: 'fx-mid' }, pult, question),
+          side('mod', f.host || 'Moderation', '#7fc8bd', modBoard, f.score.mod, r ? r.modGrade : null, isNew.modGrade,
+            singlePodium({ mirror: true, avatar: hostAvatar, color: '#7fc8bd', label: `Pult ${f.host || 'Moderation'}` }))))];
+      // Münzflug: Einsatz → vom Team auf das Pult; zurück → vom Pult zum Team.
+      if (isNew.challenge || (isNew.resolved && r.challenged && !r.coinLost)) {
+        setTimeout(() => {
+          const team = document.querySelector('.fx-coins .fx-coin.used') || [...document.querySelectorAll('.fx-coins .fx-coin')].pop();
+          const desk = document.querySelector('.fx-desk-coin.target') || document.querySelector('.fx-field-coins');
+          if (isNew.challenge) flyCoin(team, desk);
+          else {
+            const back = [...document.querySelectorAll('.fx-coins .fx-coin')].pop();
+            flyCoin(document.querySelector('.fx-field-coins'), back);
+          }
+        }, 60);
       }
-      return [h('div', { class: 'fb-stage' }, top, h('div', { class: 'fb-main' }, teamPanel, center, modPanel))];
+      return out;
+    }
+
+    // Münze von einem Element zum anderen fliegen lassen (drehend, im Bogen).
+    function flyCoin(from, to) {
+      if (!from || !to || document.documentElement.classList.contains('reduced-motion')) return;
+      const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+      const size = Math.max(a.width, 40);
+      const img = coinImg('fx-flying');
+      Object.assign(img.style, { position: 'fixed', left: `${a.left + a.width / 2 - size / 2}px`, top: `${a.top + a.height / 2 - size / 2}px`, width: `${size}px`, zIndex: 50 });
+      document.body.append(img);
+      to.style.opacity = '0';
+      const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+      const end = Math.max(0.4, Math.min(2, (b.width || size) / size));
+      const speed = Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1;
+      img.animate([
+        { transform: 'translate(0, 0) scale(1) rotateY(0deg)' },
+        { offset: 0.55, transform: `translate(${dx * 0.55}px, ${dy * 0.55 - window.innerHeight * 0.25}px) scale(2.4) rotateY(900deg)` },
+        { transform: `translate(${dx}px, ${dy}px) scale(${end}) rotateY(1440deg)` },
+      ], { duration: 1500 * speed, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' }).onfinish = () => {
+        img.remove();
+        to.style.opacity = '';
+        to.classList.add('landed');
+      };
     }
 
     // Pause: Moderationspult, dahinter die Live-Band im Takt der Pausenmusik.
@@ -495,7 +540,7 @@
       const left = Math.max(1, 3 - (s.coins || []).filter((c) => c.position < s.coin.position).length);
       const pct = (v, total) => `${(v / total) * 100}%`;
       const pult = h('div', { class: 'scene scene-pult full' },
-        h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
+        ...pultLayers(s.show, 'both'),
         h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
           stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
         // Noch nicht vergebene Münzen stehen auf dem Pult; die rechte davon hebt ab

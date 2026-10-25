@@ -145,7 +145,7 @@ function inlineImages(text) {
 }
 
 const pages = {};
-for (const f of ['start.html', 'team.html', 'moderator.html', 'beamer.html']) pages[f] = buildPage(f);
+for (const f of ['start.html', 'team.html', 'moderator.html', 'beamer.html', 'host.html']) pages[f] = buildPage(f);
 
 // --- Hauptseite ---------------------------------------------------------------
 

@@ -15,7 +15,7 @@ fs.mkdirSync(path.join(OUT, 'demo'), { recursive: true });
 // Die Startseite heißt im Prototyp start.html, weil index.html dort die
 // Übersichtsseite mit allen Bildschirmen ist.
 const rename = (text) => text.replace(/(['"`])index\.html/g, '$1start.html');
-for (const f of ['index.html', 'team.html', 'moderator.html', 'beamer.html']) {
+for (const f of ['index.html', 'team.html', 'moderator.html', 'beamer.html', 'host.html']) {
   const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
   fs.writeFileSync(path.join(OUT, f === 'index.html' ? 'start.html' : f), rename(text));
 }

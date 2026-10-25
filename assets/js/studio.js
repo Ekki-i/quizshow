@@ -125,3 +125,62 @@ export function podiumRow(teams, opts = {}) {
       rest.map((t) => h('span', { class: 'chip', style: { borderBottom: `6px solid ${t.color}` } }, opts.points ? `${t.name} · ${t.points ?? 0}` : t.name))) : '',
     opts.banner || '');
 }
+
+// ---------- Moderationspult mit austauschbaren 3D-Avataren ----------
+// Grundlage ist das Pultbild ohne Personen (938 × 530). Hinter dem Pult stehen
+// Moderation und Co-Moderation; ohne eigenen Avatar die Standardfiguren.
+const PW = 938, PH = 530, DESK_Y = 299;
+const pc = (v, t) => `${(v / t) * 100}%`;
+const DEFAULT_AV = {
+  host: { src: 'assets/img/avatar-host.webp', box: [334, 215, 430, DESK_Y] },
+  cohost: { src: 'assets/img/avatar-cohost.webp', box: [461, 210, 525, DESK_Y] },
+};
+
+function avatarSlot(src, cx, own, def, dx = 0) {
+  // Eigener Avatar: 110 px breit, oben ausgerichtet, an der Pultkante abgeschnitten.
+  const [x0, y0, x1, y1] = own ? [cx - 55, 192, cx + 55, DESK_Y] : [def.box[0] + dx, def.box[1], def.box[2] + dx, def.box[3]];
+  return h('div', { class: 'pult-av', style: { left: pc(x0, PW), top: pc(y0, PH), width: pc(x1 - x0, PW), height: pc(y1 - y0, PH) } },
+    h('img', { src, alt: '' }));
+}
+
+// who: 'both' (Moderation + Co-Moderation) oder 'cohost' (nur Co-Moderation in der Mitte, Finale)
+export function pultLayers(show, who = 'both') {
+  const out = [h('img', { class: 'pult-bg', src: 'assets/img/studio-pult-empty.webp', alt: '' })];
+  if (who === 'both') {
+    out.push(avatarSlot(show.hostAvatar || DEFAULT_AV.host.src, 382, !!show.hostAvatar, DEFAULT_AV.host));
+    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 493, !!show.coHostAvatar, DEFAULT_AV.cohost));
+  } else {
+    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 470, !!show.coHostAvatar, DEFAULT_AV.cohost, -23));
+  }
+  return out;
+}
+export const PULT = { W: PW, H: PH, DESK_Y, pc };
+
+// ---------- Einzelnes Finalpult: Stehpult ohne Bogen (wie im TV-Finale) ----------
+// Avatar steht hinter dem Pult; mirror = true spiegelt das Pult für die rechte Seite.
+export function singlePodium({ avatar, color, label, mirror = false }) {
+  const svg = el('svg', { class: 'single-podium', viewBox: '0 0 300 360', role: 'img', 'aria-label': label || '' });
+  const id = `sp${++uid}`;
+  const defs = el('defs');
+  const pat = el('pattern', { id: `${id}-rib`, width: 9, height: 10, patternUnits: 'userSpaceOnUse' });
+  pat.append(el('rect', { width: 9, height: 10, fill: '#c9c4cc' }), el('rect', { width: 3, height: 10, fill: '#8f8a95' }));
+  const gr = el('linearGradient', { id: `${id}-g`, x1: 0, y1: 0, x2: 0, y2: 1 });
+  gr.append(el('stop', { offset: 0, 'stop-color': '#000', 'stop-opacity': 0 }), el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': 0.35 }));
+  defs.append(pat, gr);
+  svg.append(defs);
+  if (avatar) svg.append(el('image', { href: avatar, x: 62, y: 14, width: 176, height: 190, preserveAspectRatio: 'xMidYMin meet' }));
+  const g = el('g', mirror ? { transform: 'translate(300 0) scale(-1 1)' } : {});
+  g.append(
+    el('ellipse', { cx: 150, cy: 352, rx: 140, ry: 9, fill: '#000', opacity: 0.45 }),
+    el('polygon', { points: '46,186 150,186 150,350 26,350', fill: `url(#${id}-rib)` }),
+    el('polygon', { points: '150,186 246,186 274,350 150,350', fill: '#e8a7a9' }),
+    el('polygon', { points: '150,186 196,186 168,350 128,350', fill: '#3d6e72' }),
+    el('polygon', { points: '196,186 246,186 222,300 186,300', fill: '#5f9095', opacity: 0.9 }),
+    el('polygon', { points: '26,350 274,350 274,356 26,356', fill: '#2c3438' }),
+    el('polygon', { points: '30,168 262,168 272,188 22,188', fill: '#56656c' }),
+    el('polygon', { points: '30,168 262,168 266,174 26,174', fill: '#7d8e95' }),
+    el('rect', { x: 26, y: 186, width: 248, height: 170, fill: `url(#${id}-g)` }),
+    el('rect', { x: 26, y: 186, width: 6, height: 164, fill: color || '#fff', opacity: 0.85 }));
+  svg.append(g);
+  return h('div', { class: 'single-podium-wrap', '--team': color || '#fff' }, svg);
+}

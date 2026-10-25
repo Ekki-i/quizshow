@@ -1,15 +1,12 @@
 // Live-Regie und Editor für das Finale gegen die Moderation.
 
-import { h, coinImg, toast, ask } from './client.js';
-import { inkPad, answerContent } from './ink.js';
+import { h, coinImg } from './client.js';
+import { answerContent } from './ink.js';
 
 const badge = (kind, text) => h('span', { class: `badge ${kind}` }, text);
 const row = (...c) => h('div', { class: 'row', style: { marginTop: '12px' } }, ...c);
 const btn = (cls, label, onclick, disabled = false) => h('button', { class: `btn ${cls}`, onclick, disabled }, label);
 
-// Das Schreibfeld der Moderation bleibt über Neuzeichnungen hinweg dasselbe Element,
-// damit ein Strich beim Eintreffen neuer Daten nicht abbricht.
-let pad = { key: null, el: null };
 let showSolution = false;
 
 export function buildFinaleLive(ui) {
@@ -54,19 +51,12 @@ export function buildFinaleLive(ui) {
     out.push(h('details', { class: 'fin-solution', open: showSolution, ontoggle: (ev) => (showSolution = ev.target.open) },
       h('summary', {}, 'Lösung (nur für die Regie)'), h('b', {}, r.answer || '–')));
 
-    // Antwort der Moderation: verdeckt aufschreiben
-    if (!r.mod) {
-      const key = `finale-mod-${st.qIndex}`;
-      if (pad.key !== key) {
-        pad = { key, el: inkPad({ draftKey: key, label: 'Antwort der Moderation (verdeckt)', button: 'Verdeckt abgeben', ask, toast, onSubmit: (ink) => act('finale.modAnswer', { ink }) }) };
-      }
-      out.push(pad.el);
-    } else {
-      out.push(h('div', { class: 'fin-answer' }, h('span', { class: 'muted' }, 'Moderation: '), r.challenged ? answerContent(r.mod) : badge('', '🤫 verdeckt abgegeben'),
-        r.challenged ? (r.modGrade === null
-          ? h('span', { class: 'row' }, badge('warn', 'Münze eingesetzt – aufdecken!'), btn('small ok', '✓ Richtig (Münze weg)', () => act('finale.gradeMod', { correct: true })), btn('small bad', '✗ Falsch (kein Punkt)', () => act('finale.gradeMod', { correct: false })))
-          : badge(r.modGrade ? 'ok' : 'bad', r.modGrade ? '✓ richtig' : '✗ falsch')) : null));
-    }
+    // Antwort der Moderation: kommt verdeckt vom iPad der Moderation
+    out.push(h('div', { class: 'fin-answer' }, h('span', { class: 'muted' }, 'Moderation: '),
+      !r.mod ? badge('', '… schreibt auf dem iPad Moderation') : r.challenged ? answerContent(r.mod) : badge('', '🤫 verdeckt abgegeben'),
+      r.mod && r.challenged ? (r.modGrade === null
+        ? h('span', { class: 'row' }, badge('warn', 'Münze eingesetzt – aufdecken!'), btn('small ok', '✓ Richtig (Münze weg)', () => act('finale.gradeMod', { correct: true })), btn('small bad', '✗ Falsch (kein Punkt)', () => act('finale.gradeMod', { correct: false })))
+        : badge(r.modGrade ? 'ok' : 'bad', r.modGrade ? '✓ richtig' : '✗ falsch')) : null));
 
     // Antwort des Teams
     out.push(h('div', { class: 'fin-answer' }, h('span', { class: 'muted' }, `${st.team.name}: `),
@@ -100,7 +90,7 @@ export function buildFinaleEditor(ui) {
     h('input', { value: q.answer, maxlength: '160', placeholder: 'Lösung', 'aria-label': `Lösung ${i + 1}`, style: { maxWidth: '220px' }, oninput: (ev) => { q.answer = ev.target.value; save(); } }),
     h('button', { class: 'btn small bad', 'aria-label': 'Frage entfernen', onclick: () => { draft.questions.splice(i, 1); save(); ui.rerender(); } }, '✕'))));
   return card('★ Finale gegen die Moderation',
-    h('p', { class: 'muted' }, 'Das Team mit den meisten Punkten spielt gegen die Moderation. Beide schreiben ihre Antwort gleichzeitig auf. Die Moderation bekommt jede Frage einen Punkt, ohne ihre Antwort zu zeigen – außer das Team setzt eine Münze ein. Wer zuerst das Ziel erreicht, gewinnt; erreichen es beide gleichzeitig, folgt Sudden Death. Der Sieger bekommt ein Ticket für die große Finalshow.'),
+    h('p', { class: 'muted' }, 'Das Team mit den meisten Punkten spielt gegen die Moderation. Beide schreiben ihre Antwort gleichzeitig auf. Die Moderation bekommt jede Frage einen Punkt, ohne ihre Antwort zu zeigen – außer das Team setzt eine Münze ein. Wer zuerst das Ziel erreicht, gewinnt; erreichen es beide gleichzeitig, folgt Sudden Death. Verliert das Team seine letzte Münze, hat es sofort verloren. Der Sieger bekommt ein Ticket für die große Finalshow. Die Moderation schreibt ihre Antwort auf dem „iPad Moderation“ (host.html), das erst im Finale aktiv wird.'),
     h('div', { class: 'row' }, h('label', { for: 'fin-target' }, 'Ziel (Punkte)'),
       h('input', { id: 'fin-target', type: 'number', min: '1', max: '20', value: draft.target, style: { width: '90px' }, oninput: (ev) => { draft.target = Number(ev.target.value); save(); } })),
     list,
