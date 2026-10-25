@@ -35,6 +35,38 @@ function load() {
   return seed();
 }
 
+// Medien (Intro-Videos) bleiben im Browser: im Speicher und, wenn möglich, in
+// IndexedDB, damit sie ein Neuladen überstehen.
+const MEDIA_DB = 'quiz.prototype.media';
+function mediaDb() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(MEDIA_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('media');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+async function mediaTx(mode, fn) {
+  const db = await mediaDb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction('media', mode);
+      const req = fn(tx.objectStore('media'));
+      tx.oncomplete = () => resolve(req ? req.result : true);
+      tx.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+const mediaMem = new Map();
+const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-m4v'];
+
 export function createLocalServer() {
   let data = load();
   const clients = new Set();
@@ -177,6 +209,22 @@ export function createLocalServer() {
         return body.password === PASSWORD ? [200, { token: DEMO_TOKEN }] : [401, { error: 'Passwort ist falsch. Im Prototyp lautet es „demo“.' }];
       }
       return [200, { ok: true }];
+    },
+
+    async uploadMedia(blob) {
+      if (!blob || !VIDEO_TYPES.includes(blob.type)) throw new Error('Bitte ein Video als MP4, WebM oder MOV wählen.');
+      if (blob.size > 1024 * 1024 * 1024) throw new Error('Das Video ist zu groß.');
+      const id = `media_${Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
+      mediaMem.set(id, blob);
+      await mediaTx('readwrite', (st) => st.put(blob, id));
+      return { id, type: blob.type, size: blob.size };
+    },
+
+    async getMedia(id) {
+      if (mediaMem.has(id)) return mediaMem.get(id);
+      const blob = await mediaTx('readonly', (st) => st.get(id));
+      if (blob) mediaMem.set(id, blob);
+      return blob || null;
     },
 
     reset() {

@@ -12,6 +12,10 @@ const ROOT = path.join(__dirname, '..');
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = process.env.QUIZ_DATA_FILE || path.join(ROOT, 'data', 'db.json');
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+// Medien (Intro-Videos) liegen als Dateien neben der Datenbank, nicht im JSON.
+const MEDIA_DIR = process.env.QUIZ_MEDIA_DIR || path.join(path.dirname(DATA_FILE), 'media');
+const MEDIA_MAX_BYTES = Number(process.env.QUIZ_MEDIA_MAX_MB || 1024) * 1024 * 1024;
+const VIDEO_EXT = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/ogg': '.ogv', 'video/x-m4v': '.m4v' };
 
 // ---------- Speicher und Moderator-Zugang ----------
 
@@ -96,6 +100,83 @@ function readBody(req) {
   });
 }
 
+function mediaPath(id) {
+  if (typeof id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(id)) return null;
+  if (!fs.existsSync(MEDIA_DIR)) return null;
+  const hit = fs.readdirSync(MEDIA_DIR).find((f) => f.startsWith(`${id}.`));
+  return hit ? path.join(MEDIA_DIR, hit) : null;
+}
+
+// Video hochladen: roher Dateiinhalt im Body, nur mit gültiger Moderator-Sitzung.
+function uploadMedia(req, res) {
+  if (!validSession(req.headers['x-token'])) return sendJson(res, 401, { error: 'Bitte als Moderation anmelden.' });
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  const ext = VIDEO_EXT[type];
+  if (!ext) return sendJson(res, 415, { error: 'Bitte ein Video als MP4, WebM oder MOV hochladen.' });
+  const length = Number(req.headers['content-length'] || 0);
+  if (length > MEDIA_MAX_BYTES) return sendJson(res, 413, { error: 'Das Video ist zu groß.' });
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  const id = `media_${crypto.randomBytes(12).toString('hex')}`;
+  const file = path.join(MEDIA_DIR, `${id}${ext}`);
+  const tmp = `${file}.part`;
+  const out = fs.createWriteStream(tmp);
+  let size = 0;
+  let failed = false;
+  const abort = (status, error) => {
+    if (failed) return;
+    failed = true;
+    out.destroy();
+    fs.rm(tmp, { force: true }, () => {});
+    sendJson(res, status, { error });
+  };
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > MEDIA_MAX_BYTES) { abort(413, 'Das Video ist zu groß.'); req.destroy(); }
+  });
+  req.on('aborted', () => abort(400, 'Upload abgebrochen.'));
+  req.pipe(out);
+  out.on('error', () => abort(500, 'Video konnte nicht gespeichert werden.'));
+  out.on('finish', () => {
+    if (failed) return;
+    if (!size) return abort(400, 'Die Datei ist leer.');
+    fs.renameSync(tmp, file);
+    sendJson(res, 200, { id, type, size });
+  });
+}
+
+// Video ausliefern, mit Range-Anfragen (Spulen, Safari/iPad).
+function serveMedia(req, res, id) {
+  const file = mediaPath(id);
+  if (!file) return false;
+  const type = Object.entries(VIDEO_EXT).find(([, e]) => file.endsWith(e))?.[0] || 'application/octet-stream';
+  const { size } = fs.statSync(file);
+  const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  if (range && (range[1] || range[2])) {
+    let start = range[1] ? Number(range[1]) : size - Number(range[2]);
+    let end = range[1] && range[2] ? Number(range[2]) : size - 1;
+    start = Math.max(0, start);
+    end = Math.min(size - 1, end);
+    if (start > end) {
+      res.writeHead(416, { 'Content-Range': `bytes */${size}` });
+      res.end();
+      return true;
+    }
+    res.writeHead(206, { 'Content-Type': type, 'Content-Length': end - start + 1, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600' });
+    fs.createReadStream(file, { start, end }).pipe(res);
+    return true;
+  }
+  res.writeHead(200, { 'Content-Type': type, 'Content-Length': size, 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600' });
+  fs.createReadStream(file).pipe(res);
+  return true;
+}
+
+// Nicht mehr verwendete Videos löschen.
+function releaseMedia(id) {
+  if (!id || game.referencedMedia(store.data).has(id)) return;
+  const file = mediaPath(id);
+  if (file) fs.rm(file, { force: true }, () => {});
+}
+
 function serveStatic(req, res, urlPath) {
   let rel = STATIC[urlPath];
   if (!rel && urlPath.startsWith('/assets/')) rel = urlPath.slice(1);
@@ -139,6 +220,9 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return sendJson(res, 200, { ok: true });
     }
+
+    if (req.method === 'POST' && url.pathname === '/api/media') return uploadMedia(req, res);
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/media/') && serveMedia(req, res, url.pathname.slice(7))) return;
 
     if (req.method === 'GET' && serveStatic(req, res, url.pathname)) return;
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -238,12 +322,15 @@ function handleAction(c, msg) {
   };
   // Auf einer Kopie arbeiten: schlägt eine Aktion fehl, bleibt der Zustand unverändert.
   const draft = structuredClone(store.data);
+  const mediaBefore = game.referencedMedia(store.data);
   try {
     const result = game.applyAction(draft, ctx, msg.name, msg.payload, typeof msg.id === 'string' ? msg.id : null);
     store.data = draft;
     store.save();
     send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate, notice: result.notice || null });
     if (result.kick) kickTeam(result.kick);
+    // Videos, auf die keine Show mehr verweist (ersetzt, entfernt, Show gelöscht), aufräumen.
+    for (const id of mediaBefore) releaseMedia(id);
     broadcast();
     scheduleWake();
   } catch (err) {

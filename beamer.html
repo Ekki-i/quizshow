@@ -12,7 +12,7 @@
   <button id="sound-on" class="btn small ghost" style="position:fixed;left:12px;bottom:12px">🔊 Ton aktivieren</button>
 
   <script type="module">
-    import { h, connect } from './assets/js/client.js';
+    import { h, connect, mediaUrl } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
     import { podiumRow } from './assets/js/studio.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
@@ -87,7 +87,7 @@
       lastEffect = s.effect.seq;
 
       const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games]);
-      const replayTitle = fresh && s.effect.kind === 'title';
+      const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
       clearTimeout(titleTimer);
@@ -95,7 +95,7 @@
       lastState = s;
       // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
       if (s.view !== 'pause') stopPause();
-      const views = { start, intro, pyramid, title, game, ranking, coin, pause, blank: () => [] };
+      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, blank: () => [] };
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
 
@@ -277,6 +277,25 @@
         h('ol', { class: 'rank' }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
           h('span', {}, `${i + 1}.`), h('span', {}, r.name), h('span', { class: 'pts' }, r.points)))),
       ];
+    }
+
+    // Intro-Video der Show, bildschirmfüllend. Ohne Video (oder am Ende) das Logo.
+    // Ton nur auf dem echten Beamer nach „Ton aktivieren“, die Vorschau bleibt stumm.
+    function video(s) {
+      const box = h('div', { class: 'video-stage' });
+      const logo = () => box.replaceChildren(h('div', { class: 'video-end' }, ...start(s)));
+      if (!s.introVideo) { logo(); return [box]; }
+      const v = h('video', { class: 'intro-video', playsinline: true, preload: 'auto' });
+      v.muted = embedded || !audio;
+      v.onended = logo;
+      box.append(v);
+      mediaUrl(s.introVideo.id).then((url) => {
+        if (!url) return logo();
+        v.src = url;
+        v.currentTime = 0;
+        v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+      });
+      return [box];
     }
 
     // Pause: Moderationspult, dahinter die Live-Band im Takt der Pausenmusik.

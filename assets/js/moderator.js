@@ -1,4 +1,4 @@
-import { h, connect, run, store, toast, ask, localServer } from './client.js';
+import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl } from './client.js';
 import { buildPlay } from './mod-play.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
@@ -125,8 +125,8 @@ function buildFlow() {
 
 // ---------- Showablauf wie eine Präsentation ----------
 
-const RUN_ICON = { start: '★', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', end: '🏁' };
-const RUN_KIND_LABEL = { start: 'Startbild', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', end: 'Abschluss' };
+const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', end: '🏁' };
+const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', end: 'Abschluss' };
 
 function runNext() { return act('run.next'); }
 function runPrev() { return act('run.prev'); }
@@ -143,6 +143,7 @@ function buildRun() {
       h('div', { class: 'run-title' }, started ? [h('span', { class: 'run-ico' }, RUN_ICON[now.kind]), now.text] : 'Show noch nicht gestartet'),
       h('div', { class: 'run-next muted' }, next ? ['Als Nächstes: ', h('b', {}, `${RUN_ICON[next.kind]} ${next.text}`)] : 'Letzter Schritt erreicht')),
     h('div', { class: 'run-buttons' },
+      now && now.kind === 'video' && S.project.introVideo ? h('button', { class: 'btn ghost', onclick: () => act('run.goto', { index: cur }) }, '⟲ Video von vorn') : null,
       h('button', { class: 'btn ghost', disabled: cur <= 0, onclick: runPrev, title: 'Zurück (Pfeil links)' }, '◀ Zurück'),
       h('button', { class: 'btn pink run-go', disabled: cur >= steps.length - 1, onclick: runNext, title: 'Weiter (Pfeil rechts, Leertaste)' }, started ? 'Weiter ▶' : 'Show starten ▶')));
   const strip = h('ol', { class: 'run-strip', 'aria-label': 'Alle Schritte' }, steps.map((st, i) => h('li', {},
@@ -168,6 +169,52 @@ document.addEventListener('keydown', (ev) => {
   if (['ArrowRight', 'PageDown', ' '].includes(ev.key)) { ev.preventDefault(); runNext(); }
   else if (['ArrowLeft', 'PageUp'].includes(ev.key)) { ev.preventDefault(); runPrev(); }
 });
+
+// Intro-Video je Show: läuft im Showablauf direkt nach dem Startbild.
+let introUpload = null; // { name, progress } während des Hochladens
+function buildIntroVideo() {
+  const v = S.project.introVideo;
+  const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+  const input = h('input', {
+    type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/x-m4v', class: 'visually-hidden', 'aria-label': 'Intro-Video wählen',
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      introUpload = { name: file.name, progress: 0 };
+      renderAll(true);
+      try {
+        const m = await uploadMedia(file, token, (p) => {
+          introUpload.progress = p;
+          const bar = document.getElementById('intro-progress');
+          if (bar) bar.value = p;
+        });
+        await act('intro.set', { media: { id: m.id, type: m.type, size: m.size, name: file.name } });
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        introUpload = null;
+        renderAll(true);
+      }
+    },
+  });
+  const preview = h('video', { class: 'intro-preview', controls: true, preload: 'metadata', playsinline: true });
+  if (v) mediaUrl(v.id).then((url) => {
+    if (url) preview.src = url;
+    else preview.replaceWith(h('p', { class: 'notice warn' }, 'Das Video ist auf diesem Gerät nicht mehr vorhanden – bitte neu hochladen.'));
+  });
+  return card('Intro-Video',
+    h('p', { class: 'muted' }, 'Läuft im Showablauf direkt nach dem Startbild. Jede Show hat ihr eigenes Video – einfach austauschen.'),
+    introUpload
+      ? h('div', {}, h('p', {}, `„${introUpload.name}“ wird hochgeladen …`), h('progress', { id: 'intro-progress', max: '1', value: String(introUpload.progress), style: { width: '100%' } }))
+      : v
+        ? h('div', { class: 'intro-box' }, preview, h('p', {}, h('b', {}, v.name), v.size ? h('span', { class: 'muted' }, ` · ${fmtSize(v.size)}`) : null))
+        : h('p', { class: 'muted' }, 'Noch kein Video hinterlegt. Ohne Video zeigt der Beamer an dieser Stelle das Show-Logo.'),
+    introUpload ? null : h('div', { class: 'row' },
+      h('label', { class: 'btn' }, input, v ? 'Video austauschen' : '+ Video hochladen'),
+      v ? h('button', { class: 'btn ghost', onclick: () => confirmAct('Intro-Video aus dieser Show entfernen?', 'intro.set', { media: null }) }, 'Entfernen') : null),
+    h('p', { class: 'muted', style: { fontSize: '0.85rem' } }, 'Formate: MP4 (empfohlen), WebM oder MOV. Ton läuft auf dem Beamer, sobald dort „Ton aktivieren“ geklickt wurde.'));
+}
 
 // Bearbeiten im Show-Editor: Schritte verschieben, löschen, Pausen einfügen.
 function buildRundownEditor() {
@@ -219,22 +266,12 @@ function buildGameControl() {
   return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor }, g, st, pos);
 }
 
+// Beamer: Umschalten übernimmt der Showablauf – hier nur, was gerade läuft.
+const BEAMER_VIEW_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', pause: 'Pause', title: 'Spieltitel', game: 'Spiel', ranking: 'Rangliste', coin: 'Münzvergabe', blank: 'Schwarz' };
 function buildBeamerControls() {
-  const views = [
-    ['start', 'Startbild'], ['intro', 'Intro & Teams'], ['pyramid', 'Übersicht Kategorien'], ['pause', 'Pause'], ['title', 'Spieltitel'],
-    ['game', 'Spiel'], ['ranking', 'Rangliste enthüllen'], ['coin', 'Münze zeigen'], ['blank', 'Schwarz'],
-  ];
   const current = S.live.beamer.view;
-  return [
-    h('p', { class: 'muted' }, `Zeigt jetzt: `, h('b', {}, views.find((v) => v[0] === current)?.[1] || current),
-      ` · ${S.connections.beamers || 0} Beamer verbunden`),
-    h('div', { class: 'row' }, views.map(([v, label]) => h('button', {
-      class: `btn small ${v === current ? 'pink' : 'ghost'}`,
-      onclick: () => v === 'ranking'
-        ? confirmAct('Kumulierte Rangliste jetzt auf dem Beamer enthüllen?', 'beamer.show', { view: v })
-        : act('beamer.show', { view: v }),
-    }, label))),
-  ];
+  return [h('p', { class: 'muted' }, 'Zeigt jetzt: ', h('b', {}, BEAMER_VIEW_LABEL[current] || current),
+    ` · ${S.connections.beamers || 0} Beamer verbunden`)];
 }
 
 function buildTeamsLive() {
@@ -260,7 +297,7 @@ function buildCoins() {
           ? w.teamIds.map((id) => h('button', { class: 'btn small', onclick: () => confirmAct(`${teamName(id)} hat die Schätzfrage gewonnen und bekommt die Münze?`, 'coin.awardTie', { teamId: id }) }, `${teamName(id)} gewinnt Schätzfrage`))
           : h('button', { class: 'btn small', onclick: () => confirmAct(`Münzgewinner nach Position ${pos} aus dem kumulierten Punktestand ermitteln?`, 'coin.determine', { position: pos }) }, 'Gewinner ermitteln'));
     })),
-    h('p', { class: 'muted' }, 'Danach „Münze zeigen“ beim Beamer wählen.'));
+    h('p', { class: 'muted' }, 'Die Münze erscheint auf dem Beamer beim Schritt „Münzvergabe“ im Showablauf.'));
 }
 
 // ---------- Teams ----------
@@ -395,6 +432,7 @@ function buildEditor() {
     h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '12px' } }, h('h2', { style: { margin: 0 } }, 'Show-Editor'), saveIndicator()),
     buildShows(),
     buildBoard(),
+    buildIntroVideo(),
     buildRundownEditor(),
     sel ? buildGameEditor('game', sel) : null,
     h('div', { class: 'grid two', style: { marginTop: '16px' } },

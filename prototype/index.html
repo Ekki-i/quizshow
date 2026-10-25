@@ -150,6 +150,14 @@
     } else if (msg.op === 'api') {
       const [status, data] = await server.api(msg.name, msg.body);
       reply({ op: 'api', callId: msg.callId, status, data });
+    } else if (msg.op === 'media-put') {
+      try {
+        reply({ op: 'media', callId: msg.callId, data: await server.uploadMedia(msg.blob) });
+      } catch (err) {
+        reply({ op: 'media', callId: msg.callId, error: err.message });
+      }
+    } else if (msg.op === 'media-get') {
+      reply({ op: 'media', callId: msg.callId, data: await server.getMedia(msg.id) });
     }
   });
   // Jeden Bildschirm in seiner echten Größe rendern und auf die Spaltenbreite skalieren.

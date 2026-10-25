@@ -22,7 +22,7 @@ const PLAY = {
 
 const STATE_VERSION = 2;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const BEAMER_VIEWS = ['start', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'blank'];
+const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'blank'];
 const MAX_PROCESSED = 5000;
 
 // 10 Zeichen aus 32 Symbolen ≈ 50 Bit: nicht erratbar, aber noch abtippbar.
@@ -247,12 +247,12 @@ function requireEditable(db) {
 // Jeder Schritt ist eine „Folie“: Beamer-Ansicht plus nötige Spielaktion.
 // Ohne eigenen Ablauf gilt der Standardablauf aus den Spielen der Show.
 
-const RUN_KINDS = ['start', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'end'];
+const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'end'];
 const RUN_NEEDS_POS = ['title', 'game', 'coin'];
 const RUN_MAX = 120;
 
 function defaultRundown(project) {
-  const steps = [{ kind: 'start' }, { kind: 'intro' }, { kind: 'pyramid' }];
+  const steps = [{ kind: 'start' }, { kind: 'video' }, { kind: 'intro' }, { kind: 'pyramid' }];
   project.games.forEach((g, i) => {
     const pos = i + 1;
     steps.push({ kind: 'title', pos }, { kind: 'game', pos });
@@ -272,6 +272,7 @@ function stepLabel(db, st) {
   const game = g ? `Spiel ${st.pos} · ${g.title}` : st.pos ? `Spiel ${st.pos} (fehlt)` : '';
   const base = {
     start: 'Startbild',
+    video: `Intro-Video${db.project.introVideo ? ` (${db.project.introVideo.name})` : ' – noch keins hinterlegt'}`,
     intro: 'Vorstellung der Teams',
     pyramid: st.pos ? `Übersicht Kategorien → ${game}` : 'Übersicht Kategorien',
     title: `${game} – Spieltitel`,
@@ -311,7 +312,7 @@ function runStep(db, ctx, index) {
   if (st.pos && !game) fail(`Auf Position ${st.pos} steht kein Spiel.`);
   db.live.run = index;
   if (game && db.live.activeGame !== game.id) moderatorActions['show.activate'](db, ctx, { gameId: game.id });
-  const view = { start: 'start', end: 'start', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin' }[st.kind];
+  const view = { start: 'start', end: 'start', video: 'video', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin' }[st.kind];
   if (st.kind === 'coin') {
     if (!db.live.coins.some((c) => c.position === st.pos)) moderatorActions['coin.determine'](db, ctx, { position: st.pos });
     const coin = db.live.coins.find((c) => c.position === st.pos);
@@ -350,6 +351,22 @@ const moderatorActions = {
       }
     }
     log(db, ctx, 'editor', 'Showdaten gespeichert');
+  },
+
+  // Intro-Video der Show (Datei liegt im Medienspeicher, hier nur der Verweis).
+  'intro.set'(db, ctx, p) {
+    const old = db.project.introVideo || null;
+    if (p.media === null) {
+      db.project.introVideo = null;
+      log(db, ctx, 'editor', 'Intro-Video entfernt');
+      return { releasedMedia: old ? old.id : null };
+    }
+    const m = p.media || {};
+    if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültiges Video.');
+    if (typeof m.type !== 'string' || !/^video\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine Videodatei wählen.');
+    db.project.introVideo = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro-Video'), 80) || 'Intro-Video', size: Number(m.size) || 0 };
+    log(db, ctx, 'editor', `Intro-Video „${db.project.introVideo.name}“ gesetzt`);
+    return { releasedMedia: old && old.id !== m.id ? old.id : null };
   },
 
   'team.add'(db, ctx, p) {
@@ -511,6 +528,7 @@ const moderatorActions = {
     }
     db.live.beamer = { view: p.view, data: {} };
     if (p.view === 'title') effect(db, 'title');
+    if (p.view === 'video') effect(db, 'video'); // Video startet (erneut) von vorn
     log(db, ctx, 'beamer', `Beamer zeigt „${p.view}“`);
   },
 
@@ -677,6 +695,13 @@ function applyAction(db, ctx, name, payload, actionId) {
   return result;
 }
 
+// Alle Medien, auf die irgendeine Show noch verweist (für das Aufräumen).
+function referencedMedia(db) {
+  const ids = new Set();
+  for (const pr of [db.project, ...db.shows.map((x) => x.project)]) if (pr.introVideo) ids.add(pr.introVideo.id);
+  return ids;
+}
+
 function findTeamByCode(db, code) {
   if (typeof code !== 'string') return null;
   const c = code.trim().toUpperCase();
@@ -748,6 +773,7 @@ function beamerView(db) {
     effect: db.live.effect,
     game: gameHeader(db),
   };
+  if (b.view === 'video') view.introVideo = pr.introVideo ? { id: pr.introVideo.id, type: pr.introVideo.type } : null;
   if (b.view === 'game') view.gameView = beamerGameView(db);
   if (b.view === 'ranking') view.ranking = b.data.ranking;
   if (b.view === 'coin') view.coin = b.data;
@@ -779,6 +805,7 @@ function moderatorView(db, connections) {
 
 module.exports = {
   QuizError,
+  referencedMedia,
   createState,
   migrate,
   applyAction,

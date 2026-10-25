@@ -49,7 +49,7 @@ function messageProxy() {
     }
     const child = children.get(msg.cid || msg.callId);
     if (child) {
-      if (msg.op === 'api' || msg.op === 'close') children.delete(msg.cid || msg.callId);
+      if (msg.op === 'api' || msg.op === 'media' || msg.op === 'close') children.delete(msg.cid || msg.callId);
       try {
         child.postMessage(msg, '*');
       } catch {
@@ -57,10 +57,10 @@ function messageProxy() {
       }
       return;
     }
-    if (msg.op === 'api') {
+    if (msg.op === 'api' || msg.op === 'media') {
       const done = calls.get(msg.callId);
       calls.delete(msg.callId);
-      return done?.([msg.status, msg.data]);
+      return done?.(msg.op === 'api' ? [msg.status, msg.data] : msg);
     }
     const c = conns.get(msg.cid);
     if (!c) return;
@@ -102,6 +102,21 @@ function messageProxy() {
         post({ op: 'api', callId, name, body });
       });
     },
+    // Videos als Blob über postMessage (strukturiert kopiert, kein Base64).
+    uploadMedia(blob) {
+      const callId = `m${++seq}`;
+      return new Promise((resolve, reject) => {
+        calls.set(callId, (m) => (m.error ? reject(new Error(m.error)) : resolve(m.data)));
+        post({ op: 'media-put', callId, blob });
+      });
+    },
+    getMedia(id) {
+      const callId = `m${++seq}`;
+      return new Promise((resolve) => {
+        calls.set(callId, (m) => resolve(m.data || null));
+        post({ op: 'media-get', callId, id });
+      });
+    },
   };
 }
 
@@ -119,6 +134,40 @@ if (localServer) {
     const [status, data] = await localServer.api(m[1], body);
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
   };
+}
+
+// ---------- Medien (Intro-Video) ----------
+
+// Video hochladen. onProgress(0…1) meldet den Fortschritt (echter Server).
+export function uploadMedia(file, token, onProgress) {
+  if (localServer) return localServer.uploadMedia(file);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'api/media');
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.setRequestHeader('X-Token', token);
+    xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress?.(ev.loaded / ev.total);
+    xhr.onload = () => {
+      let body = {};
+      try { body = JSON.parse(xhr.responseText); } catch { /* leer */ }
+      xhr.status === 200 ? resolve(body) : reject(new Error(body.error || 'Upload fehlgeschlagen.'));
+    };
+    xhr.onerror = () => reject(new Error('Upload fehlgeschlagen. Ist der Server erreichbar?'));
+    xhr.send(file);
+  });
+}
+
+// Abspielbare Adresse eines Videos (oder null, wenn es nicht mehr da ist).
+const mediaUrls = new Map();
+export async function mediaUrl(id) {
+  if (!id) return null;
+  if (!localServer) return `media/${id}`;
+  if (mediaUrls.has(id)) return mediaUrls.get(id);
+  const blob = await localServer.getMedia(id);
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  mediaUrls.set(id, url);
+  return url;
 }
 
 export function h(tag, attrs = {}, ...children) {

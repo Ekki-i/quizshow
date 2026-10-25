@@ -71,10 +71,15 @@ Umgesetzt:
   freigestelltes PNG) hochladen, der im Bogen hinter dem Pult steht. Ohne Avatar bleibt das Pult leer.
 - **Showablauf wie eine Präsentation**: In der Live-Regie führt „Weiter“ (oder Pfeil rechts,
   Leertaste, Presenter-Klicker) Schritt für Schritt durch die Show – Startbild, Vorstellung der
-  Teams, einmal die Übersicht Kategorien, je Spiel Spieltitel und Spiel, Münzvergaben nach 4, 6 und 8, Pause,
+  Teams, Intro-Video, einmal die Übersicht Kategorien, je Spiel Spieltitel und Spiel, Münzvergaben nach 4, 6 und 8, Pause,
   Rangliste und Abschluss. Jeder Schritt schaltet Spiel und Beamer automatisch. Nach einer offenen
   Münzvergabe (Gleichstand) geht es erst weiter, wenn die Münze vergeben ist. Im Show-Editor lässt
   sich der Ablauf ändern (Pausen einfügen, verschieben, löschen, Standard wiederherstellen).
+- **Intro-Video je Show**: im Show-Editor hochladen oder austauschen (MP4, WebM, MOV). Es läuft im
+  Showablauf direkt nach dem Startbild bildschirmfüllend, danach erscheint das Logo. Der Server legt
+  Videos unter `data/media/` ab (Ordner per `QUIZ_MEDIA_DIR`, Größe per `QUIZ_MEDIA_MAX_MB`, Standard
+  1024 MB) und löscht sie, sobald keine Show mehr darauf verweist. Im Prototyp bleiben sie im Browser.
+- Die Beamer-Ansicht schaltet der Showablauf; in der Live-Regie steht nur noch die Beamer-Vorschau.
 - **Pause**: Moderationspult mit „PAUSE“-Bildschirm, dahinter eine animierte Live-Band, die im Takt
   eines eigenen, mit WebAudio erzeugten Pausen-Songs spielt (Ton nach „Ton aktivieren“ am Beamer).
 - Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
