@@ -22,6 +22,7 @@
   <script type="module">
     import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
+    import { answerContent } from './assets/js/ink.js';
     import { podiumRow, INTRO_START, INTRO_STEP } from './assets/js/studio.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
 
@@ -172,7 +173,7 @@
       if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins]);
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins, s.finale]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
@@ -181,7 +182,8 @@
       lastState = s;
       // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
       if (s.view !== 'pause') stopPause();
-      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, blank: () => [] };
+      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, finale, blank: () => [] };
+      if (s.view !== 'finale') prevFin = null;
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
 
@@ -391,6 +393,88 @@
         v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
       });
       return [box];
+    }
+
+    // ---------- Finale gegen die Moderation ----------
+    // Animationen nur für das, was sich gerade geändert hat (sonst würden sie bei jedem Update neu starten).
+    let prevFin = null;
+    function finale(s) {
+      const f = s.finale;
+      if (!f) return [showLogo(s.show.name)];
+      const p = prevFin && prevFin.qIndex === f.qIndex ? prevFin : null;
+      const pr = p && p.round ? p.round : {};
+      const r = f.round;
+      const isNew = {
+        start: !prevFin,
+        question: !p || !pr.question,
+        teamAnswered: r && r.teamAnswered && !pr.teamAnswered,
+        modAnswered: r && r.modAnswered && !pr.modAnswered,
+        teamGrade: r && r.teamGrade !== null && pr.teamGrade !== r.teamGrade,
+        challenge: r && r.challenged && !pr.challenged,
+        modGrade: r && r.modGrade !== null && pr.modGrade !== r.modGrade,
+        resolved: r && r.resolved && !pr.resolved,
+        sudden: f.sudden && !(prevFin && prevFin.sudden),
+        result: f.result && !(prevFin && prevFin.result),
+      };
+      prevFin = f;
+      const an = (cond, cls) => (cond ? ` ${cls}` : '');
+
+      const pips = (n) => h('div', { class: 'fb-pips' }, Array.from({ length: f.target }, (_, i) => h('i', { class: i < n ? 'on' : '' })));
+      const coins = h('div', { class: 'fb-coins' }, f.coinsTotal
+        ? Array.from({ length: f.coinsTotal }, (_, i) => coinImg(`fb-coin${i < f.coins ? '' : ' lost'}${an(isNew.resolved && r.coinLost && i === f.coins, 'just-lost')}`))
+        : h('span', { class: 'fb-nocoin' }, 'keine Münze'));
+      const teamPanel = h('div', { class: `fb-panel team${an(isNew.resolved && r.teamPoint, 'scored')}`, '--team': f.team.color },
+        f.team.avatar ? h('img', { class: 'fb-avatar', src: f.team.avatar, alt: '' }) : h('div', { class: 'fb-avatar empty' }, f.team.name.slice(0, 1)),
+        h('div', { class: 'fb-name' }, f.team.name),
+        h('div', { class: 'fb-score' }, String(f.score.team)), pips(f.score.team), coins);
+      const modPanel = h('div', { class: `fb-panel mod${an(isNew.resolved && r.modPoint, 'scored')}` },
+        h('div', { class: 'fb-avatar mic' }, '🎤'),
+        h('div', { class: 'fb-name' }, f.host || 'Moderation'),
+        h('div', { class: 'fb-score' }, String(f.score.mod)), pips(f.score.mod),
+        h('div', { class: 'fb-coins' }, h('span', { class: 'fb-nocoin' }, 'Moderation')));
+      const top = h('div', { class: 'fb-top' },
+        h('div', { class: `fb-title${an(isNew.start, 'enter')}` }, '★ FINALE ★'),
+        f.sudden ? h('div', { class: `fb-sudden${an(isNew.sudden, 'enter')}` }, 'SUDDEN DEATH') : h('div', { class: 'fb-sub' }, `Wer zuerst ${f.target} Punkte hat, gewinnt`));
+
+      if (f.result) {
+        const won = f.result === 'team';
+        const conf = h('div', { class: 'fb-confetti', 'aria-hidden': 'true' }, won ? Array.from({ length: 70 }, (_, i) => h('i', { style: { left: `${(i * 37) % 100}%`, animationDelay: `${(i % 14) * 0.18}s`, background: ['#ffc23d', '#ff2d8a', '#1fd6f2', '#fff'][i % 4], '--rot': `${(i * 53) % 360}deg` } })) : []);
+        return [h('div', { class: `fb-stage result ${won ? 'won' : 'lost'}` }, conf, top,
+          h('div', { class: 'fb-result' },
+            won ? h('div', { class: 'fb-winner', '--team': f.team.color }, h('span', {}, f.team.name), h('b', {}, 'STIEHLT DIE SHOW!'))
+                : h('div', { class: 'fb-winner mod' }, h('span', {}, f.host || 'Die Moderation'), h('b', {}, 'BEHÄLT DIE SHOW!')),
+            won ? h('div', { class: 'fb-ticket' }, h('div', { class: 'fb-ticket-l' }, h('small', {}, 'TICKET'), h('b', {}, 'Die große Finalshow'), h('span', {}, f.team.name)), h('div', { class: 'fb-ticket-r' }, coinImg('fb-ticket-coin'), h('small', {}, 'ADMIT ONE')))
+                : h('div', { class: 'fb-sub' }, `Endstand ${f.score.team} : ${f.score.mod}`)))];
+      }
+
+      let center;
+      if (!r) {
+        center = h('div', { class: 'fb-center' }, h('div', { class: 'fb-intro' },
+          h('span', { style: { color: f.team.color } }, f.team.name), h('em', {}, 'gegen'), h('span', {}, f.host || 'die Moderation')),
+          h('div', { class: 'fb-rules' }, 'Beide antworten gleichzeitig. Die Moderation punktet immer – außer das Team zwingt sie mit einer Münze zum Aufdecken und sie liegt falsch.'));
+      } else {
+        const stamp = (g, isn) => (g === null ? null : h('div', { class: `fb-stamp ${g ? 'ok' : 'bad'}${an(isn, 'enter')}` }, g ? '✓' : '✗'));
+        const teamCard = h('div', { class: `fb-card team${an(isNew.teamAnswered, 'pop')}`, '--team': f.team.color },
+          h('div', { class: 'fb-card-label' }, f.team.name),
+          r.teamAnswer ? h('div', { class: 'fb-card-body' }, answerContent(r.teamAnswer, 'fb-ink'))
+            : h('div', { class: 'fb-card-body wait' }, r.teamAnswered ? h('span', { class: 'fb-locked' }, '🔒 abgegeben') : h('span', { class: 'fb-dots' }, h('i'), h('i'), h('i'))),
+          stamp(r.teamGrade, isNew.teamGrade));
+        const flipped = r.challenged && r.modAnswer;
+        const modCard = h('div', { class: `fb-card mod${flipped ? ' flipped' : ''}${an(isNew.modAnswered, 'pop')}${an(isNew.challenge, 'flip')}` },
+          h('div', { class: 'fb-card-label' }, f.host || 'Moderation'),
+          h('div', { class: 'fb-card-inner' },
+            h('div', { class: 'fb-card-back' }, r.modAnswered ? h('span', { class: 'fb-q' }, '?') : h('span', { class: 'fb-dots' }, h('i'), h('i'), h('i')), r.modAnswered ? h('small', {}, 'verdeckt') : null),
+            h('div', { class: 'fb-card-front' }, flipped ? answerContent(r.modAnswer, 'fb-ink') : null)),
+          isNew.challenge ? coinImg('fb-flycoin') : null,
+          stamp(r.modGrade, isNew.modGrade));
+        const verdict = r.resolved ? h('div', { class: `fb-verdict${an(isNew.resolved, 'enter')}` },
+          h('span', {}, `Lösung: `, h('b', {}, r.solution || '–')),
+          r.challenged ? h('span', { class: r.coinLost ? 'bad' : 'ok' }, r.coinLost ? ' · Münze verloren' : ' · Münze zurück, kein Punkt für die Moderation') : null) : null;
+        center = h('div', { class: 'fb-center' },
+          h('div', { class: `q compact fb-q-box${an(isNew.question, 'enter')}` }, h('small', {}, `Finalfrage ${f.qIndex + 1}`), r.question),
+          h('div', { class: 'fb-cards' }, teamCard, h('div', { class: 'fb-vs' }, 'VS'), modCard), verdict);
+      }
+      return [h('div', { class: 'fb-stage' }, top, h('div', { class: 'fb-main' }, teamPanel, center, modPanel))];
     }
 
     // Pause: Moderationspult, dahinter die Live-Band im Takt der Pausenmusik.

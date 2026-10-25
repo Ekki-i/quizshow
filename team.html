@@ -17,7 +17,7 @@
 
   <script type="module">
     import { h, connect, store, localServer, setShowTitle } from './assets/js/client.js';
-    import { renderPlay } from './assets/js/team-play.js';
+    import { renderPlay, renderFinale } from './assets/js/team-play.js';
 
     const params = new URLSearchParams(location.search);
     const urlCode = params.get('code');
@@ -78,6 +78,7 @@
       };
       draftKey = null;
       if (s.play) parts.push(...renderPlay(s.play, ui).filter(Boolean));
+      else if (s.finale) parts.push(...renderFinale(s.finale, ui).filter(Boolean));
       else parts.push(h('div', { class: 'wait' },
         h('p', { class: 'big' }, 'Gleich geht’s los!'),
         h('p', { class: 'muted' }, 'Wartet auf die Moderation. Dieses Gerät bleibt mit eurem Team verbunden.')));
@@ -87,7 +88,7 @@
       }
 
       // Ein offenes Eingabefeld nicht bei jedem Update neu aufbauen (Fokus/Tastatur bleiben).
-      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.ranking || null]);
+      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.finale || null, s.ranking || null]);
       if (key === lastRenderKey) return;
       lastRenderKey = key;
       main.replaceChildren(...parts);

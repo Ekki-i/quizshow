@@ -644,3 +644,60 @@ test('Pausen: eigene Lieder je Pause, Beamer bekommt die Playlist der laufenden 
   assert.deepEqual(game.beamerView(db).pauseSongs, []);
   assert.equal(game.referencedMedia(db).size, 0);
 });
+
+test('Finale: Moderation punktet immer, Münze erzwingt Aufdecken, Sudden Death', () => {
+  const { db, ids } = setup(2);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[1], points: 9, reason: 'x' });
+  db.live.coins.push({ position: 4, teamId: ids[1] }, { position: 6, teamId: ids[1] });
+  game.applyAction(db, mod(), 'finale.config', { target: 2, questions: [1, 2, 3, 4, 5].map((n) => ({ question: `F${n}?`, answer: `A${n}` })) });
+  // Ablaufschritt startet das Finale mit dem Team mit den meisten Punkten
+  const idx = game.moderatorView(db).rundown.findIndex((s) => s.kind === 'finale');
+  game.applyAction(db, mod(), 'run.goto', { index: idx });
+  assert.equal(db.live.finale.teamId, ids[1]);
+  assert.equal(game.beamerView(db).view, 'finale');
+  const answer = (correctTeam, challenge, modCorrect) => {
+    game.applyAction(db, mod(), 'finale.next', {});
+    assert.throws(() => game.applyAction(db, team(ids[0]), 'finale.answer', { text: 'x' }), /Finalteam/);
+    game.applyAction(db, team(ids[1]), 'finale.answer', { text: 'Antwort' });
+    assert.throws(() => game.applyAction(db, team(ids[1]), 'finale.challenge', {}), /Moderation geantwortet/);
+    game.applyAction(db, mod(), 'finale.modAnswer', { text: 'Geheim' });
+    // Verdeckte Antwort ist für Beamer und Team unsichtbar
+    assert.ok(!JSON.stringify(game.beamerView(db)).includes('Geheim'));
+    assert.ok(!JSON.stringify(game.teamView(db, ids[1])).includes('Geheim'));
+    game.applyAction(db, mod(), 'finale.gradeTeam', { correct: correctTeam });
+    if (challenge) {
+      game.applyAction(db, team(ids[1]), 'finale.challenge', {});
+      assert.ok(JSON.stringify(game.beamerView(db)).includes('Geheim'));
+      game.applyAction(db, mod(), 'finale.gradeMod', { correct: modCorrect });
+    }
+    game.applyAction(db, mod(), 'finale.resolve', {});
+  };
+  answer(true, true, false); // Moderation falsch aufgedeckt: kein Punkt, Münze zurück
+  assert.deepEqual(db.live.finale.score, { team: 1, mod: 0 });
+  assert.equal(game.beamerView(db).finale.coins, 2);
+  answer(false, true, true); // Moderation richtig: Münze weg, Punkt bleibt
+  assert.deepEqual(db.live.finale.score, { team: 1, mod: 1 });
+  assert.equal(game.beamerView(db).finale.coins, 1);
+  answer(true, false); // beide erreichen 2 → Sudden Death
+  assert.equal(db.live.finale.sudden, true);
+  assert.equal(db.live.finale.result, null);
+  answer(true, true, true); // letzte Münze verloren → Moderation gewinnt
+  assert.equal(db.live.finale.result, 'mod');
+  assert.throws(() => game.applyAction(db, mod(), 'finale.next', {}), /entschieden/);
+});
+
+test('Finale: Team erreicht das Ziel allein und gewinnt das Ticket', () => {
+  const { db, ids } = setup(2);
+  db.live.coins.push({ position: 4, teamId: ids[0] });
+  game.applyAction(db, mod(), 'finale.config', { target: 1, questions: [{ question: 'Q?', answer: 'A' }] });
+  game.applyAction(db, mod(), 'finale.start', { teamId: ids[0] });
+  game.applyAction(db, mod(), 'finale.next', {});
+  game.applyAction(db, team(ids[0]), 'finale.answer', { text: 'A' });
+  game.applyAction(db, mod(), 'finale.modAnswer', { text: 'B' });
+  game.applyAction(db, mod(), 'finale.gradeTeam', { correct: true });
+  game.applyAction(db, team(ids[0]), 'finale.challenge', {});
+  game.applyAction(db, mod(), 'finale.gradeMod', { correct: false });
+  game.applyAction(db, mod(), 'finale.resolve', {});
+  assert.equal(db.live.finale.result, 'team');
+  assert.equal(game.teamView(db, ids[0]).finale.result, 'team');
+});

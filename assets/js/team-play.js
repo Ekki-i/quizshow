@@ -1,7 +1,7 @@
 // Team-iPad: Darstellung und Eingaben für alle acht Spiele. Die Sicht kommt
 // bereits gefiltert vom Server; hier wird nichts Geheimes ausgeblendet.
 
-import { h, run, ask, toast } from './client.js';
+import { h, run, ask, toast, coinImg } from './client.js';
 import { inkPad, answerContent } from './ink.js';
 import { mapView } from './map.js';
 
@@ -335,5 +335,57 @@ function nerd(g, ui) {
   }
   const res = g.results.find((r) => r.teamId === ui.team.id);
   if (res) out.push(stateBox(res.success ? 'ok' : 'bad', res.success ? '✓' : '✗', `${res.points > 0 ? '+' : ''}${pts(res.points)}`));
+  return out;
+}
+
+// ---------- Finale gegen die Moderation ----------
+
+let finalePad = { key: null, el: null };
+
+export function renderFinale(f, ui) {
+  const scoreRow = h('div', { class: 'fin-head' },
+    h('div', { class: 'fin-side', style: { '--team': f.team.color } }, h('b', {}, f.team.name), h('span', { class: 'fin-score' }, String(f.score.team))),
+    h('div', { class: 'fin-vs' }, f.sudden ? 'SUDDEN DEATH' : `Ziel ${f.target}`),
+    h('div', { class: 'fin-side mod' }, h('b', {}, f.host || 'Moderation'), h('span', { class: 'fin-score' }, String(f.score.mod))));
+  const out = [h('p', { class: 'muted' }, '★ Finale gegen die Moderation'), scoreRow];
+  if (f.result) {
+    const won = f.result === 'team';
+    out.push(stateBox(won ? 'ok' : '', won ? '🎟' : '🎤', won ? `${f.team.name} stiehlt die Show! Ticket für die große Finalshow.` : 'Die Moderation behält die Show.'));
+    return out;
+  }
+  if (!f.player) {
+    out.push(...wait(`${f.team.name} spielt das Finale`, 'Drückt die Daumen!'));
+    return out;
+  }
+  out.push(h('div', { class: 'fin-coinrow' }, h('span', { class: 'muted' }, 'Eure Münzen: '),
+    f.coinsTotal ? Array.from({ length: f.coinsTotal }, (_, i) => coinImg(`fin-coin${i < f.coins ? '' : ' lost'}`)) : h('span', { class: 'muted' }, 'keine')));
+  const r = f.round;
+  if (!r) return [...out, ...wait('Gleich kommt die erste Finalfrage …', 'Antwortet in Ruhe – es gibt keinen Zeitdruck.')];
+  out.push(h('p', { class: 'muted' }, `Finalfrage ${f.qIndex + 1}`), h('p', { class: 'question' }, r.question));
+  if (r.resolved) {
+    out.push(stateBox(r.teamPoint ? 'ok' : 'bad', r.teamPoint ? '✓' : '✗', `${r.teamPoint ? 'Richtig! +1' : 'Leider falsch'} · Lösung: ${r.solution}`));
+    if (r.challenged) out.push(stateBox(r.coinLost ? 'bad' : 'ok', '🪙', r.coinLost ? 'Die Moderation lag richtig – Münze verloren.' : 'Die Moderation lag falsch – kein Punkt für sie, ihr behaltet die Münze!'));
+    return [...out, ...wait('Gleich geht’s weiter …')];
+  }
+  if (!r.own) {
+    const key = `finale-team-${f.team.id}-${f.qIndex}`;
+    if (finalePad.key !== key) {
+      finalePad = { key, el: inkPad({ draftKey: key, label: 'Eure Antwort', button: 'Abgeben', ask, toast, onSubmit: (ink) => run(ui.conn, 'finale.answer', { ink }) }) };
+    }
+    out.push(finalePad.el);
+    return out;
+  }
+  out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), answerContent(r.own)));
+  if (r.teamGrade === true) out.push(stateBox('ok', '✓', 'Richtig!'));
+  else if (r.teamGrade === false) out.push(stateBox('bad', '✗', 'Leider falsch'));
+  if (!r.modAnswered) out.push(stateBox('', '⏳', 'Die Moderation schreibt noch …'));
+  else if (r.challenged) {
+    out.push(stateBox('', '🪙', r.modGrade === null ? 'Münze eingesetzt – die Moderation deckt auf!' : r.modGrade ? 'Die Moderation lag richtig – eure Münze ist weg.' : 'Die Moderation lag falsch – kein Punkt für sie, ihr bekommt die Münze zurück!'));
+  } else {
+    out.push(stateBox('', '🤫', 'Die Moderation hat verdeckt geantwortet und bekommt ihren Punkt – außer ihr zwingt sie mit einer Münze zum Aufdecken.'));
+    // Münze einsetzen: sofort, ohne Rückfrage
+    out.push(h('p', {}, h('button', { class: 'btn pink huge fin-challenge', style: { width: '100%' }, disabled: !f.canChallenge, onclick: () => run(ui.conn, 'finale.challenge') },
+      coinImg('fin-coin big'), f.coins ? ' Münze einsetzen – Moderation muss aufdecken' : ' Keine Münze mehr')));
+  }
   return out;
 }
