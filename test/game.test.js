@@ -568,9 +568,12 @@ test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze 
   assert.equal(steps.filter((s) => s.kind === 'pyramid').length, 1);
   assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
   assert.ok(steps.some((s) => s.kind === 'pause'));
-  // Nach Spiel 4: erst Pause, dann Münzvergabe
-  const p4 = steps.findIndex((s) => s.kind === 'game' && s.pos === 4);
-  assert.deepEqual(steps.slice(p4 + 1, p4 + 3).map((s) => s.kind), ['pause', 'coin']);
+  // Nach Spiel 4, 6 und 8: erst Pause, dann Münzvergabe
+  for (const pos of [4, 6, 8]) {
+    const gi = steps.findIndex((s) => s.kind === 'game' && s.pos === pos);
+    assert.deepEqual(steps.slice(gi + 1, gi + 3).map((s) => s.kind), ['pause', 'coin']);
+  }
+  assert.equal(steps.filter((s) => s.kind === 'pause').length, 3);
   assert.equal(steps.at(-1).kind, 'end');
   assert.throws(() => game.applyAction(db, mod(), 'run.prev', {}), /erste Schritt/);
   game.applyAction(db, mod(), 'run.next', {});

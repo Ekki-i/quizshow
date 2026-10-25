@@ -74,7 +74,7 @@ Umgesetzt:
   freigestelltes PNG) hochladen, der im Bogen hinter dem Pult steht. Ohne Avatar bleibt das Pult leer.
 - **Showablauf wie eine Präsentation**: In der Live-Regie führt „Weiter“ (oder Pfeil rechts,
   Leertaste, Presenter-Klicker) Schritt für Schritt durch die Show – Startbild, Vorstellung der
-  Teams, Intro-Video, einmal die Übersicht Kategorien, je Spiel Spieltitel und Spiel, Pause nach Spiel 4, Münzvergaben nach 4 (erst nach der Pause, für mehr Spannung), 6 und 8,
+  Teams, Intro-Video, einmal die Übersicht Kategorien, je Spiel Spieltitel und Spiel, nach Spiel 4, 6 und 8 je eine Pause und erst danach die Münzvergabe (mehr Spannung),
   Rangliste und Abschluss. Jeder Schritt schaltet Spiel und Beamer automatisch. Nach einer offenen
   Münzvergabe (Gleichstand) geht es erst weiter, wenn die Münze vergeben ist. Im Show-Editor lässt
   sich der Ablauf ändern (Pausen einfügen, verschieben, löschen, Standard wiederherstellen).
