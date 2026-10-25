@@ -463,9 +463,9 @@
         tris(Math.min(score, f.target), who));
       const question = !r
         ? h('div', { class: 'fx-q' }, h('span', {}, `${f.team.name} gegen ${f.host || 'die Moderation'}`), h('b', {}, `Wer zuerst ${f.target} Punkte hat, gewinnt`))
-        : h('div', { class: `fx-q${an(isNew.question, 'enter')}` }, h('span', {}, r.question),
-          r.resolved ? h('b', { class: an(isNew.resolved, 'enter').trim() }, r.solution || '–') : null,
-          r.resolved && r.challenged ? h('em', { class: r.coinLost ? 'bad' : 'ok' }, r.coinLost ? 'Münze verloren' : 'Münze zurück · kein Punkt für die Moderation') : null);
+        : h('div', { class: `fx-q${an(isNew.question, 'enter')}${r.resolved ? '' : ' no-answer'}` }, h('span', {}, r.question),
+          r.resolved ? h('b', { class: an(isNew.resolved, 'enter').trim() }, r.solution || '–',
+            r.challenged ? h('em', { class: r.coinLost ? 'bad' : 'ok' }, r.coinLost ? 'Münze verloren' : 'Münze zurück') : null) : null);
       // Münzfeld auf der Pultfront: verlorene Münzen bleiben liegen, die eingesetzte glänzt.
       const deskCoins = [];
       for (let i = 0; i < lostCount; i++) deskCoins.push(coinImg(`fx-desk-coin${an(isNew.resolved && r.coinLost && i === lostCount - 1, 'target')}`));
@@ -475,8 +475,11 @@
       const pult = h('div', { class: 'scene fx-room' },
         ...pultLayers(s.show, 'cohost'),
         h('div', { class: 'overlay fx-screen', style: { left: pc(389, PW), top: pc(34, PH), width: pc(159, PW), height: pc(124, PH) } }, h('b', {}, f.sudden ? 'SUDDEN DEATH' : 'FINALE')),
-        h('div', { class: 'fx-field', style: { left: pc(372, PW), top: pc(316, PH), width: pc(130, PW), height: pc(72, PH) } },
-          h('span', { class: 'fx-glitch' }, 'FINALE'), h('div', { class: 'fx-field-coins' }, deskCoins)));
+        // „FINALE“ nur innerhalb der dunklen Fläche der Pultfront (zugeschnitten)
+        h('div', { class: 'fx-field', style: { left: pc(362, PW), top: pc(307, PH), width: pc(168, PW), height: pc(81, PH) } },
+          h('span', { class: 'fx-glitch' }, 'FINALE')),
+        // eingesetzte/verlorene Münzen liegen oben auf dem Pult
+        h('div', { class: 'fx-field-coins', style: { left: pc(380, PW), top: pc(272, PH), width: pc(120, PW), height: pc(28, PH) } }, deskCoins));
       const out = [h('div', { class: 'fb-stage fx' }, pult,
         h('div', { class: 'fx-top' }, f.sudden ? h('div', { class: `fb-sudden${an(isNew.sudden, 'enter')}` }, 'SUDDEN DEATH') : null),
         h('div', { class: 'fx-bottom' },
