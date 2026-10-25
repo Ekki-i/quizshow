@@ -46,7 +46,7 @@
       audio = new AudioContext();
       document.getElementById('sound-on')?.remove();
       // Läuft gerade die Pause, setzt die Musik jetzt ein.
-      if (lastState && lastState.view === 'pause' && lastState.settings.sound) startPause(audio);
+      if (lastState && lastState.view === 'pause' && lastState.settings.sound) startPause(audio, lastState.pauseSongs || []);
       // Ein laufendes Intro-Video bekommt jetzt Ton.
       const v = document.querySelector('video.intro-video');
       if (v) v.muted = false;
@@ -172,7 +172,7 @@
       if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games]);
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
@@ -387,7 +387,8 @@
     // Pause: Moderationspult, dahinter die Live-Band im Takt der Pausenmusik.
     // Ton nur auf dem echten Beamer, wenn er aktiviert und erlaubt ist.
     function pause(s) {
-      startPause(!embedded && s.settings.sound && audioReady(audio) ? audio : null);
+      // Eigene Lieder der Pause (aus dem Show-Editor), sonst der eingebaute Song.
+      startPause(!embedded && s.settings.sound && audioReady(audio) ? audio : null, s.pauseSongs || []);
       return [bandScene()];
     }
 
