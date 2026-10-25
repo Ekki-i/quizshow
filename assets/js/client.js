@@ -170,6 +170,22 @@ export async function mediaUrl(id) {
   return url;
 }
 
+// Show-Titel in der Logo-Schrift; das Wort „uns“ wird hervorgehoben.
+export function showTitle(name, tag = 'span', cls = '') {
+  const words = String(name || '').trim().split(/(\s+)/);
+  return h(tag, { class: `show-title ${cls}`.trim() }, words.map((w) => (/^uns$/i.test(w) ? h('span', { class: 'hot' }, w) : w)));
+}
+export function setShowTitle(el, name) {
+  if (!el) return;
+  el.classList.add('show-title');
+  el.replaceChildren(...showTitle(name).childNodes);
+}
+
+// Münze der Show (Bild), z. B. in Listen und Bannern.
+export function coinImg(cls = '') {
+  return h('img', { class: `coin-img ${cls}`.trim(), src: 'assets/img/muenze.webp', alt: 'Münze', draggable: 'false' });
+}
+
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {

@@ -1,4 +1,4 @@
-import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl } from './client.js';
+import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
@@ -39,7 +39,7 @@ for (const b of document.querySelectorAll('[role=tab]')) {
 
 function renderAll(force = false) {
   if (!S) return;
-  document.getElementById('show-name').textContent = S.project.name;
+  setShowTitle(document.getElementById('show-name'), S.project.name);
   for (const b of document.querySelectorAll('[role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   for (const id of ['live', 'teams', 'editor', 'library', 'points']) document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tab);
   renderWarning();
@@ -128,6 +128,9 @@ function buildFlow() {
 const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', end: '🏁' };
 const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', end: 'Abschluss' };
 
+// Symbol eines Schritts; die Münzvergabe zeigt die Münze der Show.
+const runIcon = (kind) => (kind === 'coin' ? coinImg('run-coin') : RUN_ICON[kind]);
+
 function runNext() { return act('run.next'); }
 function runPrev() { return act('run.prev'); }
 
@@ -140,8 +143,8 @@ function buildRun() {
   const head = h('div', { class: 'run-head' },
     h('div', { class: 'run-now' },
       h('span', { class: 'run-count' }, started ? `Schritt ${cur + 1} von ${steps.length}` : `${steps.length} Schritte`),
-      h('div', { class: 'run-title' }, started ? [h('span', { class: 'run-ico' }, RUN_ICON[now.kind]), now.text] : 'Show noch nicht gestartet'),
-      h('div', { class: 'run-next muted' }, next ? ['Als Nächstes: ', h('b', {}, `${RUN_ICON[next.kind]} ${next.text}`)] : 'Letzter Schritt erreicht')),
+      h('div', { class: 'run-title' }, started ? [h('span', { class: 'run-ico' }, runIcon(now.kind)), now.text] : 'Show noch nicht gestartet'),
+      h('div', { class: 'run-next muted' }, next ? ['Als Nächstes: ', h('b', {}, runIcon(next.kind), ' ', next.text)] : 'Letzter Schritt erreicht')),
     h('div', { class: 'run-buttons' },
       now && now.kind === 'video' && S.project.introVideo ? h('button', { class: 'btn ghost', onclick: () => act('run.goto', { index: cur }) }, '⟲ Video von vorn') : null,
       h('button', { class: 'btn ghost', disabled: cur <= 0, onclick: runPrev, title: 'Zurück (Pfeil links)' }, '◀ Zurück'),
@@ -152,7 +155,7 @@ function buildRun() {
       'aria-current': i === cur ? 'step' : null,
       title: `${i + 1}. ${st.text}`,
       onclick: () => act('run.goto', { index: i }),
-    }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, RUN_ICON[st.kind]), h('span', { class: 't' }, st.text)))));
+    }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
   const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
     h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Show-Editor.'));
   // Aktuellen Schritt in der Leiste sichtbar halten.
@@ -278,7 +281,7 @@ function buildRundownEditor() {
   const move = (i, d) => { const l = [...steps]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); save(l); };
   const insertAt = (i, st) => { const l = [...steps]; l.splice(i, 0, st); save(l); };
   const kindSel = h('select', { 'aria-label': 'Art des Schritts' },
-    Object.entries(RUN_KIND_LABEL).map(([k, label]) => h('option', { value: k }, `${RUN_ICON[k]} ${label}`)));
+    Object.entries(RUN_KIND_LABEL).map(([k, label]) => h('option', { value: k }, k === 'coin' ? label : `${RUN_ICON[k]} ${label}`)));
   const posSel = h('select', { 'aria-label': 'Spiel' }, S.project.games.map((g, i) => h('option', { value: String(i + 1) }, `Spiel ${i + 1} · ${g.title}`)));
   const afterSel = h('select', { 'aria-label': 'Einfügen nach' },
     h('option', { value: '0' }, 'ganz am Anfang'),
@@ -292,7 +295,7 @@ function buildRundownEditor() {
       S.rundownCustom ? ' Du hast den Ablauf angepasst.' : ' Das ist der Standardablauf aus deinen Spielen.'),
     h('ol', { class: 'list rundown-list' }, S.rundown.map((st, i) => h('li', { class: `rd k-${st.kind}` },
       h('b', { class: 'rd-n' }, `${i + 1}.`),
-      h('span', { class: 'rd-i', 'aria-hidden': 'true' }, RUN_ICON[st.kind]),
+      h('span', { class: 'rd-i', 'aria-hidden': 'true' }, runIcon(st.kind)),
       h('span', { class: 'grow' }, st.text),
       st.kind === 'pause' ? h('button', {
         class: `btn small ${openPause === st.id ? 'pink' : 'ghost'}`, 'aria-expanded': String(openPause === st.id),
@@ -361,9 +364,9 @@ function buildCoins() {
   return card('Münzen',
     h('ul', { class: 'list' }, S.coinPositions.map((pos) => {
       const c = S.live.coins.find((x) => x.position === pos);
-      if (c) return h('li', {}, h('span', { class: 'grow' }, `Nach Position ${pos}`), dot(teamColor(c.teamId)), h('b', {}, teamName(c.teamId)), h('span', { class: 'muted' }, `(${c.method})`));
+      if (c) return h('li', {}, coinImg(), h('span', { class: 'grow' }, `Nach Position ${pos}`), dot(teamColor(c.teamId)), h('b', {}, teamName(c.teamId)), h('span', { class: 'muted' }, `(${c.method})`));
       const tie = w?.kind === 'coinTie' && w.position === pos;
-      return h('li', {}, h('span', { class: 'grow' }, `Nach Position ${pos}`),
+      return h('li', {}, coinImg('coin-open'), h('span', { class: 'grow' }, `Nach Position ${pos}`),
         tie
           ? w.teamIds.map((id) => h('button', { class: 'btn small', onclick: () => confirmAct(`${teamName(id)} hat die Schätzfrage gewonnen und bekommt die Münze?`, 'coin.awardTie', { teamId: id }) }, `${teamName(id)} gewinnt Schätzfrage`))
           : h('button', { class: 'btn small', onclick: () => confirmAct(`Münzgewinner nach Position ${pos} aus dem kumulierten Punktestand ermitteln?`, 'coin.determine', { position: pos }) }, 'Gewinner ermitteln'));
@@ -625,7 +628,7 @@ function buildSlot(g, i, running) {
     h('div', { class: 'row', style: { gap: '6px' } },
       type.playable ? h('span', { class: 'badge ok' }, 'spielbar') : h('span', { class: 'badge' }, 'Inhalte bearbeitbar'),
       g.locked ? h('span', { class: 'badge warn' }, '🔒 Eröffnungsspiel') : null,
-      S.coinPositions.includes(pos) ? h('span', { class: 'badge coin-badge' }, '🪙 danach Münze') : null)),
+      S.coinPositions.includes(pos) ? h('span', { class: 'badge coin-badge' }, coinImg(), ' danach Münze') : null)),
   h('div', { class: 'slot-actions' },
     h('button', { class: `btn small ${g.id === selectedGame ? 'pink' : 'ghost'}`, onclick: () => { selectedGame = g.id; renderAll(true); } }, 'Bearbeiten'),
     h('button', { class: 'btn small ghost', disabled: running || g.locked || i === 0 || (i === 1 && S.project.games[0]?.locked), 'aria-label': `${g.title} nach oben`, onclick: () => act('game.moveTo', { gameId: g.id, index: i - 1 }) }, '↑'),

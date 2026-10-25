@@ -20,7 +20,7 @@
   </div>
 
   <script type="module">
-    import { h, connect, mediaUrl } from './assets/js/client.js';
+    import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
     import { podiumRow } from './assets/js/studio.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
@@ -310,6 +310,11 @@
         const fs = b[0] === 'finale' ? 52 : b[0] === 'stage' ? 30 : 26;
         const ty = b[0] === 'finale' ? y1 - hgt * 0.22 : (y0 + y1) / 2 + fs * 0.36;
         g.append(el('text', { x: W / 2, y: ty, 'text-anchor': 'middle', class: cls, 'font-size': fs }, b[1]));
+        // Gewinnstufen mit der Münze der Show markieren.
+        if (b[0] === 'stage') {
+          const cs = 54;
+          for (const side of [-1, 1]) g.append(el('image', { href: 'assets/img/muenze.webp', x: W / 2 + side * (h1 + 14) - cs / 2, y: (y0 + y1) / 2 - cs * 0.43, width: cs, height: cs * 0.87, class: 'pyr-coin' }));
+        }
         if (num && s.games) {
           const gm = s.games[Number(num[1]) - 1];
           if (gm) g.append(el('title', {}, gm.title));
@@ -403,13 +408,13 @@
         h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
         h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
           stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
-        h('div', { class: 'scene-coin', 'aria-hidden': 'true' }, '★'));
+        h('img', { class: 'scene-coin', src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true' }));
       const wrap = h('div', { class: 'coin-sequence' }, pult);
       const showTeams = () => {
         wrap.replaceChildren(
           h('div', { class: 'kicker' }, stage ? `Gewinnstufe ${stage} · Zwischenstand` : 'Zwischenstand'),
           h('div', { class: 'coin-teams' },
-            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, `🪙 Münze an ${t.name}`) })));
+            teamsScene(s, { points: true, winnerId: t.id, banner: h('div', { class: 'scene-banner', '--team': t.color }, coinImg('banner-coin'), ` Münze an ${t.name}`) })));
       };
       if (s.settings.reducedMotion) showTeams();
       else titleTimer = setTimeout(showTeams, 3400 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
