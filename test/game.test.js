@@ -145,6 +145,8 @@ test('Münze geht an das Team mit den meisten kumulierten Punkten, Gleichstand b
   game.applyAction(db, mod(), 'coin.awardTie', { teamId: ids[0] });
   assert.equal(db.live.coins[1].teamId, ids[0]);
   assert.equal(db.live.coins[1].method, 'Schätzfrage');
+  // Der Beamer kennt die vergebenen Münzen (Teampulte, Moderationspult, Pause) – ohne Punkte.
+  assert.deepEqual(game.beamerView(db).coins, [{ position: 4, teamId: ids[1] }, { position: 6, teamId: ids[0] }]);
 });
 
 test('„Die leichten 5“ bleibt auf Position 1, außer per Sonderaktion', () => {

@@ -334,8 +334,9 @@ function applyPose(root, lv) {
 // ---------------------------------------------------------------------------
 // Szene (Bühne und Musiker in band-scene.js)
 
-export function bandScene() {
+// coins: Münzen, die noch auf dem Moderationspult stehen (3 minus vergebene).
+export function bandScene(coins = 3) {
   const root = h('div', { class: 'band-scene' });
-  root.innerHTML = bandSceneSvg();
+  root.innerHTML = bandSceneSvg(coins);
   return root;
 }
