@@ -298,48 +298,40 @@ function musician(m) {
 
 const BAND = [
   // Hinterste Stufe: Bläser und Keyboard
-  { x: 600, y: 318, s: 0.62, role: 'sax', skin: 'light', hair: 'short', hairColor: '#e2c27a', top: 'sky', shirt: '#eef3f8', ph: 0.2 },
-  { x: 840, y: 318, s: 0.62, role: 'trumpet', skin: 'fair', hair: 'short', hairColor: '#6b4a32', hat: 'cap', glasses: 'round', top: 'camel', beard: true, ph: 0.7 },
-  { x: 1080, y: 318, s: 0.62, role: 'trombone', skin: 'tan', hair: 'curly', hairColor: '#2a1a12', top: 'sky', ph: 1.1 },
-  { x: 1300, y: 318, s: 0.62, role: 'keys', pose: 'sit', skin: 'tan', hair: 'short', hairColor: '#1e140e', top: 'brown', shirt: '#f3efe6', kw: 160, ph: 0.4 },
+  { x: 660, y: 318, s: 0.62, role: 'sax', skin: 'light', hair: 'short', hairColor: '#e2c27a', top: 'sky', shirt: '#eef3f8', ph: 0.2 },
+  { x: 830, y: 318, s: 0.62, role: 'trumpet', skin: 'fair', hair: 'short', hairColor: '#6b4a32', hat: 'cap', glasses: 'round', top: 'camel', beard: true, ph: 0.7 },
+  { x: 990, y: 318, s: 0.62, role: 'trombone', skin: 'tan', hair: 'curly', hairColor: '#2a1a12', top: 'sky', ph: 1.1 },
+  { x: 1150, y: 318, s: 0.62, role: 'keys', pose: 'sit', skin: 'tan', hair: 'short', hairColor: '#1e140e', top: 'brown', shirt: '#f3efe6', kw: 160, ph: 0.4 },
   // Mittlere Stufe: Percussion, Saxofon, Gitarre
-  { x: 400, y: 470, s: 0.76, role: 'marimba', skin: 'dark', hair: 'braids', hairColor: '#1a120c', top: 'sky', shirt: '#ffffff', ph: 0.5 },
-  { x: 720, y: 470, s: 0.76, role: 'sax', pose: 'sit', skin: 'fair', hair: 'curly', hairColor: '#7a4a2a', top: 'camel', shirt: '#f3efe6', ph: 0.9 },
-  { x: 970, y: 470, s: 0.76, role: 'guitar', skin: 'light', hair: 'short', hairColor: '#2a1a12', beard: true, top: 'sky', shirt: '#ffffff', ph: 0.1 },
+  { x: 520, y: 470, s: 0.76, role: 'marimba', skin: 'dark', hair: 'braids', hairColor: '#1a120c', top: 'sky', shirt: '#ffffff', ph: 0.5 },
+  { x: 730, y: 470, s: 0.76, role: 'sax', pose: 'sit', skin: 'fair', hair: 'curly', hairColor: '#7a4a2a', top: 'camel', shirt: '#f3efe6', ph: 0.9 },
+  { x: 930, y: 470, s: 0.76, role: 'guitar', skin: 'light', hair: 'short', hairColor: '#2a1a12', beard: true, top: 'sky', shirt: '#ffffff', ph: 0.1 },
   // Vorne: Schlagzeug, zwei Sängerinnen, Bass
-  { x: 190, y: 742, s: 0.92, role: 'drums', pose: 'sit', skin: 'tan', hair: 'short', hairColor: '#2a1a12', hat: 'bucket', glasses: 'sun', top: 'camel', shirt: '#ffffff', beard: true },
-  { x: 500, y: 742, s: 0.92, role: 'singer', singer: true, skin: 'light', hair: 'long', hairColor: '#24160e', top: 'cream', dress: true, sway: 4, ph: 0.3 },
-  { x: 1100, y: 742, s: 0.92, role: 'singer', singer: true, skin: 'fair', hair: 'pixie', hairColor: '#e8c98c', top: 'cream', dress: true, sway: 4, ph: 1.4 },
-  { x: 1420, y: 742, s: 0.92, role: 'bass', skin: 'light', hair: 'short', hairColor: '#6b4a32', hat: 'beanie', glasses: 'round', beard: true, top: 'olive', ph: 0.6 },
+  { x: 360, y: 742, s: 0.92, role: 'drums', pose: 'sit', skin: 'tan', hair: 'short', hairColor: '#2a1a12', hat: 'bucket', glasses: 'sun', top: 'camel', shirt: '#ffffff', beard: true },
+  { x: 575, y: 742, s: 0.92, role: 'singer', singer: true, skin: 'light', hair: 'long', hairColor: '#24160e', top: 'cream', dress: true, sway: 4, ph: 0.3 },
+  { x: 1025, y: 742, s: 0.92, role: 'singer', singer: true, skin: 'fair', hair: 'pixie', hairColor: '#e8c98c', top: 'cream', dress: true, sway: 4, ph: 1.4 },
+  { x: 1245, y: 742, s: 0.92, role: 'bass', skin: 'light', hair: 'short', hairColor: '#6b4a32', hat: 'beanie', glasses: 'round', beard: true, top: 'olive', ph: 0.6 },
 ];
 
 function stage() {
-  const wall = grad('#e88b7e', '#b85c58');
-  const riser = grad('#3a3a44', '#16161c');
-  const lip = grad('#5a5a66', '#2a2a32');
-  const teal = grad('#2f8f8a', '#14524f');
+  // Kein eigener Hintergrund: dahinter liegt das Show-Studio (Neon-Bühne) des Beamers.
+  const riser = grad('#2a2c3c', '#0d0e16');
   return `
-    <rect x="0" y="0" width="1600" height="900" fill="${wall}"/>
-    <polygon points="250,40 300,250 330,40" fill="${teal}" opacity=".9"/>
-    <polygon points="560,0 620,0 600,120" fill="${teal}"/>
-    <polygon points="1180,0 1600,0 1600,340 1420,260" fill="${teal}" opacity=".95"/>
-    <polygon points="1460,40 1560,40 1510,140" fill="#0f3f3d" opacity=".8"/>
-    <polygon points="0,120 120,0 0,0" fill="${teal}" opacity=".6"/>
-    <g class="bd-lights" opacity="0.22">
-      <polygon points="520,0 560,0 760,700 360,700" fill="#ff2d8a"/>
-      <polygon points="1040,0 1080,0 1240,700 840,700" fill="#1fd6f2"/>
-      <polygon points="790,0 810,0 960,600 640,600" fill="#ffffff"/>
+    <g class="bd-lights" opacity="0.18">
+      <polygon points="600,0 630,0 760,700 470,700" fill="#ff2d8a"/>
+      <polygon points="970,0 1000,0 1130,700 840,700" fill="#1fd6f2"/>
     </g>
-    <!-- Stufen -->
-    <rect x="360" y="318" width="1100" height="36" fill="${riser}"/><rect x="360" y="318" width="1100" height="6" fill="${lip}"/>
-    <rect x="200" y="470" width="1340" height="40" fill="${riser}"/><rect x="200" y="470" width="1340" height="6" fill="${lip}"/>
-    <rect x="0" y="742" width="1600" height="158" fill="${grad('#2a2a32', '#0c0c10')}"/>
-    <rect x="0" y="742" width="1600" height="5" fill="#ff8aa0" opacity=".55"/>
-    <rect x="0" y="868" width="1600" height="6" fill="#ffd0d8" opacity=".35"/>`;
+    <!-- Podeststufen mit Neonkanten wie im Studio -->
+    <rect x="560" y="318" width="680" height="34" rx="4" fill="${riser}"/>
+    <rect x="560" y="318" width="680" height="4" fill="#ff2d8a" opacity=".85"/>
+    <rect x="420" y="470" width="960" height="38" rx="4" fill="${riser}"/>
+    <rect x="420" y="470" width="960" height="4" fill="#1fd6f2" opacity=".85"/>
+    <path d="M220 742 L1380 742 L1470 800 L130 800 Z" fill="${riser}" opacity=".92"/>
+    <path d="M220 742 L1380 742" stroke="#ff2d8a" stroke-width="4" opacity=".8"/>`;
 }
 
 function desk() {
-  return `<g class="bd-desk">
+  return `<g class="bd-desk" transform="translate(800 884) scale(0.8) translate(-800 -884)">
     <ellipse cx="800" cy="884" rx="250" ry="14" fill="#000" opacity=".55"/>
     <polygon points="610,700 820,700 820,880 610,880" fill="${grad('#ffb3b0', '#e87e86')}"/>
     <polygon points="820,700 990,700 990,880 820,880" fill="${grad('#1f5560', '#0f2f37')}"/>
@@ -368,10 +360,10 @@ export function bandSceneSvg() {
   const mid = BAND.filter((m) => m.y >= 400 && m.y < 600);
   const frontRow = BAND.filter((m) => m.y >= 600);
   const body = `${stage()}${screen()}
-    ${musicStand(560, 300, 70)}${musicStand(1040, 300, 70)}
+    ${musicStand(745, 300, 64)}${musicStand(1072, 300, 64)}
     ${back.map(musician).join('')}
-    ${amp(820, 470)}
-    ${musicStand(680, 450, 84)}
+    ${amp(1040, 470)}
+    ${musicStand(628, 452, 76)}
     ${mid.map(musician).join('')}
     ${frontRow.map(musician).join('')}
     ${desk()}`;
