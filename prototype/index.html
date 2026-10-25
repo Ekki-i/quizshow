@@ -67,7 +67,7 @@
   <header class="top">
     <div>
       <h1><span class="show-title">Wer stiehlt <span class="hot">uns</span> die Show</span> <span class="proto">Prototyp</span></h1>
-      <p class="lead">Hier steuerst du die Show. Beamer, Team-iPads und Startseite laufen im Hintergrund mit und sind über die Reiter erreichbar.</p>
+      <p class="lead">Hier steuerst du die Show. Im Editor pflegst du Teams, Show-Ablauf und Spiele-Datenbank; Beamer, Team-iPads und Startseite laufen im Hintergrund mit.</p>
     </div>
     <div class="top-actions">
       <button class="reset fs-btn" id="beamer-fs" type="button">⛶ Beamer im Vollbild</button>
@@ -104,7 +104,8 @@
 
   const teamColors = ['#ff2e88', '#ffd400', '#00d1ff'];
   const screens = [
-    { id: 'moderation', label: 'Moderation', cls: 'mod', src: 'moderator.html', w: 1280, h: 900, color: '#00d1ff' },
+    { id: 'moderation', label: 'Moderation', cls: 'mod', src: 'moderator.html?view=live', w: 1280, h: 900, color: '#00d1ff' },
+    { id: 'editor', label: 'Editor', cls: 'mod', src: 'moderator.html?view=editor', w: 1280, h: 900, color: '#ff2e88' },
     { id: 'beamer', label: 'Beamer', cls: 'beamer', src: 'beamer.html', w: 1280, h: 720, color: '#ffffff' },
     ...server.demoTeams.map((t, i) => ({ id: `team${i + 1}`, label: `iPad ${t.name}`, cls: 'team', src: `team.html?code=${t.code}`, w: 820, h: 1100, color: teamColors[i] })),
     { id: 'start', label: 'Startseite', cls: 'start', src: 'start.html', w: 1100, h: 1100, color: '#c9b8f0' },
@@ -185,7 +186,7 @@
       const width = f.device.clientWidth;
       if (!width) continue;
       // Moderation: in Originalgröße, so hoch wie das Fenster – wie die echte Anwendung.
-      if (f.s.id === 'moderation' && stage.dataset.focus === 'moderation') {
+      if (f.s.cls === 'mod' && stage.dataset.focus === f.s.id) {
         const top = f.device.getBoundingClientRect().top + window.scrollY;
         const height = Math.max(560, window.innerHeight - top - 24);
         f.iframe.width = width;

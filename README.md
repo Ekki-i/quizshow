@@ -26,7 +26,7 @@ lässt sich so nicht.
 | --- | --- |
 | `index.html` | Startseite: „Als Team teilnehmen“ und „Moderator-Login“ |
 | `team.html` | Teamansicht für iPads, nur eigene private Daten |
-| `moderator.html` | Live-Regie, Teams, Show-Editor, Punkte & Protokoll |
+| `moderator.html` | Live-Regie, Punkte & Protokoll und der Punkt **Editor** mit Teams, Show-Editor, Spiele-Datenbank (`?view=live` bzw. `?view=editor` zeigt nur einen Teil; der Prototyp hat dafür die Reiter „Moderation“ und „Editor“) |
 | `beamer.html` | Publikumsansicht, zeigt nur freigegebene Inhalte |
 
 Tests: `npm test`
