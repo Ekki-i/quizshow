@@ -292,7 +292,9 @@ export function connect({ hello, onState, onAuthFailed, onKicked, quiet = false 
 // Aktion ausführen und Fehler verständlich anzeigen.
 export async function run(conn, name, payload) {
   try {
-    return await conn.action(name, payload);
+    const res = await conn.action(name, payload);
+    if (res && res.notice) toast(res.notice, 'info');
+    return res;
   } catch (err) {
     toast(err.message || 'Aktion fehlgeschlagen.');
     return null;

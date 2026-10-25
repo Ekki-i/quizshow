@@ -242,7 +242,7 @@ function handleAction(c, msg) {
     const result = game.applyAction(draft, ctx, msg.name, msg.payload, typeof msg.id === 'string' ? msg.id : null);
     store.data = draft;
     store.save();
-    send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate });
+    send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate, notice: result.notice || null });
     if (result.kick) kickTeam(result.kick);
     broadcast();
     scheduleWake();

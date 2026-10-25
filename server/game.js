@@ -40,6 +40,7 @@ function freshLive() {
     coins: [],
     warning: null,
     effect: { seq: 0, kind: null },
+    run: -1, // aktueller Schritt im Showablauf (-1 = noch nicht gestartet)
   };
 }
 
@@ -94,6 +95,7 @@ function migrate(db) {
   if (db.version === STATE_VERSION) {
     if (!db.shows) db.shows = [];
     if (db.project.date === undefined) db.project.date = '';
+    if (db.live.run === undefined) db.live.run = -1;
     return db;
   }
   const fresh = createState();
@@ -239,6 +241,92 @@ function showList(db) {
 
 function requireEditable(db) {
   if (db.live.activeGame !== null) fail('Während ein Spiel aktiv ist, bleibt der Showablauf fest. Zuerst das Spiel beenden.');
+}
+
+// ---------- Showablauf (wie eine Präsentation) ----------
+// Jeder Schritt ist eine „Folie“: Beamer-Ansicht plus nötige Spielaktion.
+// Ohne eigenen Ablauf gilt der Standardablauf aus den Spielen der Show.
+
+const RUN_KINDS = ['start', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'end'];
+const RUN_NEEDS_POS = ['title', 'game', 'coin'];
+const RUN_MAX = 120;
+
+function defaultRundown(project) {
+  const steps = [{ kind: 'start' }, { kind: 'intro' }, { kind: 'pyramid' }];
+  project.games.forEach((g, i) => {
+    const pos = i + 1;
+    steps.push({ kind: 'pyramid', pos }, { kind: 'title', pos }, { kind: 'game', pos });
+    if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'coin', pos });
+    if (pos === 4) steps.push({ kind: 'pause' });
+  });
+  steps.push({ kind: 'ranking' }, { kind: 'end' });
+  return steps.map((st, i) => ({ id: `std${i}`, ...st }));
+}
+
+function rundown(db) {
+  return Array.isArray(db.project.rundown) && db.project.rundown.length ? db.project.rundown : defaultRundown(db.project);
+}
+
+function stepLabel(db, st) {
+  const g = st.pos ? db.project.games[st.pos - 1] : null;
+  const game = g ? `Spiel ${st.pos} · ${g.title}` : st.pos ? `Spiel ${st.pos} (fehlt)` : '';
+  const base = {
+    start: 'Startbild',
+    intro: 'Vorstellung der Teams',
+    pyramid: st.pos ? `Übersicht Kategorien → ${game}` : 'Übersicht Kategorien',
+    title: `${game} – Spieltitel`,
+    game: `${game} – spielen`,
+    coin: `Münzvergabe nach Spiel ${st.pos}${STAGE_LABEL[st.pos] ? ` (Gewinnstufe ${STAGE_LABEL[st.pos]})` : ''}`,
+    pause: 'Pause',
+    ranking: 'Zwischenstand / Rangliste',
+    end: 'Abschluss',
+  }[st.kind];
+  return st.label ? `${st.label}` : base;
+}
+const STAGE_LABEL = { 4: 1, 6: 2, 8: 3 };
+
+function cleanRundown(db, steps) {
+  if (!Array.isArray(steps)) fail('Ungültiger Ablauf.');
+  if (steps.length > RUN_MAX) fail(`Höchstens ${RUN_MAX} Schritte.`);
+  return steps.map((st) => {
+    if (!st || !RUN_KINDS.includes(st.kind)) fail('Unbekannter Schritt im Ablauf.');
+    const out = { id: typeof st.id === 'string' && /^[\w-]{1,40}$/.test(st.id) ? st.id : newId('step'), kind: st.kind };
+    if (st.pos !== undefined && st.pos !== null) {
+      const pos = Number(st.pos);
+      if (!Number.isInteger(pos) || pos < 1 || pos > SHOW_SIZE) fail('Ungültige Spielposition im Ablauf.');
+      if (st.kind === 'coin' && !COIN_POSITIONS.includes(pos)) fail('Münzvergabe gibt es nur nach Spiel 4, 6 und 8.');
+      out.pos = pos;
+    } else if (RUN_NEEDS_POS.includes(st.kind)) fail('Für diesen Schritt fehlt das Spiel.');
+    if (st.label) out.label = cleanText(st.label, 60);
+    return out;
+  });
+}
+
+// Schritt ausführen: Spiel aktivieren, Münze ermitteln, Beamer umschalten.
+function runStep(db, ctx, index) {
+  const steps = rundown(db);
+  if (!Number.isInteger(index) || index < 0 || index >= steps.length) fail('Diesen Schritt gibt es nicht.');
+  const st = steps[index];
+  const game = st.pos ? db.project.games[st.pos - 1] : null;
+  if (st.pos && !game) fail(`Auf Position ${st.pos} steht kein Spiel.`);
+  db.live.run = index;
+  if (game && db.live.activeGame !== game.id) moderatorActions['show.activate'](db, ctx, { gameId: game.id });
+  const view = { start: 'start', end: 'start', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin' }[st.kind];
+  if (st.kind === 'coin') {
+    if (!db.live.coins.some((c) => c.position === st.pos)) moderatorActions['coin.determine'](db, ctx, { position: st.pos });
+    const coin = db.live.coins.find((c) => c.position === st.pos);
+    if (!coin) {
+      log(db, ctx, 'ablauf', `Schritt ${index + 1}: ${stepLabel(db, st)} – Gleichstand, Schätzfrage nötig`);
+      return { notice: 'Gleichstand: Bitte zuerst die Schätzfrage entscheiden, dann den Schritt erneut auslösen.' };
+    }
+    // Münze der richtigen Position zeigen (auch beim Zurückblättern).
+    db.live.beamer = { view: 'coin', data: { position: coin.position, teamId: coin.teamId } };
+    effect(db, 'coin');
+  } else {
+    moderatorActions['beamer.show'](db, ctx, { view });
+  }
+  log(db, ctx, 'ablauf', `Schritt ${index + 1}/${steps.length}: ${stepLabel(db, st)}`);
+  return {};
 }
 
 // ---------- Aktionen ----------
@@ -473,6 +561,12 @@ const moderatorActions = {
     db.live.coins.push({ position: w.position, teamId: p.teamId, at: ctx.now, method: 'Schätzfrage', points: w.points });
     db.live.warning = null;
     log(db, ctx, 'muenze', `Münze nach Position ${w.position} per Schätzfrage an ${teamName(db, p.teamId)}`);
+    // Steht der Ablauf gerade auf dieser Münzvergabe, sofort die Münze zeigen.
+    const cur = rundown(db)[db.live.run ?? -1];
+    if (cur && cur.kind === 'coin' && cur.pos === w.position) {
+      db.live.beamer = { view: 'coin', data: { position: w.position, teamId: p.teamId } };
+      effect(db, 'coin');
+    }
   },
 
   // ----- Mehrere Shows -----
@@ -525,6 +619,35 @@ const moderatorActions = {
     const s = findStashed(db, p.showId);
     db.shows = db.shows.filter((x) => x !== s);
     log(db, ctx, 'show', `Show „${s.project.name}“ gelöscht`);
+  },
+
+  // ----- Showablauf -----
+  'run.goto'(db, ctx, p) {
+    return runStep(db, ctx, Number(p.index));
+  },
+  'run.next'(db, ctx) {
+    const cur = rundown(db)[db.live.run ?? -1];
+    // Nichts vergessen: Nach einer Münzvergabe erst weiter, wenn die Münze vergeben ist.
+    if (cur && cur.kind === 'coin' && !db.live.coins.some((c) => c.position === cur.pos)) {
+      fail(`Die Münze nach Spiel ${cur.pos} ist noch nicht vergeben – erst die Schätzfrage entscheiden.`);
+    }
+    const next = (db.live.run ?? -1) + 1;
+    if (next >= rundown(db).length) fail('Das war der letzte Schritt.');
+    return runStep(db, ctx, next);
+  },
+  'run.prev'(db, ctx) {
+    const prev = (db.live.run ?? -1) - 1;
+    if (prev < 0) fail('Das ist der erste Schritt.');
+    return runStep(db, ctx, prev);
+  },
+  'rundown.set'(db, ctx, p) {
+    db.project.rundown = cleanRundown(db, p.steps);
+    if (db.live.run >= db.project.rundown.length) db.live.run = db.project.rundown.length - 1;
+    log(db, ctx, 'ablauf', `Showablauf geändert (${db.project.rundown.length} Schritte)`);
+  },
+  'rundown.reset'(db, ctx) {
+    db.project.rundown = null;
+    log(db, ctx, 'ablauf', 'Standard-Showablauf wiederhergestellt');
   },
 
   'live.reset'(db, ctx, p) {
@@ -647,6 +770,8 @@ function moderatorView(db, connections) {
     ledger: db.ledger.slice(-100),
     log: db.log.slice(-60),
     coinPositions: COIN_POSITIONS,
+    rundown: rundown(db).map((st) => ({ ...st, text: stepLabel(db, st) })),
+    rundownCustom: Array.isArray(db.project.rundown) && db.project.rundown.length > 0,
     connections: connections || {},
     beamerPreview: beamerView(db),
   };

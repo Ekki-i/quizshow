@@ -99,6 +99,7 @@ async function confirmAct(message, name, payload) {
 // Die Beamer-Vorschau steht fest im HTML, damit sie bei Updates nicht neu lädt.
 function renderLive() {
   const scroll = window.scrollY;
+  document.getElementById('run-panel').replaceChildren(buildRun());
   document.getElementById('live-left').replaceChildren(buildFlow(), buildGameControl());
   document.getElementById('beamer-controls').replaceChildren(...buildBeamerControls());
   document.getElementById('live-right').replaceChildren(buildTeamsLive(), buildCoins());
@@ -107,7 +108,7 @@ function renderLive() {
 
 function buildFlow() {
   const active = S.live.activeGame;
-  return card('Showablauf',
+  return card('Spiele (direkt aktivieren)',
     h('ul', { class: 'list' }, S.project.games.map((g, i) => {
       const pos = i + 1;
       const playable = S.types[g.type].playable;
@@ -120,6 +121,90 @@ function buildFlow() {
           : h('button', { class: 'btn small', disabled: !playable, onclick: () => act('show.activate', { gameId: g.id }) }, 'Aktivieren'));
     })),
     S.project.games.length < S.showSize ? h('p', { class: 'muted' }, `Noch ${S.showSize - S.project.games.length} Plätze frei. Spiele setzt du im Show-Editor ein.`) : null);
+}
+
+// ---------- Showablauf wie eine Präsentation ----------
+
+const RUN_ICON = { start: '★', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', end: '🏁' };
+const RUN_KIND_LABEL = { start: 'Startbild', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', end: 'Abschluss' };
+
+function runNext() { return act('run.next'); }
+function runPrev() { return act('run.prev'); }
+
+function buildRun() {
+  const steps = S.rundown || [];
+  const cur = S.live.run ?? -1;
+  const now = steps[cur];
+  const next = steps[cur + 1];
+  const started = cur >= 0;
+  const head = h('div', { class: 'run-head' },
+    h('div', { class: 'run-now' },
+      h('span', { class: 'run-count' }, started ? `Schritt ${cur + 1} von ${steps.length}` : `${steps.length} Schritte`),
+      h('div', { class: 'run-title' }, started ? [h('span', { class: 'run-ico' }, RUN_ICON[now.kind]), now.text] : 'Show noch nicht gestartet'),
+      h('div', { class: 'run-next muted' }, next ? ['Als Nächstes: ', h('b', {}, `${RUN_ICON[next.kind]} ${next.text}`)] : 'Letzter Schritt erreicht')),
+    h('div', { class: 'run-buttons' },
+      h('button', { class: 'btn ghost', disabled: cur <= 0, onclick: runPrev, title: 'Zurück (Pfeil links)' }, '◀ Zurück'),
+      h('button', { class: 'btn pink run-go', disabled: cur >= steps.length - 1, onclick: runNext, title: 'Weiter (Pfeil rechts, Leertaste)' }, started ? 'Weiter ▶' : 'Show starten ▶')));
+  const strip = h('ol', { class: 'run-strip', 'aria-label': 'Alle Schritte' }, steps.map((st, i) => h('li', {},
+    h('button', {
+      class: `run-step k-${st.kind} ${i === cur ? 'current' : ''} ${i < cur ? 'done' : ''}`,
+      'aria-current': i === cur ? 'step' : null,
+      title: `${i + 1}. ${st.text}`,
+      onclick: () => act('run.goto', { index: i }),
+    }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, RUN_ICON[st.kind]), h('span', { class: 't' }, st.text)))));
+  const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
+    h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Show-Editor.'));
+  // Aktuellen Schritt in der Leiste sichtbar halten.
+  requestAnimationFrame(() => panel.querySelector('.run-step.current')?.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  return panel;
+}
+
+// Tastatur und Presenter-Klicker (senden meist Bild↓/Bild↑ oder Pfeiltasten).
+document.addEventListener('keydown', (ev) => {
+  if (tab !== 'live' || !S || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  const t = ev.target;
+  if (t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable)) return;
+  if (document.querySelector('.modal-backdrop, dialog[open]')) return;
+  if (['ArrowRight', 'PageDown', ' '].includes(ev.key)) { ev.preventDefault(); runNext(); }
+  else if (['ArrowLeft', 'PageUp'].includes(ev.key)) { ev.preventDefault(); runPrev(); }
+});
+
+// Bearbeiten im Show-Editor: Schritte verschieben, löschen, Pausen einfügen.
+function buildRundownEditor() {
+  const steps = (S.rundown || []).map(({ id, kind, pos, label }) => ({ id, kind, pos, label }));
+  const save = (list) => act('rundown.set', { steps: list });
+  const move = (i, d) => { const l = [...steps]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); save(l); };
+  const insertAt = (i, st) => { const l = [...steps]; l.splice(i, 0, st); save(l); };
+  const kindSel = h('select', { 'aria-label': 'Art des Schritts' },
+    Object.entries(RUN_KIND_LABEL).map(([k, label]) => h('option', { value: k }, `${RUN_ICON[k]} ${label}`)));
+  const posSel = h('select', { 'aria-label': 'Spiel' }, S.project.games.map((g, i) => h('option', { value: String(i + 1) }, `Spiel ${i + 1} · ${g.title}`)));
+  const afterSel = h('select', { 'aria-label': 'Einfügen nach' },
+    h('option', { value: '0' }, 'ganz am Anfang'),
+    steps.map((st, i) => h('option', { value: String(i + 1), selected: i === steps.length - 1 }, `nach ${i + 1}. ${S.rundown[i].text}`)));
+  const updatePos = () => { posSel.hidden = !['title', 'game', 'coin', 'pyramid'].includes(kindSel.value); };
+  kindSel.onchange = updatePos;
+  kindSel.value = 'pause';
+  updatePos();
+  return card('Showablauf (Reihenfolge der Show)',
+    h('p', { class: 'muted' }, 'So läuft die Show in der Live-Regie ab – Schritt für Schritt mit „Weiter“, wie eine Präsentation.',
+      S.rundownCustom ? ' Du hast den Ablauf angepasst.' : ' Das ist der Standardablauf aus deinen Spielen.'),
+    h('ol', { class: 'list rundown-list' }, S.rundown.map((st, i) => h('li', { class: `rd k-${st.kind}` },
+      h('b', { class: 'rd-n' }, `${i + 1}.`),
+      h('span', { class: 'rd-i', 'aria-hidden': 'true' }, RUN_ICON[st.kind]),
+      h('span', { class: 'grow' }, st.text),
+      h('button', { class: 'btn small ghost', title: 'Pause danach einfügen', onclick: () => insertAt(i + 1, { kind: 'pause' }) }, '+ ☕'),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach oben', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+      h('button', { class: 'btn small ghost', 'aria-label': 'Nach unten', disabled: i === steps.length - 1, onclick: () => move(i, 1) }, '↓'),
+      h('button', { class: 'btn small bad', 'aria-label': 'Schritt entfernen', onclick: () => save(steps.filter((_, k) => k !== i)) }, '✕')))),
+    h('div', { class: 'row', style: { marginTop: '12px' } },
+      kindSel, posSel, afterSel,
+      h('button', { class: 'btn', onclick: () => {
+        const st = { kind: kindSel.value };
+        if (!posSel.hidden) st.pos = Number(posSel.value);
+        if (st.kind === 'pyramid' && st.pos === undefined) delete st.pos;
+        insertAt(Number(afterSel.value), st);
+      } }, '+ Schritt einfügen'),
+      S.rundownCustom ? h('button', { class: 'btn ghost', onclick: () => confirmAct('Eigene Änderungen am Ablauf verwerfen und den Standardablauf wiederherstellen?', 'rundown.reset') }, 'Standardablauf wiederherstellen') : null));
 }
 
 function activeGameOf() {
@@ -310,6 +395,7 @@ function buildEditor() {
     h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '12px' } }, h('h2', { style: { margin: 0 } }, 'Show-Editor'), saveIndicator()),
     buildShows(),
     buildBoard(),
+    buildRundownEditor(),
     sel ? buildGameEditor('game', sel) : null,
     h('div', { class: 'grid two', style: { marginTop: '16px' } },
       card('Show', field('Showname', 'name', 80),

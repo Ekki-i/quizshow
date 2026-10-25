@@ -549,3 +549,39 @@ test('Avatare: nur gültige Bilder, nur auf dem Beamer bei Intro und Münze, ent
   game.applyAction(db, mod(), 'team.update', { teamId: ids[0], avatar: null });
   assert.equal(db.project.teams[0].avatar, null);
 });
+
+test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze aus', () => {
+  const { db, ids } = setup(2);
+  const steps = game.moderatorView(db).rundown;
+  assert.deepEqual(steps.slice(0, 6).map((s) => s.kind), ['start', 'intro', 'pyramid', 'pyramid', 'title', 'game']);
+  assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
+  assert.ok(steps.some((s) => s.kind === 'pause'));
+  assert.equal(steps.at(-1).kind, 'end');
+  assert.throws(() => game.applyAction(db, mod(), 'run.prev', {}), /erste Schritt/);
+  game.applyAction(db, mod(), 'run.next', {});
+  assert.equal(db.live.beamer.view, 'start');
+  const titleIdx = steps.findIndex((s) => s.kind === 'title' && s.pos === 2);
+  game.applyAction(db, mod(), 'run.goto', { index: titleIdx });
+  assert.equal(db.live.activeGame, db.project.games[1].id);
+  assert.equal(db.live.beamer.view, 'title');
+  // Münze: Gleichstand → Hinweis, kein Beamerwechsel zur Münze
+  const coinIdx = steps.findIndex((s) => s.kind === 'coin' && s.pos === 4);
+  const r = game.applyAction(db, mod(), 'run.goto', { index: coinIdx });
+  assert.ok(r.notice);
+  assert.equal(db.live.warning.kind, 'coinTie');
+  assert.throws(() => game.applyAction(db, mod(), 'run.next', {}), /noch nicht vergeben/);
+  game.applyAction(db, mod(), 'coin.awardTie', { teamId: ids[1] });
+  assert.equal(db.live.beamer.view, 'coin');
+  assert.equal(db.live.coins[0].teamId, ids[1]);
+  game.applyAction(db, mod(), 'run.next', {});
+  assert.equal(db.live.beamer.view, 'pause');
+  // eigener Ablauf mit zusätzlicher Pause; ungültige Schritte werden abgelehnt
+  const custom = steps.map(({ id, kind, pos }) => ({ id, kind, pos }));
+  custom.splice(2, 0, { kind: 'pause' });
+  game.applyAction(db, mod(), 'rundown.set', { steps: custom });
+  assert.equal(game.moderatorView(db).rundown[2].kind, 'pause');
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.set', { steps: [{ kind: 'coin', pos: 3 }] }), /4, 6 und 8/);
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.set', { steps: [{ kind: 'quatsch' }] }), /Unbekannter/);
+  game.applyAction(db, mod(), 'rundown.reset', {});
+  assert.equal(game.moderatorView(db).rundownCustom, false);
+});

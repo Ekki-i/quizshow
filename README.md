@@ -69,6 +69,12 @@ Umgesetzt:
 - Teampulte auf dem Beamer in Originaloptik und -anordnung (Show-Bild, Bögen leer, erzeugt mit
   `scripts/build-podiums.py`); je Team lässt sich unter **Teams** ein 3D-Avatar (am besten
   freigestelltes PNG) hochladen, der im Bogen hinter dem Pult steht. Ohne Avatar bleibt das Pult leer.
+- **Showablauf wie eine Präsentation**: In der Live-Regie führt „Weiter“ (oder Pfeil rechts,
+  Leertaste, Presenter-Klicker) Schritt für Schritt durch die Show – Startbild, Vorstellung der
+  Teams, Übersicht Kategorien, je Spiel Spieltitel und Spiel, Münzvergaben nach 4, 6 und 8, Pause,
+  Rangliste und Abschluss. Jeder Schritt schaltet Spiel und Beamer automatisch. Nach einer offenen
+  Münzvergabe (Gleichstand) geht es erst weiter, wenn die Münze vergeben ist. Im Show-Editor lässt
+  sich der Ablauf ändern (Pausen einfügen, verschieben, löschen, Standard wiederherstellen).
 - **Pause**: Moderationspult mit „PAUSE“-Bildschirm, dahinter eine animierte Live-Band, die im Takt
   eines eigenen, mit WebAudio erzeugten Pausen-Songs spielt (Ton nach „Ton aktivieren“ am Beamer).
 - Beamer: Startbild, Intro mit Teams, Übersicht Kategorien (4–2–2), Spieltitel-Animation, Spielansicht,
