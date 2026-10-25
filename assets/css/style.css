@@ -948,3 +948,22 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .fx-top, .fx-bottom { z-index: 2; }
 .fx-room .fx-desk-coin { width: 2.6cqw; }
 .fx-room .fx-screen { background: #050507 !important; color: #fff; font-weight: 800; font-size: 2.2cqw; letter-spacing: 0.04em; }
+/* Finale: Feinschliff nach TV-Foto */
+.fx-room .fx-field { clip-path: polygon(19.6% 0, 49.4% 0, 100% 50.6%, 89.3% 100%, 0 92.6%); background: transparent; }
+.fx-room .fx-glitch { font-size: 2.3cqw; transform: rotate(-4deg); text-shadow: 0.04em 0.03em 0 #08080c, 0.07em 0.05em 0 rgba(255,255,255,0.8); margin-left: 1.5cqw; }
+.fx-room .fx-field-coins { position: absolute; display: flex; justify-content: center; align-items: flex-end; gap: 0.3cqw; min-height: 0; }
+.fx-room .fx-desk-coin { width: 2.4cqw; }
+.fx-name { height: 6vh; padding: 0 3vw; display: flex; align-items: center; justify-content: center; box-sizing: border-box; font-size: clamp(0.8rem, 3.2vh, 2.4rem); }
+.fx-name::before, .fx-name::after { width: 2.6vh; }
+.fx-tris { height: 6.4vh; box-sizing: border-box; padding: 0 2vw; align-items: center; }
+.fx-q { margin: 0 !important; height: 12.4vh; min-height: 0; padding: 0 5vh; box-sizing: border-box; display: grid; grid-template-rows: 6vh 6.4vh; align-items: center; gap: 0; background: #1e1e20; z-index: 1; }
+.fx-q::before, .fx-q::after { width: 2.6vh; }
+.fx-q span { font-size: clamp(0.7rem, 2.1vh, 1.6rem); font-weight: 500; line-height: 1.15; border-bottom: 0.3vh solid #3a3a3c; height: 100%; display: flex; align-items: center; justify-content: center; }
+.fx-q b { font-size: clamp(0.8rem, 3vh, 2.2rem); }
+.fx-q em { position: absolute; bottom: 0.4vh; left: 0; right: 0; font-size: 1.5vh; }
+.fx-q.no-answer { grid-template-rows: 12.4vh; }
+.fx-q.no-answer span { border-bottom: 0; }
+.fx-mid .fx-q { align-self: stretch; margin: 0 -0.6vw !important; }
+.fx-q b { display: flex; align-items: center; justify-content: center; gap: 1vw; }
+.fx-q em { position: static; font-size: 1.7vh; }
+.fx-q span { font-size: clamp(0.75rem, 2.6vh, 1.9rem); }
