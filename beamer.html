@@ -22,7 +22,7 @@
   <script type="module">
     import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
-    import { podiumRow } from './assets/js/studio.js';
+    import { podiumRow, INTRO_START, INTRO_STEP } from './assets/js/studio.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
@@ -250,8 +250,8 @@
       return [
         h('div', { class: 'kicker' }, 'Willkommen bei'),
         h('div', { style: { margin: '1vh 0 2.5vh' } }, showLogo(s.show.name, true)),
-        teamsScene(s),
-        h('div', { class: 'sub', style: { marginTop: '2.5vh' } }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
+        teamsScene(s, { intro: true }),
+        h('div', { class: 'sub intro-host', style: { marginTop: '2.5vh' }, '--d': `${INTRO_START + Math.min(s.teams.length, 6) * INTRO_STEP}s` }, `Moderation: ${s.show.host}${s.show.coHost ? ` & ${s.show.coHost}` : ''}`),
       ];
     }
 
@@ -316,7 +316,8 @@
         // Gewinnstufen mit der Münze der Show markieren.
         if (b[0] === 'stage') {
           const cs = 54;
-          for (const side of [-1, 1]) g.append(el('image', { href: 'assets/img/muenze.webp', x: W / 2 + side * (h1 + 14) - cs / 2, y: (y0 + y1) / 2 - cs * 0.43, width: cs, height: cs * 0.87, class: 'pyr-coin' }));
+          // nur rechts neben der Pyramide
+          g.append(el('image', { href: 'assets/img/muenze.webp', x: W / 2 + h1 + 14 - cs / 2, y: (y0 + y1) / 2 - cs * 0.43, width: cs, height: cs * 0.87, class: 'pyr-coin' }));
         }
         if (num && s.games) {
           const gm = s.games[Number(num[1]) - 1];
@@ -409,7 +410,7 @@
       // Münzen auf dem Pult vor dieser Vergabe: 3 minus die schon vergebenen.
       const left = Math.max(1, 3 - (s.coins || []).filter((c) => c.position < s.coin.position).length);
       const pct = (v, total) => `${(v / total) * 100}%`;
-      const pult = h('div', { class: 'scene scene-pult' },
+      const pult = h('div', { class: 'scene scene-pult full' },
         h('img', { src: 'assets/img/studio-pult.webp', alt: '' }),
         h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
           stage ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(stage))] : [h('small', {}, 'Münze nach Spiel'), h('b', {}, String(s.coin.position))]),
@@ -420,15 +421,16 @@
           style: { left: pct(cx - 16.5, W), top: pct(cy - 14.5, H), width: pct(33, W) },
         })),
         h('img', { class: 'scene-coin from-pult', src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true' }));
-      const wrap = h('div', { class: 'coin-sequence' }, pult);
+      const wrap = h('div', {}, pult); // ohne Animation, sonst wäre das Vollbild-Pult darin gefangen
       const showTeams = () => {
+        wrap.className = 'coin-sequence';
         wrap.replaceChildren(
           h('div', { class: 'kicker' }, stage ? `Gewinnstufe ${stage} · Zwischenstand` : 'Zwischenstand'),
           h('div', { class: 'coin-teams' },
             teamsScene(s, { points: true, winnerId: t.id, flyPosition: s.coin.position, banner: h('div', { class: 'scene-banner', '--team': t.color }, coinImg('banner-coin'), ` Münze an ${t.name}`) })));
       };
       if (s.settings.reducedMotion) showTeams();
-      else titleTimer = setTimeout(showTeams, 3800 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
+      else titleTimer = setTimeout(showTeams, 7600 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1));
       return [wrap];
     }
   </script>

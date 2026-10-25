@@ -8,6 +8,9 @@ import { PODIUM_DATA } from './podium-data.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 let uid = 0;
+// Ablauf der Team-Vorstellung (Sekunden, mal --speed in den Animationen)
+export const INTRO_START = 1.2;
+export const INTRO_STEP = 2.2;
 
 function el(tag, attrs = {}, text) {
   const n = document.createElementNS(NS, tag);
@@ -25,23 +28,41 @@ export function podiumRow(teams, opts = {}) {
   const defs = el('defs');
   svg.append(defs, el('image', { href: 'assets/img/studio-teams-empty.webp', x: 0, y: 0, width: W, height: H }));
   const flights = [];
+  if (opts.intro) {
+    svg.classList.add('intro');
+    const lg = el('linearGradient', { id: `${id}-spot`, x1: 0, y1: 0, x2: 0, y2: 1 });
+    lg.append(el('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': 0.75 }), el('stop', { offset: 1, 'stop-color': '#fff', 'stop-opacity': 0 }));
+    defs.append(lg);
+  }
 
   podiums.forEach((p, i) => {
     const t = shown[i];
     const [l, top, r, desk] = p.box;
-    const g = el('g', { class: 'podium-slot', style: t ? `--team:${t.color};animation-delay:${0.2 + i * 0.15}s` : '' });
+    // Vorstellung (opts.intro): ein Team nach dem anderen, je INTRO_STEP Sekunden.
+    const style = !t ? '' : opts.intro ? `--team:${t.color};--d:${INTRO_START + i * INTRO_STEP}s` : `--team:${t.color};animation-delay:${0.2 + i * 0.15}s`;
+    const g = el('g', { class: 'podium-slot', style });
+    if (t && opts.intro) {
+      // Lichtkegel von oben auf das Pult und ein Aufleuchten in Teamfarbe.
+      const cx = (l + r) / 2;
+      g.append(
+        el('polygon', { class: 'podium-spot', points: `${cx - 14},-40 ${cx + 14},-40 ${r + 18},${desk + 30} ${l - 18},${desk + 30}`, fill: `url(#${id}-spot)` }),
+        el('rect', { class: 'podium-flash', x: l - 6, y: top - 6, width: r - l + 12, height: desk - top + 60, rx: 40, fill: t.color }));
+    }
     // Avatar: im Bogen, unten an der Pultkante abgeschnitten (steht dahinter).
+    // Die Maske sitzt auf einer Gruppe, damit der Avatar darin hochfahren kann.
     if (t && t.avatar) {
       const clipId = `${id}-clip-${i}`;
       const clip = el('clipPath', { id: clipId });
       clip.append(el('polygon', { points: p.clip }));
       defs.append(clip);
       const w = r - l, hgt = desk - top;
-      g.append(el('image', {
-        href: t.avatar, class: 'podium-avatar', 'clip-path': `url(#${clipId})`,
+      const holder = el('g', { 'clip-path': `url(#${clipId})` });
+      holder.append(el('image', {
+        href: t.avatar, class: 'podium-avatar',
         x: l - w * 0.04, y: top + hgt * 0.08, width: w * 1.08, height: hgt * 1.3,
         preserveAspectRatio: 'xMidYMin meet',
       }));
+      g.append(holder);
     }
     // Punktefeld: im Bild steht „0“ – immer überdecken, Punkte nur bei der Münzvergabe.
     const [sx0, sy0, sx1, sy1] = p.score;
@@ -95,7 +116,7 @@ export function podiumRow(teams, opts = {}) {
       { transform: 'translate(0, 0) scale(0.9, 1.08) rotateY(1080deg)', offset: 0.88 },
       { transform: 'translate(0, -5px) scale(1.04) rotateY(1080deg)', offset: 0.94 },
       { transform: 'translate(0, 0) scale(1) rotateY(1080deg)', opacity: 1, offset: 1 },
-    ], { duration: 1700 * speed, delay: 500 * speed, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'both' });
+    ], { duration: 3200 * speed, delay: 900 * speed, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'both' });
   }
 
   const rest = teams.slice(podiums.length);
