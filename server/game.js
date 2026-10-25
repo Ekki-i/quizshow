@@ -69,7 +69,7 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
     name,
     date: '',
     subtitle: 'Die Live-Show mit acht Spielen',
-    host: 'Moderation',
+    host: 'Fabian',
     coHost: '',
     // Teams sehen standardmäßig keine fremden Punktestände (Abschnitt 4.1).
     settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
@@ -101,6 +101,7 @@ function migrate(db) {
     if (db.project.date === undefined) db.project.date = '';
     if (db.live.run === undefined) db.live.run = -1;
     if (db.live.finale === undefined) db.live.finale = null;
+    if (db.project.host === 'Moderation') db.project.host = 'Fabian';
     if (!db.project.finale) db.project.finale = clone(FINALE.EXAMPLE);
     for (const sh of db.shows) {
       if (!sh.project.finale) sh.project.finale = clone(FINALE.EXAMPLE);
@@ -372,6 +373,9 @@ const moderatorActions = {
     if ('subtitle' in p) pr.subtitle = cleanText(p.subtitle, 160);
     if ('host' in p) pr.host = cleanText(p.host, 80);
     if ('coHost' in p) pr.coHost = cleanText(p.coHost, 80);
+    // 3D-Avatare der Moderation (null = Standard-Avatar aus dem Pultbild)
+    if ('hostAvatar' in p) pr.hostAvatar = p.hostAvatar ? cleanImage(p.hostAvatar) : null;
+    if ('coHostAvatar' in p) pr.coHostAvatar = p.coHostAvatar ? cleanImage(p.coHostAvatar) : null;
     if ('date' in p) pr.date = cleanDate(p.date);
     if (p.settings && typeof p.settings === 'object') {
       for (const k of ['publicScores', 'reducedMotion', 'sound']) {
@@ -811,7 +815,7 @@ function beamerView(db) {
   const sums = b.view === 'coin' ? totals(db) : null;
   const view = {
     role: 'beamer',
-    show: { name: pr.name, subtitle: pr.subtitle, host: pr.host, coHost: pr.coHost },
+    show: { name: pr.name, subtitle: pr.subtitle, host: pr.host, coHost: pr.coHost, hostAvatar: pr.hostAvatar || null, coHostAvatar: pr.coHostAvatar || null },
     teams: publicTeams(db).map((t, i) => {
       const out = sums ? { ...t, points: sums[t.id] || 0 } : { ...t };
       // Avatare nur in den Ansichten mit Teampulten mitschicken (große Bilder).

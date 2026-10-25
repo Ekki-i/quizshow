@@ -447,6 +447,25 @@ function avatarCell(t) {
     t.avatar ? h('button', { class: 'btn small ghost', onclick: () => act('team.update', { teamId: t.id, avatar: null }) }, 'Entfernen') : null);
 }
 
+// 3D-Avatar für Moderation bzw. Co-Moderation (steht hinter dem Moderationspult; ohne Bild der Standard-Avatar)
+function hostAvatarCell(label, key) {
+  const cur = S.project[key];
+  const input = h('input', {
+    type: 'file', accept: 'image/png,image/webp,image/jpeg', class: 'visually-hidden', 'aria-label': `${label} wählen`,
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      try { act('project.update', { [key]: await shrinkImage(file) }); } catch (err) { toast(err.message); }
+    },
+  });
+  const def = key === 'hostAvatar' ? 'assets/img/avatar-host.webp' : 'assets/img/avatar-cohost.webp';
+  return h('div', {}, h('label', {}, label), h('div', { class: 'avatar-cell' },
+    h('img', { class: 'avatar-thumb', src: cur || def, alt: label }),
+    h('label', { class: 'btn small ghost' }, input, cur ? 'Ändern' : 'Eigenes Bild wählen'),
+    cur ? h('button', { class: 'btn small ghost', onclick: () => act('project.update', { [key]: null }) }, 'Standard-Avatar') : h('span', { class: 'muted' }, 'Standard-Avatar')));
+}
+
 function buildTeams() {
   const base = `${location.origin}${location.pathname.replace(/moderator\.html$/, '')}team.html?code=`;
   return [
@@ -539,7 +558,8 @@ function buildEditor() {
       card('Show', field('Showname', 'name', 80),
         h('div', {}, h('label', { for: 'show-date' }, 'Datum der Show'),
           h('input', { id: 'show-date', type: 'date', value: p.date || '', onchange: (ev) => act('project.update', { date: ev.target.value }) })),
-        field('Untertitel', 'subtitle', 160), field('Moderation', 'host', 80), field('Co-Moderation (optional)', 'coHost', 80)),
+        field('Untertitel', 'subtitle', 160), field('Moderation (Name)', 'host', 80), hostAvatarCell('Avatar Moderation', 'hostAvatar'),
+        field('Co-Moderation (Name, leitet das Finale)', 'coHost', 80), hostAvatarCell('Avatar Co-Moderation', 'coHostAvatar')),
       card('Darstellung',
         check('Animationen reduzieren', 'reducedMotion'),
         check('Soundeffekte auf dem Beamer', 'sound'),

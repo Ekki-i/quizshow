@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Wer stiehlt uns die Show – iPad Moderation</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <!-- iPad der Moderation: wird erst im Finale aktiv. Hier schreibt die Moderation
+       ihre verdeckte Antwort; die Lösung sieht sie hier nicht. -->
+  <header class="team-head" id="head" style="--team:#7fc8bd">
+    <span class="name">iPad Moderation</span>
+    <span class="muted" id="show-name"></span>
+  </header>
+  <main class="team-main" id="main">
+    <div class="wait"><p class="big">Verbinde …</p></div>
+  </main>
+
+  <script type="module">
+    import { h, connect, store, localServer, setShowTitle, run, ask, toast, coinImg } from './assets/js/client.js';
+    import { inkPad, answerContent } from './assets/js/ink.js';
+    import { stateBox } from './assets/js/team-play.js';
+
+    const main = document.getElementById('main');
+    const token = store('quiz.modToken') || localServer?.demoToken;
+    if (!token) {
+      main.replaceChildren(h('div', { class: 'wait' }, h('p', { class: 'big' }, 'Bitte zuerst als Moderation anmelden'),
+        h('p', {}, h('a', { class: 'btn pink', href: 'index.html?next=host' }, 'Zur Anmeldung'))));
+    }
+
+    let pad = { key: null, el: null };
+    let lastKey = null;
+    const conn = token ? connect({
+      hello: () => ({ role: 'moderator', token }),
+      onState: (s) => render(s),
+      onAuthFailed: () => { store('quiz.modToken', null); location.href = 'index.html?next=host'; },
+    }) : null;
+
+    const wait = (big, small) => h('div', { class: 'wait' }, h('p', { class: 'big' }, big), small ? h('p', { class: 'muted' }, small) : null);
+
+    function render(s) {
+      setShowTitle(document.getElementById('show-name'), s.project.name);
+      const st = s.finale && s.finale.state;
+      // Nur öffentliche Teile – die Lösung bleibt hier ausgeblendet.
+      const view = st ? { ...st, round: st.round ? { ...st.round, answer: undefined, solution: st.round.resolved ? st.round.solution : null } : null } : null;
+      const key = JSON.stringify(view);
+      if (key === lastKey) return;
+      lastKey = key;
+      if (!st) {
+        main.replaceChildren(wait('Dieses iPad wird im Finale aktiviert', 'Bis dahin läuft die Show über die Regie. Im Finale schreibst du hier deine verdeckte Antwort.'));
+        return;
+      }
+      const tris = (n, color) => h('div', { class: 'host-tris' }, Array.from({ length: st.target }, (_, i) => h('span', { class: `host-tri${i < n ? ' on' : ''}`, style: { '--side': color } })));
+      const out = [
+        h('p', { class: 'muted' }, '★ Finale gegen ', h('b', { style: { color: st.team.color } }, st.team.name), st.sudden ? ' · SUDDEN DEATH' : ''),
+        h('div', { class: 'fin-head' },
+          h('div', { class: 'fin-side', style: { '--team': st.team.color } }, h('b', {}, st.team.name), tris(st.score.team, st.team.color),
+            h('span', { class: 'fin-coins' }, Array.from({ length: st.coinsTotal }, (_, i) => coinImg(`fin-coin${i < st.coins ? '' : ' lost'}`)))),
+          h('div', { class: 'fin-vs' }, `Ziel ${st.target}`),
+          h('div', { class: 'fin-side mod' }, h('b', {}, st.host || 'Moderation'), tris(st.score.mod, '#7fc8bd'))),
+      ];
+      if (st.result) {
+        out.push(stateBox(st.result === 'mod' ? 'ok' : '', st.result === 'mod' ? '🎤' : '🎟', st.result === 'mod' ? 'Du behältst die Show!' : `${st.team.name} stiehlt die Show.`));
+        return main.replaceChildren(...out);
+      }
+      const r = st.round;
+      if (!r || r.resolved) {
+        if (r && r.resolved) out.push(stateBox('', 'ℹ', `Lösung: ${r.solution}${r.challenged ? (r.coinLost ? ' · deine Antwort war richtig, das Team verliert die Münze' : ' · deine Antwort war falsch, kein Punkt') : ''}`));
+        out.push(wait(r ? 'Gleich kommt die nächste Frage …' : 'Gleich kommt die erste Finalfrage …'));
+        return main.replaceChildren(...out);
+      }
+      out.push(h('p', { class: 'muted' }, `Finalfrage ${st.qIndex + 1}`), h('p', { class: 'question' }, r.question));
+      if (!r.mod) {
+        const k = `finale-host-${st.qIndex}`;
+        if (pad.key !== k) pad = { key: k, el: inkPad({ draftKey: k, label: 'Deine Antwort (verdeckt)', button: 'Verdeckt abgeben', ask, toast, onSubmit: (ink) => run(conn, 'finale.modAnswer', { ink }) }) };
+        out.push(pad.el);
+        return main.replaceChildren(...out);
+      }
+      out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Deine Antwort (verdeckt)'), answerContent(r.mod)));
+      if (!r.teamAnswered) out.push(stateBox('', '⏳', 'Das Team schreibt noch …'));
+      else if (r.challenged) out.push(stateBox('', '🪙', r.modGrade === null ? 'Das Team setzt eine Münze ein – deine Antwort wird aufgedeckt!' : r.modGrade ? 'Richtig – das Team verliert die Münze, du behältst deinen Punkt.' : 'Falsch – kein Punkt, das Team bekommt die Münze zurück.'));
+      else out.push(stateBox('ok', '🤫', 'Verdeckt abgegeben. Du bekommst deinen Punkt, wenn das Team keine Münze einsetzt.'));
+      main.replaceChildren(...out);
+    }
+  </script>
+</body>
+</html>

@@ -101,7 +101,7 @@
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || 'Anmeldung fehlgeschlagen.');
         store('quiz.modToken', body.token);
-        location.href = 'moderator.html';
+        location.href = new URLSearchParams(location.search).get('next') === 'host' ? 'host.html' : 'moderator.html';
       } catch (e) {
         err.textContent = e.message === 'Failed to fetch' ? 'Server nicht erreichbar.' : e.message;
         err.classList.remove('hidden');

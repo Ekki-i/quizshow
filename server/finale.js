@@ -12,7 +12,8 @@
 //   Ist sie falsch, bekommt die Moderation keinen Punkt und das Team die Münze zurück.
 // Wer zuerst das Ziel erreicht, gewinnt. Erreichen beide es in derselben Frage,
 // folgt Sudden Death: Es entscheidet der erste Fehler (falsche Teamantwort oder
-// aufgedeckte falsche Moderationsantwort) oder der Verlust der letzten Münze.
+// aufgedeckte falsche Moderationsantwort). Verliert das Team seine letzte Münze,
+// hat es sofort verloren.
 // Das Siegerteam erhält ein Ticket für die große Finalshow.
 
 const { fail, log, effect, teamName, totals, cleanText, cleanInk } = require('./core');
@@ -172,10 +173,11 @@ const mod = {
     f.score.mod += r.modPoint;
     const target = config(db).target;
     log(db, ctx, 'finale', `Finalfrage ${f.qIndex + 1} aufgelöst: Team ${f.score.team}, Moderation ${f.score.mod}`);
+    // Keine Münze mehr: Das Team hat automatisch verloren.
+    if (r.coinLost && coinsLeft(db, f) === 0) return decide(db, ctx, f, 'mod', 'letzte Münze verloren');
     if (f.sudden) {
       if (!r.teamGrade) return decide(db, ctx, f, 'mod', 'Fehler des Teams im Sudden Death');
       if (r.challenged && r.modGrade === false) return decide(db, ctx, f, 'team', 'Fehler der Moderation im Sudden Death');
-      if (r.coinLost && coinsLeft(db, f) === 0) return decide(db, ctx, f, 'mod', 'letzte Münze verloren');
       return;
     }
     const t = f.score.team >= target, m = f.score.mod >= target;
@@ -257,6 +259,7 @@ function base(db, f) {
   return {
     team: { id: f.teamId, name: t.name, color: t.color },
     host: db.project.host,
+    coHost: db.project.coHost,
     target: config(db).target,
     score: f.score,
     coins: coinsLeft(db, f),
