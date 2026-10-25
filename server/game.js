@@ -70,7 +70,7 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
     date: '',
     subtitle: 'Die Live-Show mit acht Spielen',
     host: 'Fabian',
-    coHost: '',
+    coHost: 'Alexia',
     // Teams sehen standardmäßig keine fremden Punktestände (Abschnitt 4.1).
     settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
     teams: [],
@@ -102,6 +102,7 @@ function migrate(db) {
     if (db.live.run === undefined) db.live.run = -1;
     if (db.live.finale === undefined) db.live.finale = null;
     if (db.project.host === 'Moderation') db.project.host = 'Fabian';
+    if (!db.project.coHostDefaulted) { if (!db.project.coHost) db.project.coHost = 'Alexia'; db.project.coHostDefaulted = true; }
     if (!db.project.finale) db.project.finale = clone(FINALE.EXAMPLE);
     for (const sh of db.shows) {
       if (!sh.project.finale) sh.project.finale = clone(FINALE.EXAMPLE);
