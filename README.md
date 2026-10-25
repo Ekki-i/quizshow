@@ -98,7 +98,8 @@ Umgesetzt:
 - **Alle acht Spiele live spielbar** mit Team-iPad, Beamer und Moderation:
   - *Die leichten 5*: Freitext, Bewertung pro Antwort.
   - *Dumm ist der, der Dummes kriegt*: A–D, Buzzer nach dem Sperren, 10-Sekunden-Fenster
-    (serverseitig), Nachabgabe durch die Moderation, ein Antworttausch im ganzen Spiel.
+    (serverseitig), Nachabgabe durch die Moderation, fünf Fragen, bei jeder Frage ein Antworttausch
+    für das schnellste Team.
   - *Ich sehe ein Land, das du nicht siehst*: Karte (Welt, Europa, Deutschland) zum Antippen,
     erst Tipps, dann Zielort enthüllen, Entfernung in km, manuelle Korrektur.
   - *Das ist ein echter Kassenschlager*: private Paywall mit zehn Hinweisen, 20 $ Start,

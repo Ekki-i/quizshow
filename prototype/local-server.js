@@ -7,7 +7,7 @@ import { game } from './game-bundle.js';
 
 const PASSWORD = 'demo';
 const DEMO_TOKEN = 'demo-token';
-const STORAGE_KEY = 'quiz.prototype.state.v3';
+const STORAGE_KEY = 'quiz.prototype.state.v4';
 const DEMO_TEAMS = [
   { name: 'Die Füchse', code: 'FUCHS12345' },
   { name: 'Team Blitz', code: 'BLITZ12345' },

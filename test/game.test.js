@@ -311,7 +311,7 @@ test('Jauch: Telefonjoker wartet, bis alle anderen gesperrt haben; Antworten ble
   assert.equal(game.totals(db)[ids[0]], 1);
 });
 
-test('Dummes: Buzzer, 10-Sekunden-Fenster, ein Tausch im ganzen Spiel', () => {
+test('Dummes: Buzzer, 10-Sekunden-Fenster, Tausch bei jeder Frage', () => {
   const { db, ids } = setup(3);
   const [a, b, c] = ids;
   activate(db, 'dummes');
@@ -335,14 +335,23 @@ test('Dummes: Buzzer, 10-Sekunden-Fenster, ein Tausch im ganzen Spiel', () => {
   assert.deepEqual([a, b, c].map((t) => game.totals(db)[t]), [1, 0, 0]);
   assert.equal(game.teamView(db, b, 72000).play.final, 'A');
   assert.equal(game.teamView(db, b, 72000).play.swappedWith, db.project.teams[0].name);
-  // Der Tausch ist verbraucht: in Frage 2 gibt es keinen Buzzer mehr.
-  game.applyAction(db, mod(), 'play.open', { qIndex: 1 });
-  play(b, 'answer', { choice: 'C' });
-  assert.throws(() => play(b, 'buzz'), /schon genutzt/);
+  assert.throws(() => play(a, 'swap', { teamId: c }, 72500), /schon getauscht|ausgewertet/);
+  // Frage 2: wieder Buzzer und Tausch möglich – diesmal für ein anderes Team.
+  game.applyAction(db, mod(), 'play.open', { qIndex: 1 }); // richtig: C
+  play(a, 'answer', { choice: 'C' }, 80000);
+  play(b, 'answer', { choice: 'A' }, 80100);
+  assert.equal(game.teamView(db, b, 80100).play.canBuzz, true);
+  play(b, 'buzz', {}, 80200);
+  play(c, 'answer', { choice: 'D' }, 80300);
+  play(b, 'swap', { teamId: a }, 80400);
   game.applyAction(db, mod(), 'play.evaluate');
+  assert.equal(game.totals(db)[b], 1);
+  assert.equal(game.totals(db)[a], 1);
+  // fünf Fragen im Beispiel
+  assert.equal(db.project.games.find((x) => x.type === 'dummes').content.questions.length, 5);
   game.applyAction(db, mod(), 'play.grade', { teamId: b, correct: false });
   assert.equal(game.totals(db)[b], 0);
-  assert.equal(game.nextWake(db, 0), null);
+  assert.equal(game.nextWake(db, 100000), null);
 });
 
 test('Musik: Feld wählen, Buzzer, falsch sperrt, richtig gibt Feldpunkte', () => {

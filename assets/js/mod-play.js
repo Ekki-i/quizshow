@@ -87,7 +87,7 @@ function dummes(ui, g, st) {
   const r = rounds[qIndex];
   const out = [
     tabs(g.content.questions.map((_, i) => `Frage ${i + 1}`), qIndex, (i) => ui.act('play.open', { qIndex: i }), (i) => rounds[i]?.evaluated),
-    h('p', { class: 'muted' }, st.swapUsed ? 'Der eine Antworttausch dieses Spiels ist verbraucht.' : 'Der Antworttausch ist in diesem Spiel noch frei.'),
+    h('p', { class: 'muted' }, 'Bei jeder Frage darf das Team, das zuerst buzzert, seine Antwort mit einem anderen Team tauschen.'),
   ];
   if (qIndex < 0 || !r) return [...out, h('p', { class: 'muted' }, 'Frage freigeben: alle Teams wählen A–D und sperren.')];
   const q = g.content.questions[qIndex];

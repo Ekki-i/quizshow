@@ -121,7 +121,7 @@ function dummes(g, ui) {
   if (g.swapDone) return [...out, stateBox('ok', '🔁', 'Tausch erledigt – gleich wird aufgelöst.')];
   if (g.swapWaiting) return [...out, stateBox('ok', '🔔', h('span', {}, 'Ihr wart am schnellsten! Gleich dürft ihr tauschen … ', g.windowEnds ? countdown(g.windowEnds) : null))];
   out.push(stateBox('', '🔒', `Antwort ${g.choice} gesperrt`));
-  if (!g.swapUsed && !g.buzzTaken) out.push(h('p', { class: 'muted', style: { textAlign: 'center' } }, 'Wer zuerst buzzert, darf seine Antwort mit einem anderen Team tauschen.'), buzzer(ui, g.canBuzz));
+  if (!g.buzzTaken) out.push(h('p', { class: 'muted', style: { textAlign: 'center' } }, 'Wer zuerst buzzert, darf seine Antwort mit einem anderen Team tauschen.'), buzzer(ui, g.canBuzz));
   else if (g.buzzTaken && !g.isBuzzer) out.push(h('p', { class: 'muted' }, 'Ein anderes Team war schneller am Buzzer.'));
   return out;
 }

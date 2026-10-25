@@ -1,8 +1,8 @@
 'use strict';
 
 // Spiel „Dumm ist der, der Dummes kriegt“: alle Teams sperren A–D, danach
-// darf gebuzzert werden. Das schnellste Team tauscht einmal im ganzen Spiel
-// seine Antwort mit einem anderen Team. Richtige finale Antwort: 1 Punkt.
+// darf gebuzzert werden. Bei jeder Frage darf das schnellste Team seine
+// Antwort mit einem anderen Team tauschen. Richtige finale Antwort: 1 Punkt.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanChoice } = require('./core');
 
@@ -41,7 +41,7 @@ function swapReady(db, r, now) {
 
 module.exports = {
   WINDOW_MS,
-  init: () => ({ qIndex: -1, rounds: {}, swapUsed: false }),
+  init: () => ({ qIndex: -1, rounds: {} }),
 
   team: {
     answer(db, ctx, game, st, p) {
@@ -56,7 +56,6 @@ module.exports = {
     buzz(db, ctx, game, st) {
       const r = current(st);
       if (!r.open) fail('Die Frage ist nicht freigegeben.');
-      if (st.swapUsed) fail('Der Antworttausch wurde in diesem Spiel schon genutzt.');
       if (!r.answers[ctx.teamId]) fail('Erst die eigene Antwort sperren, dann buzzern.');
       if (r.buzz) fail(`${teamName(db, r.buzz.teamId)} war schneller.`);
       r.buzz = { teamId: ctx.teamId, at: ctx.now };
@@ -68,12 +67,11 @@ module.exports = {
     swap(db, ctx, game, st, p) {
       const r = current(st);
       if (!r.buzz || r.buzz.teamId !== ctx.teamId) fail('Nur das schnellste Team darf tauschen.');
-      if (st.swapUsed || r.swap) fail('Der Antworttausch wurde schon genutzt.');
+      if (r.swap) fail('Bei dieser Frage wurde schon getauscht.');
       if (r.evaluated) fail('Die Frage ist bereits ausgewertet.');
       if (!swapReady(db, r, ctx.now)) fail('Erst wenn alle Teams abgegeben haben, wird getauscht.');
       if (p.teamId === ctx.teamId || !r.answers[p.teamId]) fail('Bitte ein anderes Team mit abgegebener Antwort wählen.');
       r.swap = { by: ctx.teamId, with: p.teamId };
-      st.swapUsed = true;
       r.open = false;
       log(db, ctx, 'tausch', `${teamName(db, ctx.teamId)} tauscht die Antwort mit ${teamName(db, p.teamId)}`);
     },
@@ -147,9 +145,8 @@ module.exports = {
       windowEnds: r.windowEnds,
       buzzTaken: !!r.buzz,
       isBuzzer,
-      canBuzz: r.open && !!own && !r.buzz && !st.swapUsed,
-      swapUsed: st.swapUsed,
-      swapTargets: isBuzzer && !r.swap && !r.evaluated && !st.swapUsed && swapReady(db, r, now)
+      canBuzz: r.open && !!own && !r.buzz,
+      swapTargets: isBuzzer && !r.swap && !r.evaluated && swapReady(db, r, now)
         ? teamIds(db).filter((id) => id !== teamId && r.answers[id]).map((id) => ({ id, name: teamName(db, id) }))
         : null,
       swapWaiting: isBuzzer && !r.swap && !r.evaluated && !swapReady(db, r, now),
