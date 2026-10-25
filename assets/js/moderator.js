@@ -5,7 +5,19 @@ const token = store('quiz.modToken') || localServer?.demoToken;
 if (!token) location.href = 'index.html';
 
 let S = null; // letzter Zustand vom Server
-let tab = store('quiz.modTab') || 'live';
+// Ansicht: ?view=live (nur Moderation), ?view=editor (nur Editor), sonst beides.
+const VIEW = new URLSearchParams(location.search).get('view');
+const LIVE_TABS = ['live', 'points'];
+const EDITOR_TABS = ['teams', 'editor', 'library'];
+const ALLOWED = VIEW === 'editor' ? EDITOR_TABS : VIEW === 'live' ? LIVE_TABS : [...LIVE_TABS, ...EDITOR_TABS];
+const TAB_KEY = `quiz.modTab${VIEW ? `.${VIEW}` : ''}`;
+let tab = ALLOWED.includes(store(TAB_KEY)) ? store(TAB_KEY) : ALLOWED[0];
+let lastEditorTab = EDITOR_TABS.includes(tab) ? tab : 'teams';
+if (VIEW === 'editor') {
+  document.getElementById('main-tabs').classList.add('hidden');
+  document.querySelector('.beamer-mini')?.remove(); // Beamer-Vorschau nur in der Moderation
+}
+if (VIEW === 'live') document.querySelector('#main-tabs [data-group="editor"]').remove();
 const saveState = { dirty: false, saving: false, timer: null, pending: new Map() };
 const deferred = new Set();
 
@@ -29,8 +41,9 @@ document.getElementById('logout').onclick = async () => {
 
 for (const b of document.querySelectorAll('[role=tab]')) {
   b.onclick = () => {
-    tab = b.dataset.tab;
-    store('quiz.modTab', tab);
+    tab = b.dataset.group === 'editor' ? lastEditorTab : b.dataset.tab;
+    if (EDITOR_TABS.includes(tab)) lastEditorTab = tab;
+    store(TAB_KEY, tab);
     renderAll(true);
   };
 }
@@ -40,7 +53,11 @@ for (const b of document.querySelectorAll('[role=tab]')) {
 function renderAll(force = false) {
   if (!S) return;
   setShowTitle(document.getElementById('show-name'), S.project.name);
-  for (const b of document.querySelectorAll('[role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  const inEditor = EDITOR_TABS.includes(tab);
+  for (const b of document.querySelectorAll('[role=tab]')) {
+    b.setAttribute('aria-selected', String(b.dataset.group === 'editor' ? inEditor : b.dataset.tab === tab));
+  }
+  document.getElementById('editor-tabs').classList.toggle('hidden', !inEditor);
   for (const id of ['live', 'teams', 'editor', 'library', 'points']) document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tab);
   renderWarning();
   if (tab === 'live') return renderLive();
@@ -100,7 +117,8 @@ async function confirmAct(message, name, payload) {
 function renderLive() {
   const scroll = window.scrollY;
   document.getElementById('run-panel').replaceChildren(buildRun());
-  document.getElementById('live-left').replaceChildren(buildFlow(), buildGameControl());
+  document.getElementById('live-left').replaceChildren(buildGameControl());
+  document.getElementById('live-bottom').replaceChildren(buildFlow());
   document.getElementById('beamer-controls').replaceChildren(...buildBeamerControls());
   document.getElementById('live-right').replaceChildren(buildTeamsLive(), buildCoins());
   window.scrollTo(0, scroll);
@@ -114,7 +132,7 @@ function buildFlow() {
       const playable = S.types[g.type].playable;
       return h('li', { class: g.id === active ? 'active' : '' },
         h('b', {}, `${pos}.`),
-        h('span', { class: 'grow' }, g.title, S.coinPositions.includes(pos) ? h('span', { class: 'muted' }, '  · danach Münze') : null),
+        h('span', { class: 'grow' }, g.title, S.coinPositions.includes(pos) ? h('span', { class: 'muted' }, '  · danach Pause und Münze') : null),
         playable ? null : h('span', { class: 'badge' }, 'noch nicht spielbar'),
         g.id === active
           ? h('button', { class: 'btn small ghost', onclick: () => act('show.activate', { gameId: null }) }, 'Beenden')
@@ -157,7 +175,7 @@ function buildRun() {
       onclick: () => act('run.goto', { index: i }),
     }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
   const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
-    h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Show-Editor.'));
+    h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'));
   // Aktuellen Schritt in der Leiste sichtbar halten.
   requestAnimationFrame(() => panel.querySelector('.run-step.current')?.scrollIntoView({ block: 'nearest', inline: 'center' }));
   return panel;
@@ -323,7 +341,7 @@ function activeGameOf() {
 
 function buildGameControl() {
   const g = activeGameOf();
-  if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Oben ein Spiel aktivieren.'));
+  if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Der Showablauf aktiviert die Spiele; Ausnahmen ganz unten unter „Spiele (direkt aktivieren)“.'));
   const st = S.live.games[g.id] || {};
   const pos = S.project.games.indexOf(g) + 1;
   return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor }, g, st, pos);
