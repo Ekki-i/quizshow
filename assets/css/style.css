@@ -967,3 +967,9 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .fx-q b { display: flex; align-items: center; justify-content: center; gap: 1vw; }
 .fx-q em { position: static; font-size: 1.7vh; }
 .fx-q span { font-size: clamp(0.75rem, 2.6vh, 1.9rem); }
+/* Frage und Lösung dürfen sich nie überschneiden: Frage oben (kleiner, darf zweizeilig sein), Lösung in fester Zeile darunter */
+.fx-q { grid-template-rows: minmax(0, 1fr) 4.8vh; padding-top: 0.6vh; padding-bottom: 0.6vh; }
+.fx-q span { font-size: clamp(0.65rem, 2.1vh, 1.5rem); line-height: 1.12; overflow: hidden; height: auto; min-height: 0; padding-bottom: 0.4vh; }
+.fx-q.long span { font-size: clamp(0.6rem, 1.8vh, 1.3rem); }
+.fx-q b { font-size: clamp(0.75rem, 2.6vh, 1.9rem); line-height: 1; overflow: hidden; }
+.fx-q.no-answer span { font-size: clamp(0.7rem, 2.5vh, 1.8rem); }
