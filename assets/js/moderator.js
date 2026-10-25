@@ -270,8 +270,19 @@ function buildGameControl() {
 const BEAMER_VIEW_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', pause: 'Pause', title: 'Spieltitel', game: 'Spiel', ranking: 'Rangliste', coin: 'Münzvergabe', blank: 'Schwarz' };
 function buildBeamerControls() {
   const current = S.live.beamer.view;
-  return [h('p', { class: 'muted' }, 'Zeigt jetzt: ', h('b', {}, BEAMER_VIEW_LABEL[current] || current),
-    ` · ${S.connections.beamers || 0} Beamer verbunden`)];
+  const status = h('p', { class: 'muted' }, 'Zeigt jetzt: ', h('b', {}, BEAMER_VIEW_LABEL[current] || current),
+    ` · ${S.connections.beamers || 0} Beamer verbunden`);
+  // Adresse für das zweite Gerät an der Leinwand.
+  const url = `${location.origin}${location.pathname.replace(/moderator\.html$/, '')}beamer.html`;
+  const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+  const second = localServer
+    ? h('p', { class: 'muted beamer-url' }, 'Im Prototyp läuft alles in diesem Browser: Vollbild über „⛶ Beamer im Vollbild“ oben auf der Seite. Für ein zweites Gerät an der Leinwand den Show-Server starten.')
+    : h('div', { class: 'beamer-url' },
+      h('p', { class: 'muted' }, 'Auf dem Gerät an der Leinwand öffnen, „⛶ Vollbild“ tippen:'),
+      h('div', { class: 'row' }, h('code', {}, url),
+        h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(url)).then(() => toast('Adresse kopiert', 'info'), () => toast(`Adresse: ${url}`, 'info')) }, 'Kopieren')),
+      local ? h('p', { class: 'notice warn' }, 'Diese Adresse zeigt auf diesen Rechner selbst. Auf dem zweiten Gerät statt „localhost“ die IP-Adresse dieses Rechners im WLAN verwenden, z. B. http://192.168.1.20:3000/beamer.html') : null);
+  return [status, second];
 }
 
 function buildTeamsLive() {

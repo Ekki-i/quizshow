@@ -48,7 +48,10 @@ per Doppelklick direkt von der Festplatte und auch in abgeschotteten Vorschauen.
    Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.
 2. Auf jedem iPad die Startseite öffnen, Team wählen und Code eingeben (oder den Link öffnen).
    Bei Verbindungsabbruch oder Neuladen verbindet sich das Gerät automatisch wieder.
-3. Auf dem Beamer-Rechner `beamer.html` öffnen und einmal „Ton aktivieren“ klicken.
+3. Auf dem Gerät an der Leinwand `http://<IP-des-Laptops>:3000/beamer.html` öffnen und „⛶ Vollbild“
+   tippen (startet Vollbild und Ton; Taste F oder Doppelklick schaltet um). Bedienelemente und Mauszeiger
+   blenden sich aus, der Bildschirm bleibt an. iPhone/iPad: Seite über Teilen → „Zum Home-Bildschirm“
+   öffnen, dann läuft sie ohne Browserleisten. Die Adresse steht auch in der Live-Regie beim Beamer.
 4. In der **Live-Regie** ein Spiel aktivieren, den Beamer steuern, Fragen freigeben und bewerten.
 
 ## Stand der Umsetzung (erste Phase)

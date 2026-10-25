@@ -2,14 +2,22 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- iPad/iPhone: vom Home-Bildschirm aus ohne Browserleisten (Vollbild-Ersatz) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
   <title>Wer stiehlt uns die Show – Beamer</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="beamer-page">
   <div class="studio-bg" id="studio-bg" aria-hidden="true"></div>
   <main class="beamer"><div class="stage" id="stage"></div></main>
-  <button id="sound-on" class="btn small ghost" style="position:fixed;left:12px;bottom:12px">🔊 Ton aktivieren</button>
+  <div class="beamer-controls" id="beamer-controls">
+    <button id="fullscreen" class="btn small pink" type="button" title="Vollbild (Taste F)">⛶ Vollbild</button>
+    <button id="sound-on" class="btn small ghost" type="button">🔊 Ton aktivieren</button>
+  </div>
 
   <script type="module">
     import { h, connect, mediaUrl } from './assets/js/client.js';
@@ -33,13 +41,91 @@
     }, 250);
 
     // Eigene, synthetisch erzeugte Effekte – keine fremde Musik.
-    document.getElementById('sound-on').onclick = (ev) => {
+    function enableSound() {
+      if (audio) return;
       audio = new AudioContext();
-      ev.currentTarget.remove();
+      document.getElementById('sound-on')?.remove();
       // Läuft gerade die Pause, setzt die Musik jetzt ein.
       if (lastState && lastState.view === 'pause' && lastState.settings.sound) startPause(audio);
-    };
-    if (embedded) document.getElementById('sound-on').remove();
+      // Ein laufendes Intro-Video bekommt jetzt Ton.
+      const v = document.querySelector('video.intro-video');
+      if (v) v.muted = false;
+    }
+    document.getElementById('sound-on').onclick = enableSound;
+
+    // ---------- Vollbild für Leinwand/Beamer ----------
+    // Ein Klick startet Vollbild und Ton zugleich (Browser erlauben beides nur nach einer Nutzeraktion).
+    const root = document.documentElement;
+    const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    let wakeLock = null;
+    async function keepAwake(on) {
+      try {
+        if (on && 'wakeLock' in navigator && !wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => (wakeLock = null));
+        } else if (!on && wakeLock) {
+          await wakeLock.release();
+        }
+      } catch {
+        // Nicht unterstützt oder abgelehnt – dann eben ohne.
+      }
+    }
+    // Im Prototyp (eingebettet) übernimmt die Übersichtsseite das Vollbild.
+    const inPrototype = window.parent !== window && (window.name === 'quiz-proto' || typeof __search !== 'undefined');
+    async function toggleFullscreen() {
+      enableSound();
+      if (inPrototype) {
+        window.parent.postMessage({ quiz: true, op: 'beamer-fullscreen' }, '*');
+        return;
+      }
+      if (fsElement()) {
+        await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        return;
+      }
+      if (!canFullscreen) {
+        alertNoFullscreen();
+        return;
+      }
+      try {
+        await (root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen());
+      } catch {
+        alertNoFullscreen();
+      }
+    }
+    function alertNoFullscreen() {
+      const box = h('div', { class: 'fs-hint', role: 'alert' },
+        h('b', {}, 'Vollbild wird von diesem Browser nicht unterstützt.'),
+        h('p', {}, 'iPhone/iPad: Teilen → „Zum Home-Bildschirm“ und den Beamer von dort öffnen – dann läuft er ohne Browserleisten. ',
+          'Oder Bildschirmsynchronisierung bzw. AirPlay/Chromecast auf die Leinwand nutzen.'),
+        h('button', { class: 'btn small', type: 'button', onclick: () => box.remove() }, 'OK'));
+      document.body.append(box);
+    }
+    function onFullscreenChange() {
+      const on = !!fsElement();
+      document.body.classList.toggle('is-fullscreen', on);
+      document.getElementById('fullscreen').textContent = on ? '✕ Vollbild beenden' : '⛶ Vollbild';
+      keepAwake(on);
+      showControls();
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && fsElement()) keepAwake(true); });
+    document.getElementById('fullscreen').onclick = toggleFullscreen;
+    document.addEventListener('dblclick', toggleFullscreen);
+    document.addEventListener('keydown', (ev) => {
+      if ((ev.key === 'f' || ev.key === 'F') && !ev.ctrlKey && !ev.metaKey && !ev.altKey) toggleFullscreen();
+    });
+    // Bedienelemente und Mauszeiger blenden sich nach kurzer Zeit aus.
+    let idleTimer = null;
+    function showControls() {
+      document.body.classList.remove('is-idle');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => document.body.classList.add('is-idle'), fsElement() ? 2500 : 8000);
+    }
+    for (const ev of ['mousemove', 'pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, showControls, { passive: true });
+    showControls();
+    if (embedded) document.getElementById('beamer-controls').remove();
 
     function tone(freqs, dur = 0.18, type = 'square') {
       if (!audio) return;

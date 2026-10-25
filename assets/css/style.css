@@ -588,3 +588,15 @@ body.beamer-page { background: #05060f; }
 
 .intro-box { display: grid; gap: 8px; }
 .intro-preview { width: 100%; max-width: 560px; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius-sm); }
+
+/* Beamer: Vollbild-Steuerung */
+.beamer-controls { position: fixed; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 60; display: flex; gap: 8px; transition: opacity 0.4s; }
+body.beamer-page.is-idle .beamer-controls { opacity: 0; pointer-events: none; }
+body.beamer-page.is-idle, body.beamer-page.is-idle * { cursor: none !important; }
+body.beamer-page.is-fullscreen .conn { opacity: 0; transition: opacity 0.4s; }
+body.beamer-page.is-fullscreen:not(.is-idle) .conn { opacity: 1; }
+.fs-hint { position: fixed; left: 50%; top: 50%; translate: -50% -50%; z-index: 100; max-width: min(92vw, 520px); background: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); text-align: left; }
+.fs-hint p { margin: 8px 0 12px; color: var(--text-muted); }
+
+.beamer-url code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--bg); padding: 6px 10px; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.beamer-url .notice { font-size: 0.85rem; }
