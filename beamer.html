@@ -458,7 +458,6 @@
       const hostAvatar = s.show.hostAvatar || 'assets/img/avatar-host.webp';
       const side = (who, name, color, board, score, grade, isn, podium) => h('div', { class: `fx-side ${who}${an(isNew.start, 'enter')}`, '--side': color },
         podium,
-        who === 'team' ? coinRow : null,
         h('div', { class: `fx-board${an(who === 'team' ? isNew.teamAnswered : isNew.modAnswered, 'pop')}` }, board, stamp(grade, isn)),
         h('div', { class: 'fx-name' }, name),
         tris(Math.min(score, f.target), who));
@@ -480,7 +479,7 @@
         h('div', { class: 'fx-top' }, f.sudden ? h('div', { class: `fb-sudden${an(isNew.sudden, 'enter')}` }, 'SUDDEN DEATH') : null),
         h('div', { class: 'fx-bottom' },
           side('team', f.team.name, f.team.color, teamBoard, f.score.team, r ? r.teamGrade : null, isNew.teamGrade,
-            singlePodium({ avatar: f.team.avatar, color: f.team.color, label: `Pult ${f.team.name}` })),
+            singlePodium({ avatar: f.team.avatar, color: f.team.color, label: `Pult ${f.team.name}`, extra: coinRow })),
           h('div', { class: 'fx-mid' }, pult, question),
           side('mod', f.host || 'Moderation', '#7fc8bd', modBoard, f.score.mod, r ? r.modGrade : null, isNew.modGrade,
             singlePodium({ mirror: true, avatar: hostAvatar, color: '#7fc8bd', label: `Pult ${f.host || 'Moderation'}` }))))];

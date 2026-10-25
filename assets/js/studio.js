@@ -156,31 +156,16 @@ export function pultLayers(show, who = 'both') {
 }
 export const PULT = { W: PW, H: PH, DESK_Y, pc };
 
-// ---------- Einzelnes Finalpult: Stehpult ohne Bogen (wie im TV-Finale) ----------
-// Avatar steht hinter dem Pult; mirror = true spiegelt das Pult für die rechte Seite.
-export function singlePodium({ avatar, color, label, mirror = false }) {
-  const svg = el('svg', { class: 'single-podium', viewBox: '0 0 300 360', role: 'img', 'aria-label': label || '' });
-  const id = `sp${++uid}`;
-  const defs = el('defs');
-  const pat = el('pattern', { id: `${id}-rib`, width: 9, height: 10, patternUnits: 'userSpaceOnUse' });
-  pat.append(el('rect', { width: 9, height: 10, fill: '#c9c4cc' }), el('rect', { width: 3, height: 10, fill: '#8f8a95' }));
-  const gr = el('linearGradient', { id: `${id}-g`, x1: 0, y1: 0, x2: 0, y2: 1 });
-  gr.append(el('stop', { offset: 0, 'stop-color': '#000', 'stop-opacity': 0 }), el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': 0.35 }));
-  defs.append(pat, gr);
-  svg.append(defs);
-  if (avatar) svg.append(el('image', { href: avatar, x: 62, y: 14, width: 176, height: 190, preserveAspectRatio: 'xMidYMin meet' }));
-  const g = el('g', mirror ? { transform: 'translate(300 0) scale(-1 1)' } : {});
-  g.append(
-    el('ellipse', { cx: 150, cy: 352, rx: 140, ry: 9, fill: '#000', opacity: 0.45 }),
-    el('polygon', { points: '46,186 150,186 150,350 26,350', fill: `url(#${id}-rib)` }),
-    el('polygon', { points: '150,186 246,186 274,350 150,350', fill: '#e8a7a9' }),
-    el('polygon', { points: '150,186 196,186 168,350 128,350', fill: '#3d6e72' }),
-    el('polygon', { points: '196,186 246,186 222,300 186,300', fill: '#5f9095', opacity: 0.9 }),
-    el('polygon', { points: '26,350 274,350 274,356 26,356', fill: '#2c3438' }),
-    el('polygon', { points: '30,168 262,168 272,188 22,188', fill: '#56656c' }),
-    el('polygon', { points: '30,168 262,168 266,174 26,174', fill: '#7d8e95' }),
-    el('rect', { x: 26, y: 186, width: 248, height: 170, fill: `url(#${id}-g)` }),
-    el('rect', { x: 26, y: 186, width: 6, height: 164, fill: color || '#fff', opacity: 0.85 }));
-  svg.append(g);
-  return h('div', { class: 'single-podium-wrap', '--team': color || '#fff' }, svg);
+// ---------- Einzelnes Finalpult (Vorlage: Fabians Finalbild) ----------
+// Das Pult ist ein freigestelltes Bild; rechts wird es gespiegelt. Der Avatar steht
+// dahinter, extra (z. B. die Münzen des Teams) liegt oben auf dem Pult.
+export function singlePodium({ avatar, color, label, mirror = false, extra = null }) {
+  const VW = 394, VH = 560, PY = VH - 342;
+  const svg = el('svg', { class: 'single-podium', viewBox: `0 0 ${VW} ${VH}`, role: 'img', 'aria-label': label || '' });
+  const cx = mirror ? 104 : 290;
+  if (avatar) svg.append(el('image', { href: avatar, x: cx - 135, y: 0, width: 270, height: 290, preserveAspectRatio: 'xMidYMin meet' }));
+  svg.append(el('ellipse', { cx: VW / 2, cy: VH - 8, rx: 180, ry: 12, fill: '#000', opacity: 0.45 }));
+  svg.append(el('image', { href: 'assets/img/finale-pult.webp', x: 0, y: PY, width: VW, height: 342, transform: mirror ? `translate(${VW} 0) scale(-1 1)` : null }));
+  const top = h('div', { class: 'sp-top', style: { left: `${((mirror ? 6 : 200) / VW) * 100}%`, width: `${(188 / VW) * 100}%`, top: `${((PY - 34) / VH) * 100}%`, height: `${(44 / VH) * 100}%` } }, extra);
+  return h('div', { class: 'single-podium-wrap', '--team': color || '#fff' }, svg, extra ? top : null);
 }
