@@ -937,3 +937,5 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .sp-top .fx-coin { height: 100%; width: auto; }
 .sp-top .fx-coin-slot { height: 80%; width: auto; aspect-ratio: 1; }
 .fx-side .single-podium-wrap { width: 80%; margin: 0 auto -3vh; }
+.fx-side .single-podium-wrap { width: 78%; margin: 0 auto -15vh; }
+.fx-field .fx-glitch { transform: rotate(-3deg); }
