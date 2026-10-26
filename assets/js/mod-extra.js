@@ -133,7 +133,7 @@ function weissnicht2(ui, g, st) {
 function konsequenz(ui, g, st) {
   const i = st.index ?? -1;
   const r = (st.rounds || {})[i];
-  const stages = [0.1, 1, 3, 5, 10];
+  const stages = [0.5, 1, 3, 5, 10];
   const nums = String(g.content.points || '').split(/[,;\s/]+/).filter(Boolean).map(Number);
   const pv = stages.map((_, k) => (Number.isFinite(nums[k]) ? nums[k] : [5, 4, 3, 2, 1][k]));
   const out = [tabs(g.content.songs.map((s, k) => s.title || `Lied ${k + 1}`), i, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.awarded),
