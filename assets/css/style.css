@@ -1324,3 +1324,23 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .join-qr-code { width: 22vh; height: 22vh; padding: 1.2vh; background: #fff; border-radius: 4px; }
 .join-qr-code svg { display: block; width: 100%; height: 100%; }
 .join-qr small { font-size: 1.7vh; color: rgba(255, 255, 255, 0.8); font-variant-numeric: tabular-nums; }
+
+/* Startbild: goldenes Ticket und Begrüßung statt Untertitel */
+.welcome-row { display: flex; align-items: center; justify-content: center; gap: 4vh; margin-top: 3.5vh; flex-wrap: wrap; }
+.welcome-ticket { width: 54vh; height: 17vh; }
+.welcome-ticket .fb-ticket-l { padding: 0 2.6vh; }
+.welcome-ticket .fb-ticket-l small { font-size: 1.7vh; }
+.welcome-ticket .fb-ticket-l b { font-size: 3.6vh; }
+.welcome-ticket .fb-ticket-l span { font-size: 1.9vh; }
+.welcome-ticket .fb-ticket-r small { font-size: 1.3vh; }
+.welcome-ticket .fb-ticket-coin { width: 7.5vh; }
+.welcome-text { font-family: var(--font-display); font-weight: 900; font-size: 4.6vh; line-height: 1.1; max-width: 46vh; text-align: left; color: #fff; text-shadow: 0 0.4vh 0 rgba(0, 0, 0, 0.6), 0 0 3vh rgba(255, 45, 138, 0.45); margin: 0; }
+.welcome-row.small { gap: 16px; margin-top: 18px; }
+.welcome-row.small .welcome-ticket { width: min(320px, 80vw); height: 100px; }
+.welcome-row.small .fb-ticket-l { padding: 0 14px; }
+.welcome-row.small .fb-ticket-l small { font-size: 10px; }
+.welcome-row.small .fb-ticket-l b { font-size: 20px; }
+.welcome-row.small .fb-ticket-l span { font-size: 11px; }
+.welcome-row.small .fb-ticket-r small { font-size: 8px; }
+.welcome-row.small .fb-ticket-coin { width: 44px; }
+.welcome-row.small .welcome-text { font-size: 22px; max-width: 260px; }

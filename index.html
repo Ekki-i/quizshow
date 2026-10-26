@@ -13,7 +13,13 @@
     <header class="hero">
       <div class="logo" aria-hidden="true"><span class="logo-mark"><i class="a"></i><i class="b"></i></span></div>
       <h1 id="show-name" class="show-title">Wer stiehlt <span class="hot">uns</span> die Show</h1>
-      <p id="show-subtitle">Die Live-Show mit acht Spielen</p>
+      <div class="welcome-row small">
+        <div class="fb-ticket welcome-ticket" aria-hidden="true">
+          <div class="fb-ticket-l"><small>TICKET</small><b>Die große Finalshow</b><span>Wer stiehlt uns die Show</span></div>
+          <div class="fb-ticket-r"><img class="fb-ticket-coin" src="assets/img/muenze.webp" alt=""><small>ADMIT ONE</small></div>
+        </div>
+        <p class="welcome-text">Herzlich Willkommen zu Deiner Show!</p>
+      </div>
     </header>
 
     <div id="offline" class="notice warn hidden" role="alert">
@@ -47,6 +53,7 @@
           <input id="pw" name="pw" type="password" autocomplete="current-password" required>
           <p id="mod-error" class="notice bad hidden" role="alert"></p>
           <p style="margin-top:14px"><button class="btn cyan huge" type="submit" style="width:100%">Anmelden</button></p>
+          <p style="margin-top:10px"><button class="btn ghost" type="submit" name="target" value="host" style="width:100%">Als iPad Moderation (Finale) anmelden</button></p>
         </form>
         <p class="muted" style="margin-top:18px">
           Beamer/Publikum: <a href="beamer.html">Beamer-Ansicht öffnen</a> (zeigt nur freigegebene Inhalte).
@@ -101,7 +108,8 @@
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || 'Anmeldung fehlgeschlagen.');
         store('quiz.modToken', body.token);
-        location.href = new URLSearchParams(location.search).get('next') === 'host' ? 'host.html' : 'moderator.html';
+        const toHost = (ev.submitter && ev.submitter.value === 'host') || new URLSearchParams(location.search).get('next') === 'host';
+        location.href = toHost ? 'host.html' : 'moderator.html';
       } catch (e) {
         err.textContent = e.message === 'Failed to fetch' ? 'Server nicht erreichbar.' : e.message;
         err.classList.remove('hidden');

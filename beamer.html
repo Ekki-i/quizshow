@@ -27,6 +27,7 @@
     import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
     import { studioRoom } from './assets/js/studio-room.js';
     import { qrcode } from './assets/js/vendor/qrcode.js';
+    import { pooled, unlockMedia } from './assets/js/media-pool.js';
     import { startPause, stopPause, bandScene, audioReady, preloadSongs } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
@@ -47,6 +48,8 @@
     // Eigene, synthetisch erzeugte Effekte – keine fremde Musik.
     function enableSound() {
       if (audio) return;
+      // Feste Medien-Elemente im Klick freischalten (Safari: sonst nur beim ersten Mal Ton).
+      if (!embedded) unlockMedia();
       audio = new AudioContext();
       document.getElementById('sound-on')?.remove();
       // Läuft gerade die Pause, setzt die Musik jetzt ein.
@@ -183,7 +186,7 @@
       if (fresh && s.settings.sound && !embedded && !titleSlide) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage]);
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.pauseCoinPos, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
@@ -248,9 +251,18 @@
     function start(s) {
       return [
         showLogo(s.show.name),
-        s.show.subtitle ? h('div', { class: 'sub', style: { marginTop: '3vh' } }, s.show.subtitle) : '',
+        welcomeRow(),
         s.view === 'start' ? joinQr() : '',
       ];
+    }
+
+    // Goldenes Ticket (wie nach dem Finale) und Begrüßung unter dem Logo.
+    function welcomeRow() {
+      return h('div', { class: 'welcome-row' },
+        h('div', { class: 'fb-ticket welcome-ticket', 'aria-hidden': 'true' },
+          h('div', { class: 'fb-ticket-l' }, h('small', {}, 'TICKET'), h('b', {}, 'Die große Finalshow'), h('span', {}, 'Wer stiehlt uns die Show')),
+          h('div', { class: 'fb-ticket-r' }, coinImg('fb-ticket-coin'), h('small', {}, 'ADMIT ONE'))),
+        h('div', { class: 'welcome-text' }, 'Herzlich Willkommen zu Deiner Show!'));
     }
 
     // QR-Code zum Mitspielen: zeigt immer die aktuelle WLAN-Adresse des Show-Rechners
@@ -399,17 +411,23 @@
 
     // Intro-Lied der Kategorie (MP3 oder MP4) läuft, solange die Spieltitel-Folie steht.
     // Ton nur auf dem echten Beamer nach „Ton aktivieren“; die Vorschau bleibt stumm.
+    // Immer dasselbe (beim „Ton aktivieren“ freigeschaltete) Element, sonst bleibt Safari ab dem 2. Mal stumm.
     let gameIntro = null;
+    let introFade = null;
+    let introToken = 0;
     function stopGameIntro() {
       const el = gameIntro;
       gameIntro = null;
       if (!el) return;
+      const token = introToken;
       const start = el.volume;
       let k = 0;
-      const t = setInterval(() => {
+      clearInterval(introFade);
+      introFade = setInterval(() => {
         k += 1;
+        if (token !== introToken) { clearInterval(introFade); return; } // inzwischen neues Intro
         el.volume = Math.max(0, start * (1 - k / 10));
-        if (k >= 10) { clearInterval(t); el.pause(); el.remove(); }
+        if (k >= 10) { clearInterval(introFade); el.pause(); }
       }, 80);
     }
     // which: undefined = Spiel, 'finale' = Finale, { stage: n } = Gewinnstufe
@@ -417,15 +435,23 @@
       stopGameIntro();
       const m = which === 'finale' ? s.finaleIntro : which && which.stage ? s.stage && s.stage.intro : s.game && s.game.intro;
       if (!m || embedded || !s.settings.sound) return;
-      const el = h('video', { class: 'game-intro', playsinline: true, preload: 'auto', 'aria-hidden': 'true' });
+      const el = pooled('intro');
+      el.className = 'game-intro';
+      el.setAttribute('aria-hidden', 'true');
+      clearInterval(introFade);
+      introToken += 1;
+      el.pause();
+      el.volume = 1;
       el.muted = !audio;
       // Lied zu Ende → automatisch weiter zum Spiel (der Server prüft, ob noch der Spieltitel läuft).
       el.onended = () => { if (gameIntro === el) conn.action('beamer.introEnded', which === 'finale' ? { pos: 'finale' } : which && which.stage ? { pos: 'stage', stage: which.stage } : { pos: s.game.position }).catch(() => {}); };
-      document.body.append(el);
+      if (!el.isConnected) document.body.append(el);
       gameIntro = el;
+      const token = introToken;
       mediaUrl(m.id).then((url) => {
-        if (!url || gameIntro !== el) return;
-        el.src = url;
+        if (!url || gameIntro !== el || token !== introToken) return;
+        if (el.getAttribute('src') !== url) el.src = url;
+        el.currentTime = 0;
         el.play().catch(() => {});
       });
     }
@@ -484,13 +510,15 @@
       const box = h('div', { class: 'video-stage' });
       const logo = () => box.replaceChildren(h('div', { class: 'video-end' }, ...start(s)));
       if (!s.introVideo) { logo(); return [box]; }
-      const v = h('video', { class: 'intro-video', playsinline: true, preload: 'auto' });
+      const v = embedded ? h('video', { playsinline: true, preload: 'auto' }) : pooled('video');
+      v.className = 'intro-video';
+      v.pause();
       v.muted = embedded || !audio;
       v.onended = logo;
       box.append(v);
       mediaUrl(s.introVideo.id).then((url) => {
         if (!url) return logo();
-        v.src = url;
+        if (v.getAttribute('src') !== url) v.src = url;
         v.currentTime = 0;
         v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
       });
@@ -663,7 +691,9 @@
     function pause(s) {
       // Eigene Lieder der Pause (aus dem Show-Editor), sonst der eingebaute Song.
       startPause(!embedded && s.settings.sound && audioReady(audio) ? audio : null, s.pauseSongs || []);
-      return [bandScene(Math.max(0, 3 - (s.coins || []).length))];
+      // Nur Münzen, die vor der nächsten Münzvergabe schon vergeben wurden.
+      const given = (s.coins || []).filter((c) => !s.pauseCoinPos || c.position < s.pauseCoinPos).length;
+      return [bandScene(Math.max(0, 3 - given))];
     }
 
     // Münze / Gewinnstufe: erst das Moderationspult mit der Stufe auf dem Bildschirm,

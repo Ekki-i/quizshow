@@ -5,6 +5,7 @@
 // Ohne Ton (Vorschau, Ton nicht aktiviert) läuft die Band im selben Takt stumm.
 
 import { h, mediaUrl } from './client.js';
+import { pooled } from './media-pool.js';
 import { bandSceneSvg, poseBand } from './band-scene.js';
 
 const BPM = 104;
@@ -165,13 +166,17 @@ export function audioReady(ctx) {
 let player = null;
 
 function createSongPlayer(ctx, songs) {
-  // Das erste Lied ist meist schon vorgeladen (preloadSongs) → sofortiger Start.
-  const pre = songs[0] && preloaded.get(songs[0].id);
-  if (pre) preloaded.delete(songs[0].id);
-  const el = pre || new Audio();
+  // Immer dasselbe, beim „Ton aktivieren“ freigeschaltete Element (Safari). Die Lieder
+  // sind über preloadSongs schon im Browser-Cache, der Start ist trotzdem sofort.
+  const el = pooled('pause');
   el.muted = false;
   el.preload = 'auto';
-  const source = ctx.createMediaElementSource(el);
+  el.volume = 1;
+  const owner = {};
+  el.__owner = owner;
+  if (!el.__source || el.__ctx !== ctx) { el.__source = ctx.createMediaElementSource(el); el.__ctx = ctx; }
+  const source = el.__source;
+  try { source.disconnect(); } catch { /* war nicht verbunden */ }
   const gain = ctx.createGain();
   gain.gain.value = 0;
   const analyser = ctx.createAnalyser();
@@ -205,8 +210,9 @@ function createSongPlayer(ctx, songs) {
     else el.currentTime = 0;
     el.play().catch(() => {});
   }
-  el.addEventListener('ended', () => playAt(index + 1));
-  el.addEventListener('error', () => setTimeout(() => playAt(index + 1), 300));
+  // Als Eigenschaft (nicht addEventListener): das Element wird von Pause zu Pause weiterverwendet.
+  el.onended = () => { if (el.__owner === owner) playAt(index + 1); };
+  el.onerror = () => { if (el.__owner === owner) setTimeout(() => playAt(index + 1), 300); };
   playAt(0);
 
   return {
@@ -246,7 +252,11 @@ function createSongPlayer(ctx, songs) {
       gain.gain.cancelScheduledValues(t);
       gain.gain.setValueAtTime(gain.gain.value, t);
       gain.gain.linearRampToValueAtTime(0, t + 0.8);
-      setTimeout(() => { el.pause(); el.removeAttribute('src'); el.load(); source.disconnect(); }, 900);
+      setTimeout(() => {
+        if (el.__owner !== owner) return; // Element gehört schon dem nächsten Pausen-Player
+        el.pause(); el.removeAttribute('src'); el.load();
+        try { source.disconnect(); } catch { /* schon getrennt */ }
+      }, 900);
     },
   };
 }
