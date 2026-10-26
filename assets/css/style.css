@@ -1316,3 +1316,11 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .beamer .land-image-box { flex: 0 1 auto; display: flex; }
 .beamer .land-image { max-width: 44vw; max-height: 64vh; object-fit: contain; background: #000; box-shadow: 0 0 0 0.5vh var(--box-2, #2b2b2e), 0 1vh 3vh rgba(0, 0, 0, 0.55); }
 .land-image.ipad { display: block; max-width: 100%; max-height: 34vh; margin: 0 auto 12px; object-fit: contain; border-radius: var(--radius-sm); }
+
+/* QR-Code zum Mitspielen auf dem Beamer-Startbild */
+.join-qr { position: fixed; right: 3vw; bottom: 8vh; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 1vh; padding: 1.6vh 1.6vh 1.2vh; background: rgba(34, 34, 40, 0.92); border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 6px; box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.45); }
+.join-qr[hidden] { display: none; }
+.join-qr b { font-size: 2.2vh; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; }
+.join-qr-code { width: 22vh; height: 22vh; padding: 1.2vh; background: #fff; border-radius: 4px; }
+.join-qr-code svg { display: block; width: 100%; height: 100%; }
+.join-qr small { font-size: 1.7vh; color: rgba(255, 255, 255, 0.8); font-variant-numeric: tabular-nums; }
