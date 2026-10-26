@@ -29,20 +29,18 @@ function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
 
+// Moderator-/Admin-Passwort: dauerhaft „fabian“. Eine Umgebungsvariable
+// QUIZ_ADMIN_PASSWORD kann es bei Bedarf weiterhin überschreiben.
+const DEFAULT_PASSWORD = 'fabian';
 function ensureModeratorPassword() {
   const db = store.data;
   db.auth = db.auth || { sessions: {} };
-  const envPw = process.env.QUIZ_ADMIN_PASSWORD;
-  if (envPw) {
-    const salt = crypto.randomBytes(16).toString('hex');
-    db.auth.salt = salt;
-    db.auth.hash = hashPassword(envPw, salt);
-  } else if (!db.auth.hash) {
-    const pw = crypto.randomBytes(6).toString('base64url');
+  const pw = process.env.QUIZ_ADMIN_PASSWORD || DEFAULT_PASSWORD;
+  if (!db.auth.hash || !checkPassword(pw)) {
     const salt = crypto.randomBytes(16).toString('hex');
     db.auth.salt = salt;
     db.auth.hash = hashPassword(pw, salt);
-    console.log(`\n  Erstes Moderator-Passwort: ${pw}\n  (Ändern per Umgebungsvariable QUIZ_ADMIN_PASSWORD)\n`);
+    db.auth.sessions = {}; // alte Anmeldungen mit dem früheren Passwort ungültig machen
   }
   store.save();
 }

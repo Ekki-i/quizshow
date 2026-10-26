@@ -10,11 +10,11 @@ Voraussetzung: Node.js 20 oder neuer.
 
 ```bash
 npm install
-QUIZ_ADMIN_PASSWORD=dein-passwort npm start
+npm start
 ```
 
-Danach `http://localhost:3000` öffnen. Ohne `QUIZ_ADMIN_PASSWORD` erzeugt der Server
-beim ersten Start ein zufälliges Moderator-Passwort und gibt es in der Konsole aus.
+Danach `http://localhost:3000` öffnen. Das Passwort für Moderation/Admin (Regie, Editor,
+iPad Moderation) ist dauerhaft `fabian`. Bei Bedarf überschreibt `QUIZ_ADMIN_PASSWORD=…` es.
 Teams, Beamer und Moderation müssen im selben Netz den Server erreichen können
 (z. B. `http://<IP-des-Laptops>:3000`).
 
@@ -36,7 +36,7 @@ Tests: `npm test`
 `npm run build:prototype` erzeugt in `dist-prototype/` einen klickbaren Prototyp.
 Die Übersichtsseite `prototype.html` zeigt Moderation, Beamer, drei Team-iPads und
 die Startseite nebeneinander. Die Spiellogik läuft dabei im Browser, alles bleibt in
-diesem einen Browser gespeichert. Moderator-Passwort im Prototyp: `demo`.
+diesem einen Browser gespeichert. Moderator-Passwort im Prototyp: `fabian`.
 
 `npm run build:single` erzeugt zusätzlich `dist-single/quizshow-prototyp.html`: den
 kompletten Prototyp als **eine** eigenständige Datei ohne nachgeladene Dateien. Sie läuft

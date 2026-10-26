@@ -8,7 +8,7 @@ Mac:     Rechtsklick auf "Prototyp starten (Mac).command" -> "Öffnen"
 Der Browser öffnet sich danach von selbst mit allen Bildschirmen der Show.
 Das Konsolenfenster offen lassen, solange du spielst.
 
-Moderator-Passwort: demo
+Moderator-Passwort: fabian
 
 Voraussetzung: Node.js (kostenlos, LTS-Version) von https://nodejs.org
 
