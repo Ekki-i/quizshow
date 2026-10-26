@@ -158,15 +158,18 @@ test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung erst nach 
   for (const [i, ok] of [[0, true], [1, true], [2, false], [3, true]]) act(db, mod(), 'grade', { teamId: ids[i], correct: ok });
   act(db, mod(), 'evaluate');
   assert.equal(totals(db)[ids[0]], 3); // 2 richtige Einschätzungen + eigene Antwort
-  assert.equal(totals(db)[ids[1]], 0);
-  // Eine falsche Einschätzung → 0 für alle Einschätzungen, eigene Antwort zählt trotzdem.
+  assert.equal(totals(db)[ids[1]], 1); // richtige Antwort, nicht gebuzzert: +1
+  assert.equal(totals(db)[ids[2]], 0);
+  assert.equal(totals(db)[ids[3]], 1);
+  // Eine falsche Einschätzung → 0 für das Buzzer-Team, auch für die eigene richtige Antwort.
   act(db, mod(), 'open', { index: 1 });
   for (const id of ids) act(db, team(id), 'submit', { ink });
   act(db, team(ids[1]), 'buzz');
   act(db, team(ids[1]), 'guess', { guesses: { [ids[0]]: true, [ids[2]]: true } });
   for (const [i, ok] of [[0, true], [1, true], [2, false], [3, false]]) act(db, mod(), 'grade', { teamId: ids[i], correct: ok });
   act(db, mod(), 'evaluate');
-  assert.equal(totals(db)[ids[1]], 1);
+  assert.equal(totals(db)[ids[1]], 1); // unverändert: 1 aus Runde 1, Runde 2 bringt 0
+  assert.equal(totals(db)[ids[0]], 4); // +1 für die richtige Antwort ohne Buzzer
 });
 
 test('Keine Kon-Sequenz: Stufe beim Abschicken zählt, andere bleiben frei, Punkte erst nach Bestätigung', () => {

@@ -129,8 +129,8 @@ function weissnicht2(g, ui) {
   const out = [muted(`Runde ${g.index + 1} von ${g.count}`), g.question ? question(g.question) : null];
   if (g.evaluated) {
     if (g.solution) out.push(stateBox('', '💡', `Lösung: ${g.solution}`));
-    if (g.ownCorrect !== null) out.push(g.ownCorrect ? stateBox('ok', '✓', 'Eure Antwort war richtig.') : stateBox('bad', '✗', 'Eure Antwort war falsch.'));
-    if (g.result) out.push(stateBox(g.result.allRight ? 'ok' : 'bad', '★', `Einschätzung: ${g.result.allRight ? `alles richtig, +${g.result.guessPoints}` : 'mindestens eine falsch – 0'} · eigene Antwort +${g.result.ownPoint}`));
+    if (g.ownCorrect !== null) out.push(g.ownCorrect ? stateBox('ok', '✓', g.isBuzzer ? 'Eure Antwort war richtig.' : 'Eure Antwort war richtig: +1') : stateBox('bad', '✗', 'Eure Antwort war falsch.'));
+    if (g.result) out.push(stateBox(g.result.allRight ? 'ok' : 'bad', '★', g.result.allRight ? `Einschätzung alles richtig: +${g.result.guessPoints} · eigene Antwort +${g.result.ownPoint}` : 'Mindestens eine Einschätzung falsch – 0 Punkte, auch für eure eigene Antwort.'));
     return out;
   }
   if (!g.submitted) {
