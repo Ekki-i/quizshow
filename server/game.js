@@ -23,7 +23,7 @@ const PLAY = {
 };
 
 const STATE_VERSION = 2;
-const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'finale', 'blank'];
+const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'stageTitle', 'finaleTitle', 'finale', 'blank'];
 const MAX_PROCESSED = 5000;
 
 // Kurze Zugangscodes: vierstellige Zahl (1000–9999), in der Show eindeutig –
@@ -291,7 +291,7 @@ function requireEditable(db) {
 // Jeder Schritt ist eine „Folie“: Beamer-Ansicht plus nötige Spielaktion.
 // Ohne eigenen Ablauf gilt der Standardablauf aus den Spielen der Show.
 
-const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'finale', 'end'];
+const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'stageTitle', 'finaleTitle', 'finale', 'end'];
 const RUN_NEEDS_POS = ['title', 'game', 'coin'];
 const RUN_MAX = 120;
 
@@ -299,11 +299,13 @@ function defaultRundown(project) {
   const steps = [{ kind: 'start' }, { kind: 'video' }, { kind: 'intro' }, { kind: 'pyramid' }];
   project.games.forEach((g, i) => {
     const pos = i + 1;
+    // Zu Beginn jeder Gewinnstufe (Spiel 1, 5 und 7) eine eigene Spieltitel-Folie.
+    if (STAGE_START[pos]) steps.push({ kind: 'stageTitle', stage: STAGE_START[pos] });
     steps.push({ kind: 'title', pos }, { kind: 'game', pos });
     // Nach Spiel 4, 6 und 8 erst eine Pause, dann die Münzvergabe (mehr Spannung).
     if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'pause' }, { kind: 'coin', pos });
   });
-  steps.push({ kind: 'ranking' }, { kind: 'finale' }, { kind: 'end' });
+  steps.push({ kind: 'ranking' }, { kind: 'finaleTitle' }, { kind: 'finale' }, { kind: 'end' });
   return steps.map((st, i) => ({ id: `std${i}`, ...st }));
 }
 
@@ -324,12 +326,21 @@ function stepLabel(db, st) {
     coin: `Münzvergabe nach Spiel ${st.pos}${STAGE_LABEL[st.pos] ? ` (Gewinnstufe ${STAGE_LABEL[st.pos]})` : ''}`,
     pause: `Pause${st.songs && st.songs.length ? ` · ${st.songs.length} ${st.songs.length === 1 ? 'eigenes Lied' : 'eigene Lieder'}` : ''}`,
     ranking: 'Zwischenstand / Rangliste',
+    finaleTitle: `Finale – Spieltitel${db.project.finaleIntro ? ' ♪' : ''}`,
+    stageTitle: `Gewinnstufe ${st.stage} – Spieltitel${stageOf(db, st.stage).intro ? ' ♪' : ''}`,
     finale: 'Finale gegen die Moderation',
     end: 'Abschluss',
   }[st.kind];
   return st.label ? `${st.label}` : base;
 }
 const STAGE_LABEL = { 4: 1, 6: 2, 8: 3 };
+const STAGE_START = { 1: 1, 5: 2, 7: 3 };
+const STAGES = [1, 2, 3];
+function cleanColor(c) {
+  if (typeof c !== 'string' || !/^#[0-9a-f]{6}$/i.test(c)) fail('Ungültige Farbe.');
+  return c.toLowerCase();
+}
+const stageOf = (db, n) => (db.project.stages && db.project.stages[n]) || {};
 
 function cleanRundown(db, steps) {
   if (!Array.isArray(steps)) fail('Ungültiger Ablauf.');
@@ -343,6 +354,11 @@ function cleanRundown(db, steps) {
       if (st.kind === 'coin' && !COIN_POSITIONS.includes(pos)) fail('Münzvergabe gibt es nur nach Spiel 4, 6 und 8.');
       out.pos = pos;
     } else if (RUN_NEEDS_POS.includes(st.kind)) fail('Für diesen Schritt fehlt das Spiel.');
+    if (st.kind === 'stageTitle') {
+      const n = st.stage === undefined || st.stage === null ? 1 : Number(st.stage);
+      if (!STAGES.includes(n)) fail('Gewinnstufe muss 1, 2 oder 3 sein.');
+      out.stage = n;
+    }
     if (st.label) out.label = cleanText(st.label, 60);
     if (st.kind === 'pause' && Array.isArray(st.songs) && st.songs.length) out.songs = cleanSongs(st.songs);
     return out;
@@ -371,7 +387,14 @@ function runStep(db, ctx, index) {
   db.live.run = index;
   if (game && db.live.activeGame !== game.id) moderatorActions['show.activate'](db, ctx, { gameId: game.id });
   const view = { start: 'start', end: 'start', video: 'video', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin', finale: 'finale' }[st.kind];
-  if (st.kind === 'finale') {
+  if (st.kind === 'finaleTitle') {
+    if (db.live.activeGame) moderatorActions['show.activate'](db, ctx, { gameId: null });
+    db.live.beamer = { view: 'finaleTitle', data: {} };
+    effect(db, 'title');
+  } else if (st.kind === 'stageTitle') {
+    db.live.beamer = { view: 'stageTitle', data: { stage: st.stage || 1 } };
+    effect(db, 'title');
+  } else if (st.kind === 'finale') {
     if (db.live.activeGame) moderatorActions['show.activate'](db, ctx, { gameId: null });
     if (!db.live.finale) FINALE.start(db, ctx, null);
     db.live.beamer = { view: 'finale', data: {} };
@@ -400,9 +423,19 @@ function runStep(db, ctx, index) {
 function introEnded(db, ctx, p) {
   const steps = rundown(db);
   const cur = steps[db.live.run ?? -1];
+  const next = steps[db.live.run + 1];
+  if (p.pos === 'stage') {
+    if (!cur || cur.kind !== 'stageTitle' || cur.stage !== Number(p.stage) || !next) return {};
+    log(db, ctx, 'ablauf', `Lied der Gewinnstufe ${cur.stage} zu Ende – automatisch weiter`);
+    return runStep(db, ctx, db.live.run + 1);
+  }
+  if (p.pos === 'finale') {
+    if (!cur || cur.kind !== 'finaleTitle' || !next || next.kind !== 'finale') return {};
+    log(db, ctx, 'ablauf', 'Intro-Lied des Finales zu Ende – automatisch weiter zum Finale');
+    return runStep(db, ctx, db.live.run + 1);
+  }
   const pos = Number(p.pos);
   if (!cur || cur.kind !== 'title' || cur.pos !== pos) return {};
-  const next = steps[db.live.run + 1];
   if (!next || next.kind !== 'game' || next.pos !== pos) return {};
   log(db, ctx, 'ablauf', `Intro-Lied von Spiel ${pos} zu Ende – automatisch weiter zum Spiel`);
   return runStep(db, ctx, db.live.run + 1);
@@ -477,8 +510,51 @@ const moderatorActions = {
     log(db, ctx, 'editor', `Intro-Lied „${game.intro.name}“ für „${game.title}“ gesetzt`);
   },
 
-  // Teams gehören zur jeweiligen Show. Mit showId lassen sich auch die Teams einer
-  // anderen (noch nicht geöffneten) Show vorbereiten.
+  // Farbe der Spieltitel-Folie dieses Spiels (null = Standardfarbe der Position).
+  'game.setColor'(db, ctx, p) {
+    const game = findGame(db, p.gameId);
+    if (p.color === null) delete game.color;
+    else game.color = cleanColor(p.color);
+    log(db, ctx, 'editor', `Farbe der Spieltitel-Folie von „${game.title}“ geändert`);
+  },
+
+  // Intro-Lied für die Spieltitel-Folie des Finales.
+  'finale.setIntro'(db, ctx, p) {
+    if (p.media === null) {
+      delete db.project.finaleIntro;
+      log(db, ctx, 'editor', 'Intro-Lied des Finales entfernt');
+      return;
+    }
+    const m = p.media || {};
+    if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültige Datei.');
+    if (typeof m.type !== 'string' || !/^(audio|video)\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine MP3- oder MP4-Datei wählen.');
+    db.project.finaleIntro = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro'), 100) || 'Intro', size: Number(m.size) || 0 };
+    log(db, ctx, 'editor', `Intro-Lied „${db.project.finaleIntro.name}“ für das Finale gesetzt`);
+  },
+
+  // Gewinnstufe ankündigen: Lied (MP3/MP4) und Farbe je Stufe; null entfernt.
+  'stage.set'(db, ctx, p) {
+    const n = Number(p.stage);
+    if (!STAGES.includes(n)) fail('Gewinnstufe muss 1, 2 oder 3 sein.');
+    db.project.stages = db.project.stages || {};
+    const st = { ...(db.project.stages[n] || {}) };
+    if ('intro' in p) {
+      if (p.intro === null) delete st.intro;
+      else {
+        const m = p.intro || {};
+        if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültige Datei.');
+        if (typeof m.type !== 'string' || !/^(audio|video)\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine MP3- oder MP4-Datei wählen.');
+        st.intro = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Lied'), 100) || 'Lied', size: Number(m.size) || 0 };
+      }
+    }
+    if ('color' in p) {
+      if (p.color === null) delete st.color;
+      else st.color = cleanColor(p.color);
+    }
+    db.project.stages[n] = st;
+    log(db, ctx, 'editor', `Spieltitel der Gewinnstufe ${n} geändert`);
+  },
+
   'team.add'(db, ctx, p) {
     const sh = showFor(db, p.showId);
     const teams = sh.project.teams;
@@ -863,7 +939,7 @@ const UNDO_LABEL = {
   'finale.gradeTeam': 'Bewertung des Teams', 'finale.reveal': 'Auflösung', 'finale.challenge': 'Münzeinsatz', 'finale.pass': 'kein Münzeinsatz',
   'finale.gradeMod': 'Bewertung der Moderation', 'finale.resolve': 'Weiter ohne Münze', 'finale.decide': 'Entscheidung',
 };
-const FINALE_UNDOABLE = (name) => name.startsWith('finale.') && !['finale.undo', 'finale.config', 'finale.start', 'finale.reset'].includes(name);
+const FINALE_UNDOABLE = (name) => name.startsWith('finale.') && !['finale.undo', 'finale.config', 'finale.start', 'finale.reset', 'finale.setIntro'].includes(name);
 function rememberFinale(db, name, before) {
   if (!before) return;
   if (!db.live.finaleHistory) db.live.finaleHistory = [];
@@ -877,6 +953,8 @@ function referencedMedia(db) {
   for (const pr of [db.project, ...db.shows.map((x) => x.project)]) {
     if (pr.introVideo) ids.add(pr.introVideo.id);
     for (const g of pr.games) if (g.intro) ids.add(g.intro.id);
+    if (pr.finaleIntro) ids.add(pr.finaleIntro.id);
+    Object.values(pr.stages || {}).forEach((st) => { if (st && st.intro) ids.add(st.intro.id); });
     for (const st of pr.rundown || []) for (const m of st.songs || []) ids.add(m.id);
   }
   return ids;
@@ -892,7 +970,7 @@ function findTeamByCode(db, code) {
 
 function gameHeader(db) {
   const g = activeGame(db);
-  return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null } : null;
+  return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null, color: g.color || null } : null;
 }
 
 function teamView(db, teamId, now = Date.now()) {
@@ -966,6 +1044,12 @@ function beamerView(db) {
   if (b.view === 'ranking') view.ranking = b.data.ranking;
   if (b.view === 'coin') view.coin = b.data;
   if (b.view === 'finale') view.finale = FINALE.beamerView(db);
+  if (b.view === 'stageTitle') {
+    const n = (b.data && b.data.stage) || 1;
+    const st = stageOf(db, n);
+    view.stage = { n, color: st.color || null, intro: st.intro ? { id: st.intro.id, type: st.intro.type } : null };
+  }
+  if (b.view === 'finaleTitle') view.finaleIntro = pr.finaleIntro ? { id: pr.finaleIntro.id, type: pr.finaleIntro.type } : null;
   if (b.view === 'pyramid' || b.view === 'intro') {
     view.games = pr.games.map((g, i) => ({ title: g.title, position: i + 1 }));
   }

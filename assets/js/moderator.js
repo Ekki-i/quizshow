@@ -150,8 +150,8 @@ function buildFlow() {
 
 // ---------- Showablauf wie eine Präsentation ----------
 
-const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', finale: '★', end: '🏁' };
-const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', finale: 'Finale gegen die Moderation', end: 'Abschluss' };
+const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', stageTitle: '🎬', finaleTitle: '🎬', finale: '★', end: '🏁' };
+const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', stageTitle: 'Gewinnstufe – Spieltitel', finaleTitle: 'Finale – Spieltitel', finale: 'Finale gegen die Moderation', end: 'Abschluss' };
 
 // Symbol eines Schritts; die Münzvergabe zeigt die Münze der Show.
 const runIcon = (kind) => (kind === 'coin' ? coinImg('run-coin') : RUN_ICON[kind]);
@@ -246,11 +246,11 @@ function buildIntroVideo() {
 
 // Intro-Lied je Spiel (Kategorie): läuft auf der Spieltitel-Folie dieses Spiels.
 let gameIntroUpload = null; // { gameId, name, progress }
-function buildGameIntro(g, pos) {
+function buildGameIntro(g, pos, set = (media) => act('game.setIntro', { gameId: g.id, media })) {
   const m = g.intro;
   const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
   const input = h('input', {
-    type: 'file', accept: 'audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,.mp3,.m4a,.mp4', class: 'visually-hidden', 'aria-label': `Intro-Lied für Spiel ${pos} wählen`,
+    type: 'file', accept: 'audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,.mp3,.m4a,.mp4', class: 'visually-hidden', 'aria-label': `Intro-Lied für ${typeof pos === 'number' ? `Spiel ${pos}` : pos} wählen`,
     onchange: async (ev) => {
       const file = ev.target.files && ev.target.files[0];
       ev.target.value = '';
@@ -263,7 +263,7 @@ function buildGameIntro(g, pos) {
           const bar = document.getElementById('game-intro-progress');
           if (bar) bar.value = p;
         });
-        await act('game.setIntro', { gameId: g.id, media: { id: up.id, type: up.type, size: up.size, name: file.name } });
+        await set({ id: up.id, type: up.type, size: up.size, name: file.name });
       } catch (err) {
         toast(err.message);
       } finally {
@@ -286,7 +286,37 @@ function buildGameIntro(g, pos) {
         : h('p', { class: 'muted', style: { margin: '6px 0' } }, 'Noch kein Intro-Lied. MP3 oder MP4 hochladen – es läuft, solange der Spieltitel auf dem Beamer steht.'),
     busy ? null : h('div', { class: 'row' },
       h('label', { class: 'btn small' }, input, m ? 'Austauschen' : '+ MP3/MP4 hochladen'),
-      m ? h('button', { class: 'btn small ghost', onclick: () => act('game.setIntro', { gameId: g.id, media: null }) }, 'Entfernen') : null));
+      m ? h('button', { class: 'btn small ghost', onclick: () => set(null) }, 'Entfernen') : null));
+}
+
+// Farbe einer Spieltitel-Folie wählen. Vorschau: Farbe in der Mitte, Rahmen in dunklerer Abstufung.
+const GAME_COLORS = ['#ff8a7a', '#3fd3ea', '#ff63b1', '#f4b740', '#ab8dff', '#4fdca4', '#ff9d45', '#7fb0ff'];
+const STAGE_COLOR = '#1d9bf5';
+function titleColorPicker(label, current, fallback, sample, set) {
+  const color = current || fallback;
+  let timer = null;
+  const input = h('input', {
+    type: 'color', value: color, 'aria-label': label,
+    oninput: (ev) => { const v = ev.target.value; ev.target.closest('.title-color').style.setProperty('--c', v); clearTimeout(timer); timer = setTimeout(() => set(v), 250); },
+  });
+  return h('div', { class: 'title-color', '--c': color },
+    h('div', { class: 'title-swatch', 'aria-hidden': 'true' }, h('span', {}, sample)),
+    h('label', { class: 'btn small ghost' }, input, '🎨 Farbe ändern'),
+    current ? h('button', { class: 'btn small ghost', onclick: () => set(null) }, 'Standardfarbe') : h('span', { class: 'muted' }, 'Standardfarbe'));
+}
+
+// Spieltitel der Gewinnstufen: je Stufe ein Lied und eine Farbe.
+function buildStageTitles() {
+  const stages = S.project.stages || {};
+  return card('Spieltitel der Gewinnstufen',
+    h('p', { class: 'muted' }, 'Zu Beginn jeder Gewinnstufe (vor Spiel 1, nach der Münzvergabe von Spiel 4 und 6) kündigt der Beamer die Stufe an. Ist das Lied zu Ende, geht es automatisch weiter.'),
+    h('div', { class: 'stage-grid' }, [1, 2, 3].map((n) => {
+      const st = stages[n] || {};
+      return h('div', { class: 'stage-cell' },
+        h('b', {}, `Gewinnstufe ${n}`),
+        titleColorPicker(`Farbe Gewinnstufe ${n}`, st.color, STAGE_COLOR, String(n), (color) => act('stage.set', { stage: n, color })),
+        buildGameIntro({ id: `stage${n}`, intro: st.intro }, `Gewinnstufe ${n}`, (media) => act('stage.set', { stage: n, intro: media })));
+    })));
 }
 
 // Eigene Lieder je Pause: Playlist hochladen, sortieren, entfernen.
@@ -346,17 +376,18 @@ function buildPauseSongs(st) {
 
 // Bearbeiten im Show-Editor: Schritte verschieben, löschen, Pausen einfügen.
 function buildRundownEditor() {
-  const steps = (S.rundown || []).map(({ id, kind, pos, label, songs }) => ({ id, kind, pos, label, songs }));
+  const steps = (S.rundown || []).map(({ id, kind, pos, stage, label, songs }) => ({ id, kind, pos, stage, label, songs }));
   const save = (list) => act('rundown.set', { steps: list });
   const move = (i, d) => { const l = [...steps]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); save(l); };
   const insertAt = (i, st) => { const l = [...steps]; l.splice(i, 0, st); save(l); };
   const kindSel = h('select', { 'aria-label': 'Art des Schritts' },
     Object.entries(RUN_KIND_LABEL).map(([k, label]) => h('option', { value: k }, k === 'coin' ? label : `${RUN_ICON[k]} ${label}`)));
   const posSel = h('select', { 'aria-label': 'Spiel' }, S.project.games.map((g, i) => h('option', { value: String(i + 1) }, `Spiel ${i + 1} · ${g.title}`)));
+  const stageSel = h('select', { 'aria-label': 'Gewinnstufe' }, [1, 2, 3].map((n) => h('option', { value: String(n) }, `Gewinnstufe ${n}`)));
   const afterSel = h('select', { 'aria-label': 'Einfügen nach' },
     h('option', { value: '0' }, 'ganz am Anfang'),
     steps.map((st, i) => h('option', { value: String(i + 1), selected: i === steps.length - 1 }, `nach ${i + 1}. ${S.rundown[i].text}`)));
-  const updatePos = () => { posSel.hidden = !['title', 'game', 'coin', 'pyramid'].includes(kindSel.value); };
+  const updatePos = () => { posSel.hidden = !['title', 'game', 'coin', 'pyramid'].includes(kindSel.value); stageSel.hidden = kindSel.value !== 'stageTitle'; };
   kindSel.onchange = updatePos;
   kindSel.value = 'pause';
   updatePos();
@@ -377,11 +408,12 @@ function buildRundownEditor() {
       h('button', { class: 'btn small bad', 'aria-label': 'Schritt entfernen', onclick: () => save(steps.filter((_, k) => k !== i)) }, '✕'),
       st.kind === 'pause' && openPause === st.id ? buildPauseSongs(st) : null))),
     h('div', { class: 'row', style: { marginTop: '12px' } },
-      kindSel, posSel, afterSel,
+      kindSel, posSel, stageSel, afterSel,
       h('button', { class: 'btn', onclick: () => {
         const st = { kind: kindSel.value };
         if (!posSel.hidden) st.pos = Number(posSel.value);
         if (st.kind === 'pyramid' && st.pos === undefined) delete st.pos;
+        if (st.kind === 'stageTitle') st.stage = Number(stageSel.value);
         insertAt(Number(afterSel.value), st);
       } }, '+ Schritt einfügen'),
       S.rundownCustom ? h('button', { class: 'btn ghost', onclick: () => confirmAct('Eigene Änderungen am Ablauf verwerfen und den Standardablauf wiederherstellen?', 'rundown.reset') }, 'Standardablauf wiederherstellen') : null));
@@ -659,8 +691,8 @@ function buildEditor() {
   const content = {
     teams: () => buildTeams(),
     games: () => [buildBoard(), sel ? buildGameEditor('game', sel) : null],
-    rundown: () => [buildRundownEditor(), buildIntroVideo(), showCards],
-    finale: () => [buildFinaleEditor({ ...finaleUi(), reset: !saveState.dirty })],
+    rundown: () => [buildRundownEditor(), buildStageTitles(), buildIntroVideo(), showCards],
+    finale: () => [card('Spieltitel des Finales', h('p', { class: 'muted' }, 'Vor dem Finale zeigt der Beamer eine eigene Spieltitel-Folie. Ist das Lied zu Ende, geht es automatisch ins Finale.'), buildGameIntro({ id: 'finale', title: 'Finale', intro: S.project.finaleIntro }, 'das Finale', (media) => act('finale.setIntro', { media }))), buildFinaleEditor({ ...finaleUi(), reset: !saveState.dirty })],
   }[editorSection]();
   return [
     h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '12px' } }, h('h2', { style: { margin: 0 } }, 'Show-Editor'), saveIndicator()),
@@ -882,6 +914,7 @@ function buildGameEditor(kind, item) {
       ? 'Änderungen gelten nur für diese Show. Der Eintrag in der Datenbank bleibt unverändert.'
       : 'Änderungen gelten für künftige Shows. Spiele, die schon in einer Show sind, bleiben unverändert.'),
     running ? h('p', { class: 'notice warn' }, 'Dieses Spiel läuft gerade. Inhalte erst nach dem Beenden ändern.') : null,
+    kind === 'game' ? titleColorPicker(`Farbe der Spieltitel-Folie für Spiel ${pos}`, item.color, GAME_COLORS[(pos - 1) % GAME_COLORS.length], String(pos), (color) => act('game.setColor', { gameId: item.id, color })) : null,
     kind === 'game' ? buildGameIntro(item, pos) : null,
     h('fieldset', { disabled: running, class: 'plain' },
       h('label', { for: `${key}-title` }, 'Name in der Show (erscheint im Spieltitel auf dem Beamer)'),

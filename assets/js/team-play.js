@@ -307,7 +307,7 @@ function jauch(g, ui) {
 // ---------- 8 · Wer nix werd, werd Nerd ----------
 
 function nerd(g, ui) {
-  const out = [h('p', { class: 'muted' }, `${g.finale ? '★ Große Finalkategorie' : `Kategorie ${g.catIndex + 1} von ${g.count}`}`), h('p', { class: 'question' }, g.category)];
+  const out = [h('p', { class: 'muted' }, `${g.finale ? '★ Große Finalkategorie' : `Kategorie ${g.catIndex + 1} von ${g.count}`}`), h('p', { class: 'question' }, g.category), g.possible ? h('p', { class: 'muted' }, `Maximal ${g.possible} richtige Antworten möglich`) : null];
   if (g.phase === 'bidding') {
     if (!g.canBid) return [...out, stateBox('', '🔒', `Euer Gebot: ${g.ownBid} – wartet, bis alle Gebote aufgedeckt werden.`)];
     const input = h('input', { id: 'bid', type: 'number', min: '1', max: String(g.maxBid), inputmode: 'numeric', class: 'bid-input', 'aria-label': 'Gebot' });

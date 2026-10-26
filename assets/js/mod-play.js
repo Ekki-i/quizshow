@@ -307,6 +307,8 @@ function nerd(ui, g, st) {
   if (c < 0 || !r) return [...out, h('p', { class: 'muted' }, 'Kategorie öffnen: Teams geben geheim ihr Gebot ab.')];
   const cat = g.content.categories[c];
   out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, cat.name || `Kategorie ${c + 1}`));
+  const possible = cat.answers.split('\n').map((l) => l.trim()).filter(Boolean).length;
+  out.push(h('p', { class: 'muted' }, `Maximal ${possible} richtige Antworten möglich (steht auch auf dem Beamer).`));
   out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
     const bid = r.bids[t.id];
     const res = r.results.find((x) => x.teamId === t.id);
@@ -331,10 +333,12 @@ function nerd(ui, g, st) {
     const named = a.given.filter((x) => x.ok).map((x) => x.text);
     out.push(h('p', {}, h('b', { style: { color: ui.teamColor(a.teamId) } }, ui.teamName(a.teamId)), ` · ${a.which === 'first' ? 'erster' : 'zweiter'} Versuch · Ziel ${a.target} · `,
       h('b', {}, `${a.correct} richtig`), ` · ${a.errors} von ${a.maxErrors} Fehlern`, a.done ? ` · ${a.done === 'success' ? 'geschafft ✓' : 'gescheitert ✗'}` : ''));
+    const kept = a.given.filter((x) => x.kept).length;
+    if (kept) out.push(h('p', { class: 'notice' }, `${kept} richtige Antworten des ersten Teams bleiben stehen – ${ui.teamName(a.teamId)} muss nur noch ${a.target - kept} auffüllen.`));
     if (!a.done) {
       out.push(h('p', { class: 'muted' }, 'Genannte Antwort antippen. Bereits genannte zählen als Fehler.'));
       out.push(h('div', { class: 'row' }, valid.map((v) => btn(`small ${named.includes(v) ? 'cyan' : 'ghost'}`, named.includes(v) ? `✓ ${v}` : v, () => ui.act('play.mark', { answer: v })))));
-      out.push(row(btn('bad', '✗ Falsche Antwort', () => ui.act('play.mark', { text: 'Falsche Antwort' })), btn('small ghost', '↶ Letzte Wertung zurück', () => ui.act('play.unmark'), !a.given.length)));
+      out.push(row(btn('bad', '✗ Falsche Antwort', () => ui.act('play.mark', { text: 'Falsche Antwort' })), btn('small ghost', '↶ Letzte Wertung zurück', () => ui.act('play.unmark'), !a.given.length || a.given[a.given.length - 1].kept)));
     }
   }
   if (r.phase === 'done') out.push(row(badge('ok', 'Kategorie beendet')));
