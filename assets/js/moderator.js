@@ -518,6 +518,64 @@ function buildCoins() {
 
 // 3D-Avatar eines Teams: steht auf dem Beamer im Bogen hinter dem Pult.
 // Das Bild wird vor dem Speichern verkleinert (max. 480 px hoch).
+// Hintergrund-Entfernung für Avatare: Alles Helle, das vom Bildrand aus zusammenhängt
+// (Flutfüllung), wird durchsichtig; am Übergang zur Figur weich ausgeblendet. Helle Stellen
+// innerhalb der Figur (z. B. weißes Hemd) bleiben, weil sie nicht mit dem Rand verbunden sind.
+// Bilder, die schon transparent sind oder keinen hellen Rand haben, bleiben unverändert.
+function removeLightBackground(ctx, w, h) {
+  const im = ctx.getImageData(0, 0, w, h);
+  const d = im.data;
+  const n = w * h;
+  const light = (i) => {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    return d[i * 4 + 3] > 200 && min >= 228 && max - min <= 28;
+  };
+  // Nur wenn der Rand überwiegend hell und undurchsichtig ist (typischer weißer Hintergrund).
+  let edge = 0, edgeLight = 0, transparent = 0;
+  for (let x = 0; x < w; x++) for (const y of [0, h - 1]) { edge++; if (light(y * w + x)) edgeLight++; if (d[(y * w + x) * 4 + 3] < 200) transparent++; }
+  for (let y = 0; y < h; y++) for (const x of [0, w - 1]) { edge++; if (light(y * w + x)) edgeLight++; if (d[(y * w + x) * 4 + 3] < 200) transparent++; }
+  if (transparent > edge * 0.2 || edgeLight < edge * 0.6) return false;
+  const bg = new Uint8Array(n);
+  const stack = [];
+  const push = (i) => { if (!bg[i] && light(i)) { bg[i] = 1; stack.push(i); } };
+  // Start nur am oberen, linken und rechten Rand: Figuren sind unten oft angeschnitten
+  // (z. B. weißes Hemd am unteren Bildrand) – das soll stehen bleiben.
+  for (let x = 0; x < w; x++) push(x);
+  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % w, y = (i - x) / w;
+    if (x > 0) push(i - 1);
+    if (x < w - 1) push(i + 1);
+    if (y > 0) push(i - w);
+    if (y < h - 1) push(i + w);
+  }
+  // Randzone (bis 2 Pixel neben dem Hintergrund): helle Säume weich ausblenden und den
+  // Weißanteil aus der Farbe herausrechnen, damit kein heller Rand um die Figur bleibt.
+  const ring = new Uint8Array(n);
+  for (let pass = 1; pass <= 2; pass++) {
+    for (let i = 0; i < n; i++) {
+      if (bg[i] || ring[i]) continue;
+      const x = i % w, y = (i - x) / w;
+      const near = (j) => bg[j] || (pass === 2 && ring[j] === 1);
+      if ((x > 0 && near(i - 1)) || (x < w - 1 && near(i + 1)) || (y > 0 && near(i - w)) || (y < h - 1 && near(i + w))) ring[i] = pass;
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    if (bg[i]) { d[i * 4 + 3] = 0; continue; }
+    if (!ring[i]) continue;
+    const lum = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+    const a = Math.min(1, Math.max(0, (255 - lum) / 125));
+    if (a >= 1) continue;
+    if (a <= 0.04) { d[i * 4 + 3] = 0; continue; }
+    for (let k = 0; k < 3; k++) d[i * 4 + k] = Math.max(0, Math.min(255, Math.round((d[i * 4 + k] - 255 * (1 - a)) / a)));
+    d[i * 4 + 3] = Math.round(d[i * 4 + 3] * a);
+  }
+  ctx.putImageData(im, 0, 0);
+  return true;
+}
+
 async function shrinkImage(file) {
   if (!/^image\/(png|webp|jpeg)$/.test(file.type)) throw new Error('Bitte ein PNG-, WebP- oder JPEG-Bild wählen.');
   const url = URL.createObjectURL(file);
@@ -532,7 +590,10 @@ async function shrinkImage(file) {
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(img.naturalWidth * scale));
     c.height = Math.max(1, Math.round(img.naturalHeight * scale));
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    // Weißen (oder sehr hellen, einfarbigen) Hintergrund automatisch entfernen.
+    removeLightBackground(ctx, c.width, c.height);
     // WebP behält Transparenz und ist klein; Safari kann es nicht erzeugen → PNG.
     let data = c.toDataURL('image/webp', 0.86);
     if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
@@ -616,7 +677,7 @@ function buildTeams() {
       }, h('input', { name: 'name', placeholder: 'Teamname', maxlength: '40', style: { flex: '1 1 220px', width: 'auto' } }),
       h('button', { class: 'btn', type: 'submit' }, '+ Team hinzufügen')),
       h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen kurzen Zugangscode (4 Ziffern) und einen persönlichen Link.'),
-      h('p', { class: 'muted' }, '3D-Avatar: am besten ein freigestelltes PNG (transparenter Hintergrund), hochkant. Er steht auf dem Beamer im Bogen hinter dem Pult; ohne Avatar bleibt das Pult leer.')),
+      h('p', { class: 'muted' }, '3D-Avatar: am besten ein freigestelltes PNG (transparenter Hintergrund), hochkant. Ein weißer Hintergrund wird beim Hochladen automatisch entfernt. Er steht auf dem Beamer im Bogen hinter dem Pult; ohne Avatar bleibt das Pult leer.')),
     card(`Teams von „${showName}“ (${teams.length})`,
       teams.length ? h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'Farbe'), h('th', {}, 'Name'), h('th', {}, '3D-Avatar'), h('th', {}, 'Zugangscode / Link'), h('th', {}, ''))),
