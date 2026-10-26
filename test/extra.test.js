@@ -373,7 +373,11 @@ test('Brain or Dreh\'n: Joker, Glücksrad, Sperren, Reset nur Spielpunkte, Gehei
   assert.throws(() => act(db, team(C), 'wheelBuzz'), /richtiger Antwort/);
   act(db, team(B), 'wheelBuzz');
   assert.throws(() => act(db, team(A), 'wheelBuzz'), /schneller/);
-  act(db, team(B), 'spin');
+  // Rad fest auf „Doppelpunkt“ (Index 0), damit der Test nicht vom Zufall abhängt.
+  const coreMod = require('../server/core');
+  const realRandom = coreMod.randomInt;
+  coreMod.randomInt = () => 0;
+  try { act(db, team(B), 'spin'); } finally { coreMod.randomInt = realRandom; }
   assert.ok(pv(db).wheel.spin.field);
   // Joker gezielt in den Vorrat legen, um die Wirkungen zu prüfen.
   const s = st();
