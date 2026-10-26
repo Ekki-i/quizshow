@@ -991,8 +991,7 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .fb-stage.fx .fx-q span, .fb-stage.fx .fx-q b, .fb-stage.fx .fx-name { overflow: hidden; white-space: normal; }
 .fb-stage.fx .fx-name { white-space: nowrap; }
 /* Avatar hinter dem Finalpult: an das Studiolicht angepasst */
-.sp-avatar { filter: brightness(0.96) contrast(1.04) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.55)); }
-.pult-av img { filter: brightness(0.9) contrast(1.04) drop-shadow(-2px 0 3px rgba(31, 214, 242, 0.45)) drop-shadow(2px 0 3px rgba(255, 45, 138, 0.4)); }
+.pult-av img { filter: brightness(0.9) contrast(1.04) saturate(0.95) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5)); }
 /* Handschrift groß und kräftig, vollständig sichtbar */
 .fb-stage.fx .fx-ink { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; filter: url(#ink-bold) invert(1); mix-blend-mode: screen; background: transparent !important; border-radius: 0; }
 .fb-stage.fx .fx-board { overflow: visible; }
