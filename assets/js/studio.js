@@ -152,11 +152,18 @@ const DEFAULT_AV = {
   cohost: { src: 'assets/img/avatar-cohost.webp', box: [461, 210, 525, DESK_Y] },
 };
 
-function avatarSlot(src, cx, own, def, dx = 0) {
-  // Eigener Avatar: 110 px breit, oben ausgerichtet, an der Pultkante abgeschnitten.
-  const [x0, y0, x1, y1] = own ? [cx - 55, 192, cx + 55, DESK_Y] : [def.box[0] + dx, def.box[1], def.box[2] + dx, def.box[3]];
-  return h('div', { class: 'pult-av', style: { left: pc(x0, PW), top: pc(y0, PH), width: pc(x1 - x0, PW), height: pc(y1 - y0, PH) } },
-    h('img', { src, alt: '' }));
+function avatarSlot(src, cx, own, def, dx = 0, maxW = 120) {
+  // Steht hinter dem Pult: Behälter endet an der Pultkante, die Figur wird nach
+  // Kopfgröße eingepasst (gleiche Größenverhältnisse wie an den Finalpulten).
+  const img = h('img', { src, alt: '', style: { position: 'absolute', visibility: 'hidden' } });
+  const box = h('div', { class: 'pult-av fit', style: { left: 0, top: 0, width: '100%', height: pc(DESK_Y + 2, PH) } }, img);
+  figureBox(src).then((b) => {
+    if (!b) { img.style.visibility = ''; return; }
+    const { s, mid, vis } = computeFit(b, ROOM_HEAD_W, maxW);
+    const top = DESK_Y + 4 - vis - b.y0 * s;
+    Object.assign(img.style, { left: pc(cx + dx - mid * s, PW), top: pc(top, DESK_Y + 2), width: pc(b.W * s, PW), height: 'auto', visibility: '' });
+  });
+  return box;
 }
 
 // who: 'both' (Moderation + Co-Moderation) oder 'cohost' (nur Co-Moderation in der Mitte, Finale)
@@ -166,7 +173,7 @@ export function pultLayers(show, who = 'both') {
     out.push(avatarSlot(show.hostAvatar || DEFAULT_AV.host.src, 382, !!show.hostAvatar, DEFAULT_AV.host));
     out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 493, !!show.coHostAvatar, DEFAULT_AV.cohost));
   } else {
-    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 470, !!show.coHostAvatar, DEFAULT_AV.cohost, -23));
+    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 447, !!show.coHostAvatar, DEFAULT_AV.cohost, 0, 200));
   }
   return out;
 }
@@ -178,6 +185,9 @@ export const PULT = { W: PW, H: PH, DESK_Y, pc };
 // Kopf ≈ 84 Einheiten, Schultern damit etwa so breit wie die Pultoberseite.
 // Über der Pultkante sind Kopf, Schultern und Oberkörper zu sehen.
 const HEAD_W = 106, VIS_HEADS = 3, DESK_MAX_W = 330;
+// Moderationspult in der Mitte (Raumeinheiten 938 × 530): steht etwas weiter hinten,
+// Köpfe daher minimal kleiner als an den Seitenpulten.
+const ROOM_HEAD_W = 50;
 const boxCache = new Map();
 function figureBox(src) {
   if (boxCache.has(src)) return boxCache.get(src);
@@ -197,9 +207,11 @@ function figureBox(src) {
         const rows = [];
         let x0 = w, y0 = hh, x1 = -1, y1 = -1;
         for (let y = 0; y < hh; y++) {
-          let a = -1, b = -1;
-          for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 60) { if (a < 0) a = x; b = x; }
-          rows.push(a < 0 ? null : [a, b]);
+          let a = -1, b = -1, run = 0, best = 0;
+          for (let x = 0; x < w; x++) {
+            if (d[(y * w + x) * 4 + 3] > 60) { if (a < 0) a = x; b = x; run++; if (run > best) best = run; } else run = 0;
+          }
+          rows.push(a < 0 ? null : [a, b, best]);
           if (a >= 0) { x0 = Math.min(x0, a); x1 = Math.max(x1, b); if (y < y0) y0 = y; y1 = y; }
         }
         if (x1 >= 0) {
@@ -207,8 +219,9 @@ function figureBox(src) {
           // Kopf: breiteste Zeile im oberen Bereich (ca. ein Drittel einer Kopf-und-Schulter-Höhe)
           const lim = y0 + Math.max(2, Math.round(Math.min(bh, bw * 1.2) * 0.3));
           let head = 0;
-          for (let y = y0; y <= lim && y < hh; y++) if (rows[y]) head = Math.max(head, rows[y][1] - rows[y][0] + 1);
-          box = { W, H, x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, head: Math.max(head, bw * 0.25) / k, rows, k };
+          // längstes zusammenhängendes Stück je Zeile: bei zwei Personen nur ein Kopf
+          for (let y = y0; y <= lim && y < hh; y++) if (rows[y]) head = Math.max(head, rows[y][2]);
+          box = { W, H, x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, head: Math.max(head, bw * 0.12) / k, rows, k };
         }
       } catch { /* fremde Quelle: ganzes Bild nehmen */ }
       resolve(box);
@@ -220,26 +233,31 @@ function figureBox(src) {
   return p;
 }
 
+// Maßstab und Lage einer Figur: Kopf = headW Einheiten, an der Pultkante höchstens
+// maxW breit, sichtbar etwa drei Kopfhöhen.
+function computeFit(b, headW, maxW) {
+  let s = headW / b.head;
+  let vis = 0, cut = null;
+  for (let pass = 0; pass < 3; pass++) {
+    vis = Math.min(VIS_HEADS * b.head * s, (b.y1 - b.y0) * s * 0.8);
+    cut = null;
+    if (b.rows) {
+      const y = Math.min(b.rows.length - 1, Math.round((b.y0 + vis / s) * b.k));
+      for (let yy = y; yy >= 0 && !cut; yy--) if (b.rows[yy]) cut = [b.rows[yy][0] / b.k, (b.rows[yy][1] + 1) / b.k];
+    }
+    if (!cut) break;
+    const wDesk = (cut[1] - cut[0]) * s;
+    if (wDesk <= maxW) break;
+    s *= maxW / wDesk;
+  }
+  const mid = cut ? (cut[0] + cut[1]) / 2 : (b.x0 + b.x1) / 2;
+  return { s, mid, vis };
+}
+
 function fitAvatar(img, src, cx, deskY) {
   figureBox(src).then((b) => {
     if (!b) return;
-    let s = HEAD_W / b.head;
-    let vis = 0, cut = null;
-    // Breite der Figur an der Pultkante: höchstens so breit wie die Pultoberseite,
-    // sonst ragen die Schultern seitlich über das Pult hinaus.
-    for (let pass = 0; pass < 3; pass++) {
-      vis = Math.min(HEAD_W * VIS_HEADS, (b.y1 - b.y0) * s * 0.8);
-      cut = null;
-      if (b.rows) {
-        const y = Math.min(b.rows.length - 1, Math.round((b.y0 + vis / s) * b.k));
-        for (let yy = y; yy >= 0 && !cut; yy--) if (b.rows[yy]) cut = b.rows[yy].map((v) => v / b.k);
-      }
-      if (!cut) break;
-      const wDesk = (cut[1] - cut[0]) * s;
-      if (wDesk <= DESK_MAX_W) break;
-      s *= DESK_MAX_W / wDesk;
-    }
-    const mid = cut ? (cut[0] + cut[1]) / 2 : (b.x0 + b.x1) / 2;
+    const { s, mid, vis } = computeFit(b, HEAD_W, DESK_MAX_W);
     const top = deskY + 12 - vis;
     img.setAttribute('preserveAspectRatio', 'none');
     img.setAttribute('width', b.W * s);
@@ -267,13 +285,28 @@ export function singlePodium({ avatar, color, label, mirror = false, extra = nul
     grad.append(el('stop', { offset: 0, 'stop-color': '#fff' }), el('stop', { offset: 1, 'stop-color': '#fff', 'stop-opacity': 0 }));
     const mask = el('mask', { id: maskId, maskUnits: 'userSpaceOnUse', x: -600, y: -800, width: VW + 1200, height: 800 + VH });
     mask.append(el('rect', { x: -600, y: -800, width: VW + 1200, height: 800 + VH, fill: `url(#${maskId}-g)` }));
+    // Studiolicht: kühle Farbanpassung an den Raum, von hinten Kantenlicht
+    // (links türkis, rechts pink) wie von den Neonleisten.
+    const fx = el('filter', { id: `${maskId}-l`, x: '-10%', y: '-10%', width: '120%', height: '120%', 'color-interpolation-filters': 'sRGB' });
+    const rim = (dx, color, name) => [
+      el('feOffset', { in: 'soft', dx, dy: -2, result: `${name}o` }),
+      el('feComposite', { in: 'SourceAlpha', in2: `${name}o`, operator: 'out', result: `${name}e` }),
+      el('feFlood', { 'flood-color': color, 'flood-opacity': 0.75 }),
+      el('feComposite', { in2: `${name}e`, operator: 'in', result: name }),
+    ];
+    fx.append(
+      el('feColorMatrix', { in: 'SourceGraphic', type: 'matrix', values: '0.86 0 0 0 0  0 0.9 0 0 0.005  0 0 0.98 0 0.02  0 0 0 1 0', result: 'grade' }),
+      el('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 2.2, result: 'soft' }),
+      ...rim(5, '#38e8ff', 'cy'), ...rim(-5, '#ff3d9a', 'pk'),
+      el('feMerge', {}, ));
+    const merge = fx.lastChild;
+    for (const n of ['grade', 'cy', 'pk']) merge.append(el('feMergeNode', { in: n }));
     const defs = el('defs');
-    defs.append(grad, mask);
+    defs.append(grad, mask, fx);
     svg.append(defs);
-    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet', mask: `url(#${maskId})` });
+    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet', mask: `url(#${maskId})`, filter: `url(#${maskId}-l)` });
     svg.append(img);
     fitAvatar(img, avatar, cx, PY);
-    svg.append(el('rect', { x: 0, y: PY - 6, width: VW, height: 30, fill: '#000', opacity: 0.35, filter: 'blur(6px)' }));
   }
   svg.append(el('ellipse', { cx: VW / 2, cy: VH - 8, rx: 180, ry: 12, fill: '#000', opacity: 0.45 }));
   svg.append(el('image', { href: 'assets/img/finale-pult.webp', x: 0, y: PY, width: VW, height: 342, transform: mirror ? `translate(${VW} 0) scale(-1 1)` : null }));
