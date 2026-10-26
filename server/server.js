@@ -387,4 +387,12 @@ setInterval(() => {
 ensureModeratorPassword();
 server.listen(PORT, () => {
   console.log(`„Wer stiehlt uns die Show“ läuft auf http://localhost:${PORT}`);
+  // Adressen im WLAN für iPads und Beamer anzeigen.
+  const nets = Object.values(require('os').networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal);
+  if (nets.length) {
+    console.log('\n  iPads und Beamer im selben WLAN öffnen:');
+    for (const n of nets) console.log(`    http://${n.address}:${PORT}`);
+  }
+  console.log('\n  Passwort für Regie und Editor: fabian');
+  console.log('  Dieses Fenster während der Show offen lassen. Beenden mit Strg+C.\n');
 });
