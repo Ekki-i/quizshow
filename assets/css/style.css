@@ -1143,3 +1143,6 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .beamer .map-box.beamer-map { width: fit-content; max-width: 92vw; border-radius: 0; border: 0; box-shadow: 0 0 0 0.5vh var(--box-2, #2b2b2e), 0 1vh 3vh rgba(0, 0, 0, 0.55); }
 .beamer .map-box.beamer-map .map { width: auto; height: 68vh; max-width: 92vw; }
 .beamer .map .pin-label { font-size: 20px; }
+/* Deutschlandkarte: Deutschland hell hervorgehoben, Nachbarländer gedämpft */
+.map .land.has-hl path { fill: #2c4a35; stroke: #16281c; stroke-width: 1; }
+.map .land.has-hl path.hl { fill: #4a8a5c; stroke: #e8f5ec; stroke-width: 2.2; }

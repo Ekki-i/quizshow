@@ -35,8 +35,14 @@ for (const [name, v] of Object.entries(VIEWS)) {
     .translate([WIDTH / 2, v.latMax * rad * s])
     .clipExtent([[-2, -2], [WIDTH + 2, height + 2]]);
   const pathGen = geoPath(projection).digits(v.digits);
-  const paths = countries.map((f) => pathGen(f)).filter(Boolean);
-  out[name] = { lonMin: v.lonMin, lonMax: v.lonMax, latMin: v.latMin, latMax: v.latMax, width: WIDTH, height, c, paths };
+  // Pfade, die durch das Zuschneiden die ganze Fläche füllen (falsche Umlaufrichtung), weglassen –
+  // sonst ist z. B. die Deutschlandkarte nur eine grüne Fläche.
+  const full = `M-2,-2L${WIDTH + 2},-2L${WIDTH + 2},${height + 2}L-2,${height + 2}Z`;
+  const drawn = countries.map((f) => ({ id: f.id, d: pathGen(f) })).filter((x) => x.d && x.d !== full);
+  const paths = drawn.map((x) => x.d);
+  // In der Deutschlandkarte wird Deutschland (ISO 276) hervorgehoben.
+  const highlight = name === 'Deutschland' ? drawn.findIndex((x) => String(x.id) === '276') : -1;
+  out[name] = { lonMin: v.lonMin, lonMax: v.lonMax, latMin: v.latMin, latMax: v.latMax, width: WIDTH, height, c, paths, ...(highlight >= 0 ? { highlight } : {}) };
   console.log(name, paths.length, 'Länder,', Math.round(paths.join('').length / 1024), 'KB');
 }
 
