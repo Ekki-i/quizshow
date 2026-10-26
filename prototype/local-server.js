@@ -162,7 +162,7 @@ export function createLocalServer() {
       send(c, { type: 'welcome', role: c.role });
       return broadcast();
     }
-    if (msg.type !== 'action' || !(c.role === 'moderator' || c.role === 'team')) return;
+    if (msg.type !== 'action' || !(c.role === 'moderator' || c.role === 'team' || (c.role === 'beamer' && !c.preview))) return;
     const ctx = { role: c.role, teamId: c.teamId, actor: c.role === 'team' ? `team:${c.teamId}` : c.role, now: Date.now() };
     const draft = structuredClone(data);
     try {

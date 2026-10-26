@@ -359,7 +359,7 @@ wss.on('connection', (ws) => {
       c.token = msg.token;
       return handleHello(c, msg);
     }
-    if (msg.type === 'action' && (c.role === 'moderator' || c.role === 'team')) return handleAction(c, msg);
+    if (msg.type === 'action' && (c.role === 'moderator' || c.role === 'team' || (c.role === 'beamer' && !c.preview))) return handleAction(c, msg);
   });
   ws.on('close', () => {
     clients.delete(c);

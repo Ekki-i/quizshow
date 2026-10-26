@@ -154,7 +154,7 @@
       title: () => tone([392, 392, 523, 659, 523, 784], 0.2, 'square'),
     };
 
-    connect({
+    const conn = connect({
       hello: () => ({ role: 'beamer', preview: embedded }),
       quiet: embedded,
       onState: (s, serverTime) => {
@@ -378,6 +378,8 @@
       if (!m || embedded || !s.settings.sound) return;
       const el = h('video', { class: 'game-intro', playsinline: true, preload: 'auto', 'aria-hidden': 'true' });
       el.muted = !audio;
+      // Lied zu Ende → automatisch weiter zum Spiel (der Server prüft, ob noch der Spieltitel läuft).
+      el.onended = () => { if (gameIntro === el) conn.action('beamer.introEnded', { pos: s.game.position }).catch(() => {}); };
       document.body.append(el);
       gameIntro = el;
       mediaUrl(m.id).then((url) => {

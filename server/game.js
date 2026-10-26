@@ -363,6 +363,19 @@ function runStep(db, ctx, index) {
   return {};
 }
 
+// Intro-Lied der Spieltitel-Folie ist zu Ende: automatisch weiter zum Spiel.
+// Mehrere Beamer melden das evtl. gleichzeitig – nur die erste Meldung schaltet.
+function introEnded(db, ctx, p) {
+  const steps = rundown(db);
+  const cur = steps[db.live.run ?? -1];
+  const pos = Number(p.pos);
+  if (!cur || cur.kind !== 'title' || cur.pos !== pos) return {};
+  const next = steps[db.live.run + 1];
+  if (!next || next.kind !== 'game' || next.pos !== pos) return {};
+  log(db, ctx, 'ablauf', `Intro-Lied von Spiel ${pos} zu Ende – automatisch weiter zum Spiel`);
+  return runStep(db, ctx, db.live.run + 1);
+}
+
 // ---------- Aktionen ----------
 
 const moderatorActions = {
@@ -745,7 +758,11 @@ const moderatorActions = {
 function applyAction(db, ctx, name, payload, actionId) {
   if (actionId && db.processed.includes(actionId)) return { duplicate: true };
   let result;
-  if (typeof name === 'string' && name.startsWith('play.') && (ctx.role === 'moderator' || ctx.role === 'team')) {
+  if (ctx.role === 'beamer') {
+    // Der Beamer darf nur melden, dass das Intro-Lied eines Spieltitels zu Ende ist.
+    if (name !== 'beamer.introEnded') fail('Diese Aktion ist für diese Rolle nicht erlaubt.');
+    result = introEnded(db, ctx, payload || {}) || {};
+  } else if (typeof name === 'string' && name.startsWith('play.') && (ctx.role === 'moderator' || ctx.role === 'team')) {
     result = playAction(db, ctx, name.slice(5), payload || {}) || {};
   } else if (ctx.role === 'team' && Object.prototype.hasOwnProperty.call(FINALE.team, name)) {
     result = FINALE.team[name](db, ctx, payload || {}) || {};
