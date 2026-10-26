@@ -32,6 +32,52 @@ function filmEl() {
   }
   return media.film;
 }
+// „Hits me baby“: Häppchen sample-genau über Web Audio abspielen. Das Lied wird beim
+// Auswählen einmal komplett geladen und dekodiert; jede Stufe startet dann ohne
+// Lade- oder Anlaufzeit des Audio-Elements (wichtig für die 0,5-s-Stufe).
+const konBufs = new Map();
+let konSrc = null;
+function konBuffer(ctx, id) {
+  if (!konBufs.has(id)) {
+    konBufs.set(id, (async () => {
+      const url = await mediaUrl(id);
+      if (!url) return null;
+      const data = await (await fetch(url)).arrayBuffer();
+      return await new Promise((res, rej) => ctx.decodeAudioData(data, res, rej));
+    })().catch(() => null));
+  }
+  return konBufs.get(id);
+}
+function konStop() {
+  if (!konSrc) return;
+  const { src, gain, ctx } = konSrc;
+  konSrc = null;
+  try {
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.03);
+    src.stop(ctx.currentTime + 0.05);
+  } catch { /* schon beendet */ }
+}
+function konPlay(ctx, buf, from, len) {
+  konStop();
+  if (ctx.state === 'suspended') ctx.resume();
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const gain = ctx.createGain();
+  const t = ctx.currentTime + 0.03;
+  const end = t + len;
+  // 10 ms ein- und ausblenden gegen Knackser
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(1, t + 0.01);
+  gain.gain.setValueAtTime(1, Math.max(t + 0.01, end - 0.01));
+  gain.gain.linearRampToValueAtTime(0, end);
+  src.connect(gain).connect(ctx.destination);
+  src.start(t, Math.min(from, Math.max(0, buf.duration - 0.05)), len + 0.02);
+  konSrc = { src, gain, ctx };
+  src.onended = () => { if (konSrc && konSrc.src === src) konSrc = null; };
+}
+
 function audioEl() {
   if (!media.audio) {
     media.audio = h('audio', { preload: 'auto', 'aria-hidden': 'true' });
@@ -54,6 +100,7 @@ export function soundEnabled() {
 
 // Bei jedem Neuzeichnen: Medien passend zum Spielzustand steuern.
 export function syncMedia(s) {
+  last.s = s;
   const v = s.view === 'game' ? s.gameView : null;
   const film = v && v.type === 'filmab' && !v.waiting ? v : null;
   const fl = media.film || (film ? filmEl() : null);
@@ -76,13 +123,34 @@ export function syncMedia(s) {
   const au = media.audio || (song || kon ? audioEl() : null);
   if (!au) return;
   au.muted = !env.soundOn();
+  if (!kon) konStop();
   if (song && song.audio) {
     setSrc(au, song.audio.id, 'audioId').then(() => {
       if (last.audioSeq === `s${song.playback.seq}`) return;
       last.audioSeq = `s${song.playback.seq}`;
       if (song.playback.state === 'playing') { au.currentTime = 0; au.play().catch(() => {}); } else au.pause();
     });
+  } else if (kon && kon.audio && last.konFallback !== kon.audio.id && env.soundOn() && env.audioCtx && env.audioCtx()) {
+    // Web-Audio-Weg (echter Beamer mit Ton)
+    const ctx = env.audioCtx();
+    if (!au.paused) au.pause();
+    const id = kon.audio.id;
+    const bufP = konBuffer(ctx, id); // schon beim Auswählen laden
+    if (kon.stage >= 0 && last.audioSeq !== `k${kon.seq}`) {
+      last.audioSeq = `k${kon.seq}`;
+      const seq = kon.seq;
+      const from = kon.start || 0, len = kon.stages[kon.stage];
+      bufP.then((buf) => {
+        if (last.audioSeq !== `k${seq}`) return;
+        if (buf) return konPlay(ctx, buf, from, len);
+        // Dekodieren fehlgeschlagen: über das Audio-Element abspielen
+        last.audioSeq = null;
+        last.konFallback = id;
+        syncMedia(last.s);
+      });
+    }
   } else if (kon && kon.audio) {
+    konStop();
     setSrc(au, kon.audio.id, 'audioId').then(() => {
       if (last.audioSeq === `k${kon.seq}` || kon.stage < 0) return;
       last.audioSeq = `k${kon.seq}`;
@@ -110,6 +178,7 @@ export function syncMedia(s) {
       au.play().catch(() => {});
     });
   } else if (!au.paused) {
+    konStop();
     clearTimeout(last.stageTimer);
     cancelAnimationFrame(last.stageRaf);
     au.pause();
