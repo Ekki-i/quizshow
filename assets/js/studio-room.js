@@ -22,11 +22,13 @@ function tri([cx, by, s], i, mirror) {
 function side(mirror) {
   const m = (pts) => (mirror ? pts.map(([x, y]) => [938 - x, y]) : pts).map((p) => p.join(',')).join(' ');
   return `
+    <g mask="url(#G-fade)">
     <polygon points="${m([[0, 150], [34, 150], [126, 336], [92, 336]])}" fill="#16c4dc" opacity=".55" filter="url(#G-soft)"/>
     <polygon points="${m([[0, 150], [30, 150], [122, 336], [92, 336]])}" fill="url(#G-cyanbar)"/>
     <polygon points="${m([[0, 40], [24, 40], [172, 336], [148, 336]])}" fill="#ff2d8a" opacity=".6" filter="url(#G-soft)"/>
     <polygon points="${m([[0, 40], [20, 40], [168, 336], [148, 336]])}" fill="url(#G-pinkbar)"/>
     <polygon points="${m([[0, 226], [12, 226], [66, 336], [54, 336]])}" fill="#ff4f9a" opacity=".85"/>
+    </g>
     <g fill="none" stroke-width="2.6" stroke-linejoin="round" filter="url(#G-neon)">${TRI.map((t, i) => tri(t, i, mirror)).join('')}</g>
     <polyline points="${m([[0, 322], [205, 322]])}" stroke="#2ee6ff" stroke-width="2.4" filter="url(#G-neon)"/>
     <polyline points="${m([[0, 338], [175, 338]])}" stroke="#ff2d8a" stroke-width="2" opacity=".8" filter="url(#G-neon)"/>`;
@@ -86,6 +88,10 @@ export function studioRoomSvg(cls = 'pult-bg') {
     <linearGradient id="G-shelf" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffcf7a"/><stop offset=".5" stop-color="#c98a35"/><stop offset="1" stop-color="#7d4f17"/>
     </linearGradient>
+    <linearGradient id="G-fadeg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff"/><stop offset=".36" stop-color="#fff"/><stop offset=".56" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/>
+    </linearGradient>
+    <mask id="G-fade" maskUnits="userSpaceOnUse" x="-50" y="0" width="1040" height="530"><rect x="-50" y="0" width="1040" height="530" fill="url(#G-fadeg)"/></mask>
     <filter id="G-neon" x="-30%" y="-30%" width="160%" height="160%">
       <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
