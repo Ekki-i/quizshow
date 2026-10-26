@@ -152,16 +152,19 @@ const DEFAULT_AV = {
   cohost: { src: 'assets/img/avatar-cohost.webp', box: [461, 210, 525, DESK_Y] },
 };
 
-function avatarSlot(src, cx, own, def, dx = 0, maxW = 120) {
-  // Steht hinter dem Pult: Behälter endet an der Pultkante, die Figur wird nach
-  // Kopfgröße eingepasst (gleiche Größenverhältnisse wie an den Finalpulten).
+function avatarSlot(src, cx, frame = ROOM_FRAME) {
+  // Steht hinter dem Pult: Behälter = unsichtbarer Rahmen, endet an der Pultkante.
   const img = h('img', { src, alt: '', style: { position: 'absolute', visibility: 'hidden' } });
-  const box = h('div', { class: 'pult-av fit', style: { left: 0, top: 0, width: '100%', height: pc(DESK_Y + 2, PH) } }, img);
+  const top = DESK_Y + 2 - frame.h * 1.3;
+  const box = h('div', { class: 'pult-av fit', style: { left: pc(cx - frame.w / 2, PW), top: pc(top, PH), width: pc(frame.w, PW), height: pc(DESK_Y + 2 - top, PH) } }, img);
   figureBox(src).then((b) => {
     if (!b) { img.style.visibility = ''; return; }
-    const { s, mid, vis } = computeFit(b, ROOM_HEAD_W, maxW);
-    const top = DESK_Y + 4 - vis - b.y0 * s;
-    Object.assign(img.style, { left: pc(cx + dx - mid * s, PW), top: pc(top, DESK_Y + 2), width: pc(b.W * s, PW), height: 'auto', visibility: '' });
+    const { s, mid, bottom } = computeFrame(b, frame);
+    const hh = DESK_Y + 2 - top;
+    Object.assign(img.style, {
+      left: pc(frame.w / 2 - mid * s, frame.w), top: pc(DESK_Y + 2 - top - bottom * s + 2, hh),
+      width: pc(b.W * s, frame.w), height: 'auto', visibility: '',
+    });
   });
   return box;
 }
@@ -170,10 +173,10 @@ function avatarSlot(src, cx, own, def, dx = 0, maxW = 120) {
 export function pultLayers(show, who = 'both') {
   const out = [studioRoom('pult-bg')];
   if (who === 'both') {
-    out.push(avatarSlot(show.hostAvatar || DEFAULT_AV.host.src, 382, !!show.hostAvatar, DEFAULT_AV.host));
-    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 493, !!show.coHostAvatar, DEFAULT_AV.cohost));
+    out.push(avatarSlot(show.hostAvatar || DEFAULT_AV.host.src, 385, { w: 112, h: 100 }));
+    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 500, { w: 112, h: 100 }));
   } else {
-    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 447, !!show.coHostAvatar, DEFAULT_AV.cohost, 0, 200));
+    out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 442));
   }
   return out;
 }
@@ -184,10 +187,14 @@ export const PULT = { W: PW, H: PH, DESK_Y, pc };
 // über den Kopf, damit Brustbilder und Ganzkörperfiguren gleich groß wirken:
 // Kopf ≈ 84 Einheiten, Schultern damit etwa so breit wie die Pultoberseite.
 // Über der Pultkante sind Kopf, Schultern und Oberkörper zu sehen.
-const HEAD_W = 106, VIS_HEADS = 3, DESK_MAX_W = 196;
-// Moderationspult in der Mitte (Raumeinheiten 938 × 530): steht etwas weiter hinten,
-// Köpfe daher minimal kleiner als an den Seitenpulten.
-const ROOM_HEAD_W = 50;
+// Unsichtbarer Rahmen je Pult: Die Figur (Kopf bis Hüfte) wird so groß wie möglich
+// hineingesetzt, aber nie breiter oder höher – nichts ragt seitlich über das Pult.
+// Seitenpulte (Einheiten des Pult-SVG): Rahmen über dem ganzen Pult (Oberseite und Schräge).
+const SIDE_FRAME = { w: 250, h: 240 };
+// Oberkante des Finalpult-Bilds (x → y ab Bildoberkante), für die Verdeckung an der Schräge
+const PULT_TOP = [[20, 274], [40, 234], [60, 194], [80, 154], [100, 114], [120, 74], [140, 37], [160, 35], [180, 33], [200, 15], [220, 14], [260, 12], [300, 11], [340, 9], [394, 8]];
+// Moderationspult in der Mitte (Raumeinheiten 938 × 530)
+const ROOM_FRAME = { w: 132, h: 110 };
 const boxCache = new Map();
 function figureBox(src) {
   if (boxCache.has(src)) return boxCache.get(src);
@@ -220,7 +227,15 @@ function figureBox(src) {
           const lim = y0 + Math.max(2, Math.round(Math.min(bh, bw * 1.2) * 0.3));
           let head = 0;
           // längstes zusammenhängendes Stück je Zeile: bei zwei Personen nur ein Kopf
-          for (let y = y0; y <= lim && y < hh; y++) if (rows[y]) head = Math.max(head, rows[y][2]);
+          // Von oben nach unten bis zum Sprung an den Schultern (Breite springt deutlich).
+          const minRows = Math.max(3, Math.round(bh * 0.03));
+          // Kopf = breiteste Stelle bis zum Hals (Breite fällt deutlich ab) bzw. bis zu
+          // einem plötzlichen Sprung (Schultern).
+          for (let y = y0, n = 0; y <= Math.min(hh - 1, y0 + Math.round(bh * 0.35)); y++, n++) {
+            const wRun = rows[y] ? rows[y][2] : 0;
+            if (n >= minRows * 2 && head > 0 && (wRun < head * 0.85 || wRun > head * 1.45)) break;
+            if (y <= lim) head = Math.max(head, wRun);
+          }
           box = { W, H, x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, head: Math.max(head, bw * 0.12) / k, rows, k };
         }
       } catch { /* fremde Quelle: ganzes Bild nehmen */ }
@@ -233,45 +248,36 @@ function figureBox(src) {
   return p;
 }
 
-// Maßstab und Lage einer Figur: Kopf = headW Einheiten, an der Pultkante höchstens
-// maxW breit, sichtbar etwa drei Kopfhöhen.
-function computeFit(b, headW, maxW) {
-  let s = headW / b.head;
-  let vis = 0, cut = null;
-  for (let pass = 0; pass < 3; pass++) {
-    // etwa drei Kopfhöhen sichtbar (bis zur Brust/Hüfte), bei Brustbildern höchstens 80 %
-    vis = Math.min(VIS_HEADS * b.head * s, (b.y1 - b.y0) * s * 0.8);
-    cut = null;
-    if (b.rows) {
-      // breiteste Stelle des sichtbaren Teils (Schultern, Ellbogen)
-      // (Hände direkt an der Pultkante zählen nicht mit)
-      const y = Math.min(b.rows.length - 1, Math.round((b.y0 + 0.85 * vis / s) * b.k));
-      for (let yy = Math.round(b.y0 * b.k); yy <= y; yy++) {
-        const r = b.rows[yy];
-        if (!r) continue;
-        if (!cut) cut = [r[0] / b.k, (r[1] + 1) / b.k];
-        else { cut[0] = Math.min(cut[0], r[0] / b.k); cut[1] = Math.max(cut[1], (r[1] + 1) / b.k); }
-      }
+// Sichtbarer Teil: von oben bis etwa zur Hüfte (3,4 Kopfbreiten), bei Brustbildern
+// bis knapp über die Bildunterkante. Rückgabe: Maßstab s, Mitte und Unterkante
+// des sichtbaren Teils (in Bildpixeln).
+function computeFrame(b, frame) {
+  const figH = b.y1 - b.y0;
+  // Ganzkörperfigur (mehr als sechs Kopfbreiten hoch): höchstens die obere Hälfte bis zur Hüfte
+  const visSrc = Math.min(figH * (figH / b.head > 6 ? 0.45 : 0.92), b.head * 3.4);
+  let l = b.x0, r = b.x1;
+  if (b.rows) {
+    l = Infinity; r = -Infinity;
+    const y1 = Math.min(b.rows.length - 1, Math.round((b.y0 + visSrc) * b.k));
+    for (let yy = Math.round(b.y0 * b.k); yy <= y1; yy++) {
+      const row = b.rows[yy];
+      if (row) { l = Math.min(l, row[0] / b.k); r = Math.max(r, (row[1] + 1) / b.k); }
     }
-    if (!cut) break;
-    const wDesk = (cut[1] - cut[0]) * s;
-    if (wDesk <= maxW) break;
-    s *= maxW / wDesk;
+    if (!isFinite(l)) { l = b.x0; r = b.x1; }
   }
-  const mid = cut ? (cut[0] + cut[1]) / 2 : (b.x0 + b.x1) / 2;
-  return { s, mid, vis };
+  const s = Math.min(frame.w / (r - l), frame.h / visSrc);
+  return { s, mid: (l + r) / 2, bottom: b.y0 + visSrc };
 }
 
 function fitAvatar(img, src, cx, deskY) {
   figureBox(src).then((b) => {
     if (!b) return;
-    const { s, mid, vis } = computeFit(b, HEAD_W, DESK_MAX_W);
-    const top = deskY + 12 - vis;
+    const { s, mid, bottom } = computeFrame(b, SIDE_FRAME);
     img.setAttribute('preserveAspectRatio', 'none');
     img.setAttribute('width', b.W * s);
     img.setAttribute('height', b.H * s);
     img.setAttribute('x', cx - mid * s);
-    img.setAttribute('y', top - b.y0 * s);
+    img.setAttribute('y', deskY + 4 - bottom * s);
   });
 }
 
@@ -282,13 +288,18 @@ export function singlePodium({ avatar, color, label, mirror = false, extra = nul
   const VW = 394, VH = 560, PY = VH - 342;
   const svg = el('svg', { class: 'single-podium', viewBox: `0 0 ${VW} ${VH}`, role: 'img', 'aria-label': label || '' });
   const cx = mirror ? 100 : 294;
+  const fcx = mirror ? 124 : 270; // Mitte des unsichtbaren Rahmens
   // Avatar so breit wie die Pultoberseite, unten bündig hinter der Pultkante (Oberkörper hinter dem Pult).
   if (avatar) {
     // Die Person steht hinter dem Pult: nie breiter als die Pultoberseite und
     // unterhalb der Pultkante komplett verdeckt.
     const clipId = `sp${++uid}`;
     const clip = el('clipPath', { id: clipId });
-    clip.append(el('rect', { x: -400, y: -800, width: VW + 800, height: 800 + PY + 10 }));
+    const fl = fcx - SIDE_FRAME.w / 2, fr = fcx + SIDE_FRAME.w / 2;
+    const prof = PULT_TOP.map(([x, y]) => [mirror ? VW - x : x, PY + y + 2]).filter(([x]) => x >= fl && x <= fr);
+    prof.sort((a, b) => a[0] - b[0]);
+    const yAt = (x) => { const m = PULT_TOP.map(([px, py]) => [mirror ? VW - px : px, PY + py + 2]).sort((a, b) => Math.abs(a[0] - x) - Math.abs(b[0] - x))[0]; return m[1]; };
+    clip.append(el('polygon', { points: [[fl, -800], [fr, -800], [fr, yAt(fr)], ...prof.reverse(), [fl, yAt(fl)]].map((q) => q.join(',')).join(' ') }));
     const fx = el('filter', { id: `${clipId}-l`, 'color-interpolation-filters': 'sRGB' });
     fx.append(el('feColorMatrix', { type: 'matrix', values: '0.9 0 0 0 0  0 0.92 0 0 0.004  0 0 0.98 0 0.015  0 0 0 1 0' }));
     const defs = el('defs');
@@ -296,7 +307,7 @@ export function singlePodium({ avatar, color, label, mirror = false, extra = nul
     svg.append(defs);
     const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 92, y: PY - 228, width: 184, height: 240, preserveAspectRatio: 'xMidYMax meet', 'clip-path': `url(#${clipId})`, filter: `url(#${clipId}-l)` });
     svg.append(img);
-    fitAvatar(img, avatar, cx, PY);
+    fitAvatar(img, avatar, fcx, PY);
   }
   svg.append(el('ellipse', { cx: VW / 2, cy: VH - 8, rx: 180, ry: 12, fill: '#000', opacity: 0.45 }));
   svg.append(el('image', { href: 'assets/img/finale-pult.webp', x: 0, y: PY, width: VW, height: 342, transform: mirror ? `translate(${VW} 0) scale(-1 1)` : null }));
