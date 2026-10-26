@@ -730,3 +730,19 @@ test('Intro-Lied je Spiel: setzen, an Beamer im Spieltitel, entfernen', () => {
   assert.equal(game.beamerView(db).game.intro, null);
   assert.ok(!game.referencedMedia(db).has('media_aaaaaaaaaaaa11'));
 });
+
+test('Intro-Lied zu Ende: Beamer schaltet vom Spieltitel automatisch ins Spiel', () => {
+  const { db } = setup(1);
+  const beamer = { role: 'beamer', actor: 'beamer', now: clock++ };
+  const steps = game.moderatorView(db).rundown;
+  const t = steps.findIndex((s) => s.kind === 'title' && s.pos === 2);
+  game.applyAction(db, mod(), 'run.goto', { index: t });
+  assert.throws(() => game.applyAction(db, beamer, 'run.next', {}), /nicht erlaubt/);
+  game.applyAction(db, beamer, 'beamer.introEnded', { pos: 3 }); // falsches Spiel: nichts passiert
+  assert.equal(db.live.run, t);
+  game.applyAction(db, beamer, 'beamer.introEnded', { pos: 2 });
+  assert.equal(db.live.run, t + 1);
+  assert.equal(db.live.beamer.view, 'game');
+  game.applyAction(db, beamer, 'beamer.introEnded', { pos: 2 }); // zweiter Beamer: kein weiterer Sprung
+  assert.equal(db.live.run, t + 1);
+});
