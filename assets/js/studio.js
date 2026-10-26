@@ -177,7 +177,7 @@ export const PULT = { W: PW, H: PH, DESK_Y, pc };
 // über den Kopf, damit Brustbilder und Ganzkörperfiguren gleich groß wirken:
 // Kopf ≈ 84 Einheiten, Schultern damit etwa so breit wie die Pultoberseite.
 // Über der Pultkante sind Kopf, Schultern und Oberkörper zu sehen.
-const HEAD_W = 84, VIS_HEADS = 2.7;
+const HEAD_W = 106, VIS_HEADS = 3, DESK_MAX_W = 330;
 const boxCache = new Map();
 function figureBox(src) {
   if (boxCache.has(src)) return boxCache.get(src);
@@ -208,7 +208,7 @@ function figureBox(src) {
           const lim = y0 + Math.max(2, Math.round(Math.min(bh, bw * 1.2) * 0.3));
           let head = 0;
           for (let y = y0; y <= lim && y < hh; y++) if (rows[y]) head = Math.max(head, rows[y][1] - rows[y][0] + 1);
-          box = { W, H, x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, head: Math.max(head, bw * 0.25) / k };
+          box = { W, H, x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, head: Math.max(head, bw * 0.25) / k, rows, k };
         }
       } catch { /* fremde Quelle: ganzes Bild nehmen */ }
       resolve(box);
@@ -223,15 +223,28 @@ function figureBox(src) {
 function fitAvatar(img, src, cx, deskY) {
   figureBox(src).then((b) => {
     if (!b) return;
-    const s = HEAD_W / b.head;
-    const figH = (b.y1 - b.y0) * s;
-    // Unterkante der Figur muss hinter dem Pult bleiben.
-    const vis = Math.min(HEAD_W * VIS_HEADS, figH * 0.86);
+    let s = HEAD_W / b.head;
+    let vis = 0, cut = null;
+    // Breite der Figur an der Pultkante: höchstens so breit wie die Pultoberseite,
+    // sonst ragen die Schultern seitlich über das Pult hinaus.
+    for (let pass = 0; pass < 3; pass++) {
+      vis = Math.min(HEAD_W * VIS_HEADS, (b.y1 - b.y0) * s * 0.8);
+      cut = null;
+      if (b.rows) {
+        const y = Math.min(b.rows.length - 1, Math.round((b.y0 + vis / s) * b.k));
+        for (let yy = y; yy >= 0 && !cut; yy--) if (b.rows[yy]) cut = b.rows[yy].map((v) => v / b.k);
+      }
+      if (!cut) break;
+      const wDesk = (cut[1] - cut[0]) * s;
+      if (wDesk <= DESK_MAX_W) break;
+      s *= DESK_MAX_W / wDesk;
+    }
+    const mid = cut ? (cut[0] + cut[1]) / 2 : (b.x0 + b.x1) / 2;
     const top = deskY + 12 - vis;
     img.setAttribute('preserveAspectRatio', 'none');
     img.setAttribute('width', b.W * s);
     img.setAttribute('height', b.H * s);
-    img.setAttribute('x', cx - ((b.x0 + b.x1) / 2) * s);
+    img.setAttribute('x', cx - mid * s);
     img.setAttribute('y', top - b.y0 * s);
   });
 }
@@ -242,19 +255,22 @@ function fitAvatar(img, src, cx, deskY) {
 export function singlePodium({ avatar, color, label, mirror = false, extra = null }) {
   const VW = 394, VH = 560, PY = VH - 342;
   const svg = el('svg', { class: 'single-podium', viewBox: `0 0 ${VW} ${VH}`, role: 'img', 'aria-label': label || '' });
-  const cx = mirror ? 104 : 290;
+  const cx = mirror ? 100 : 294;
   // Avatar so breit wie die Pultoberseite, unten bündig hinter der Pultkante (Oberkörper hinter dem Pult).
   if (avatar) {
     // Person steht im Raum hinter dem Pult: Oberkörper verschwindet hinter der Pultkante.
     // Größe nach der sichtbaren Figur (ohne leeren Rand) – breit wie die Pultoberseite.
-    // Alles unterhalb der Pultkante ist verdeckt (die Person steht hinter dem Pult).
-    const clipId = `sp${++uid}`;
-    const clip = el('clipPath', { id: clipId });
-    clip.append(el('rect', { x: -400, y: -600, width: VW + 800, height: 600 + PY + 12 }));
+    // Die Person steht groß hinter dem Pult; neben dem Pult läuft der Körper
+    // nach unten weich ins Dunkel aus (keine harte Schnittkante).
+    const maskId = `sp${++uid}`;
+    const grad = el('linearGradient', { id: `${maskId}-g`, gradientUnits: 'userSpaceOnUse', x1: 0, y1: PY - 10, x2: 0, y2: PY + 80 });
+    grad.append(el('stop', { offset: 0, 'stop-color': '#fff' }), el('stop', { offset: 1, 'stop-color': '#fff', 'stop-opacity': 0 }));
+    const mask = el('mask', { id: maskId, maskUnits: 'userSpaceOnUse', x: -600, y: -800, width: VW + 1200, height: 800 + VH });
+    mask.append(el('rect', { x: -600, y: -800, width: VW + 1200, height: 800 + VH, fill: `url(#${maskId}-g)` }));
     const defs = el('defs');
-    defs.append(clip);
+    defs.append(grad, mask);
     svg.append(defs);
-    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet', 'clip-path': `url(#${clipId})` });
+    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet', mask: `url(#${maskId})` });
     svg.append(img);
     fitAvatar(img, avatar, cx, PY);
     svg.append(el('rect', { x: 0, y: PY - 6, width: VW, height: 30, fill: '#000', opacity: 0.35, filter: 'blur(6px)' }));

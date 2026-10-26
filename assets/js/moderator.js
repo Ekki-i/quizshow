@@ -535,16 +535,29 @@ function removeLightBackground(ctx, w, h) {
   const im = ctx.getImageData(0, 0, w, h);
   const d = im.data;
   const n = w * h;
+  // Heller Hintergrund: weiß – oder das grau-weiße Schachbrett, das manche
+  // Bildgeneratoren als „Transparenz“ fest ins Bild malen.
+  let minLight = 228;
   const light = (i) => {
     const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    return d[i * 4 + 3] > 200 && min >= 228 && max - min <= 28;
+    return d[i * 4 + 3] > 200 && min >= minLight && max - min <= 28;
   };
-  // Nur wenn der Rand überwiegend hell und undurchsichtig ist (typischer weißer Hintergrund).
-  let edge = 0, edgeLight = 0, transparent = 0;
-  for (let x = 0; x < w; x++) for (const y of [0, h - 1]) { edge++; if (light(y * w + x)) edgeLight++; if (d[(y * w + x) * 4 + 3] < 200) transparent++; }
-  for (let y = 0; y < h; y++) for (const x of [0, w - 1]) { edge++; if (light(y * w + x)) edgeLight++; if (d[(y * w + x) * 4 + 3] < 200) transparent++; }
-  if (transparent > edge * 0.2 || edgeLight < edge * 0.6) return false;
+  const edgeIdx = [];
+  for (let x = 0; x < w; x++) edgeIdx.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) edgeIdx.push(y * w, y * w + w - 1);
+  const edge = edgeIdx.length;
+  let transparent = 0;
+  for (const i of edgeIdx) if (d[i * 4 + 3] < 200) transparent++;
+  if (transparent > edge * 0.2) return false;
+  const count = () => edgeIdx.reduce((c, i) => c + (light(i) ? 1 : 0), 0);
+  if (count() < edge * 0.6) {
+    // Schachbrett? Rand fast nur neutral hell, mit deutlichem Anteil grauer Felder.
+    minLight = 180;
+    let grey = 0;
+    for (const i of edgeIdx) if (light(i) && Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) < 228) grey++;
+    if (count() < edge * 0.6 || grey < edge * 0.12) return false;
+  }
   const bg = new Uint8Array(n);
   const stack = [];
   const push = (i) => { if (!bg[i] && light(i)) { bg[i] = 1; stack.push(i); } };
@@ -559,6 +572,35 @@ function removeLightBackground(ctx, w, h) {
     if (x < w - 1) push(i + 1);
     if (y > 0) push(i - w);
     if (y < h - 1) push(i + w);
+  }
+  // Schachbrett: auch eingeschlossene Flächen (z. B. zwischen Arm und Körper) entfernen,
+  // wenn sie das typische Grau-Weiß-Muster haben. Unten mit starten.
+  if (minLight < 228) {
+    for (let x = 0; x < w; x++) push((h - 1) * w + x);
+    const seen = new Uint8Array(n);
+    for (let s0 = 0; s0 < n; s0++) {
+      if (bg[s0] || seen[s0] || !light(s0)) continue;
+      const comp = [s0];
+      seen[s0] = 1;
+      let grey = 0, white = 0;
+      for (let k = 0; k < comp.length; k++) {
+        const i = comp[k];
+        if (Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) < 228) grey++; else white++;
+        const x = i % w;
+        for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
+          if (j >= 0 && j < n && !seen[j] && !bg[j] && light(j)) { seen[j] = 1; comp.push(j); }
+        }
+      }
+      if (comp.length > n * 0.002 && grey > comp.length * 0.2 && white > comp.length * 0.2) for (const i of comp) push(i);
+    }
+    while (stack.length) {
+      const i = stack.pop();
+      const x = i % w, y = (i - x) / w;
+      if (x > 0) push(i - 1);
+      if (x < w - 1) push(i + 1);
+      if (y > 0) push(i - w);
+      if (y < h - 1) push(i + w);
+    }
   }
   // Randzone (bis 2 Pixel neben dem Hintergrund): helle Säume weich ausblenden und den
   // Weißanteil aus der Farbe herausrechnen, damit kein heller Rand um die Figur bleibt.
@@ -595,17 +637,22 @@ async function shrinkImage(file) {
       i.onerror = () => reject(new Error('Bild konnte nicht gelesen werden.'));
       i.src = url;
     });
-    const scale = Math.min(1, 480 / img.naturalHeight, 480 / img.naturalWidth);
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(img.naturalWidth * scale));
-    c.height = Math.max(1, Math.round(img.naturalHeight * scale));
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    // Weißen (oder sehr hellen, einfarbigen) Hintergrund automatisch entfernen.
-    removeLightBackground(ctx, c.width, c.height);
-    // WebP behält Transparenz und ist klein; Safari kann es nicht erzeugen → PNG.
-    let data = c.toDataURL('image/webp', 0.86);
-    if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
+    // Möglichst groß (scharf auf dem Beamer), aber unter der Größengrenze des Servers.
+    let data = '';
+    for (const max of [760, 600, 480, 360]) {
+      const scale = Math.min(1, max / img.naturalHeight, max / img.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      // Weißen (oder sehr hellen, einfarbigen) Hintergrund automatisch entfernen.
+      removeLightBackground(ctx, c.width, c.height);
+      // WebP behält Transparenz und ist klein; Safari kann es nicht erzeugen → PNG.
+      data = c.toDataURL('image/webp', 0.86);
+      if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
+      if (data.length < 850000) break;
+    }
     return data;
   } finally {
     URL.revokeObjectURL(url);
