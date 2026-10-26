@@ -1087,6 +1087,8 @@ function beamerView(db) {
     // Bereits vergebene Münzen: stehen auf den Teampulten, fehlen auf dem Moderationspult.
     coins: db.live.coins.map((c) => ({ position: c.position, teamId: c.teamId })),
   };
+  // Erstes Lied jeder Pause: der Beamer lädt es vorab, damit die Musik sofort startet.
+  view.preloadSongs = rundown(db).filter((x) => x.kind === 'pause' && x.songs && x.songs.length).map((x) => ({ id: x.songs[0].id, type: x.songs[0].type }));
   if (b.view === 'pause') {
     const st = b.data && b.data.stepId ? rundown(db).find((x) => x.id === b.data.stepId) : null;
     view.pauseSongs = st && st.songs ? st.songs.map((m) => ({ id: m.id, type: m.type, name: m.name })) : [];
