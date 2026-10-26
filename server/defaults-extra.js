@@ -83,7 +83,7 @@ const EXTRA_TYPES = {
   },
 
   konsequenz: {
-    title: 'Keine Kon-Sequenz',
+    title: 'Hits me baby, one more time',
     playable: true,
     summary: 'Ein Lied in Häppchen: 0,5 s, 1 s, 3 s, 5 s, 10 s. Früher richtig = mehr Punkte.',
     schema: [

@@ -172,7 +172,7 @@ test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung erst nach 
   assert.equal(totals(db)[ids[0]], 4); // +1 für die richtige Antwort ohne Buzzer
 });
 
-test('Keine Kon-Sequenz: Stufe beim Abschicken zählt, andere bleiben frei, Punkte erst nach Bestätigung', () => {
+test('Hits me baby, one more time: Stufe beim Abschicken zählt, andere bleiben frei, Punkte erst nach Bestätigung', () => {
   const { db, ids } = setup(3);
   use(db, 'konsequenz', { points: '5, 4, 3, 2, 1', songs: [{ audio: { id: 'media_abcdefabcdef12', type: 'audio/mpeg', name: 's' }, title: 'Song', start: 0 }] });
   act(db, mod(), 'open', { index: 0 });
@@ -525,4 +525,16 @@ test('Ich sehe ein Land: Bild zur Aufgabe geht an Beamer und Teams', () => {
   act(db, mod(), 'open', { taskIndex: 0 });
   assert.deepEqual(pv(db).image, { id: 'media_abcdefabcdef99', type: 'image/jpeg' });
   assert.deepEqual(tv(db, ids[0]).image, { id: 'media_abcdefabcdef99', type: 'image/jpeg' });
+});
+
+test('Umbenennung: „Keine Kon-Sequenz“ heißt jetzt „Hits me baby, one more time“, eigene Namen bleiben', () => {
+  const g = require('../server/game');
+  const db = g.createState();
+  const lib = db.library.find((e) => e.type === 'konsequenz');
+  lib.title = 'Keine Kon-Sequenz';
+  const other = { ...lib, id: 'lib_x', title: 'Mein eigener Name' };
+  db.library.push(other);
+  g.migrate(db);
+  assert.equal(db.library.find((e) => e.id === lib.id).title, 'Hits me baby, one more time');
+  assert.equal(db.library.find((e) => e.id === 'lib_x').title, 'Mein eigener Name');
 });

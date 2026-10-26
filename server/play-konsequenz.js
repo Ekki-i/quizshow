@@ -1,6 +1,6 @@
 'use strict';
 
-// Spiel „Keine Kon-Sequenz“: Ein Lied wird in Stufen angespielt (0,5 s, 1 s,
+// Spiel „Hits me baby, one more time“ (früher „Keine Kon-Sequenz“): Ein Lied wird in Stufen angespielt (0,5 s, 1 s,
 // 3 s, 5 s, 10 s). Teams schreiben den Titel und schicken ihn per Buzzer ab –
 // das sperrt keine anderen Teams. Gewertet wird die Stufe, die beim Abschicken
 // lief. Die Punkte je Stufe sind ein Vorschlag aus dem Editor und werden erst

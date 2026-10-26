@@ -129,7 +129,7 @@ function weissnicht2(ui, g, st) {
   return out;
 }
 
-// ---------- Keine Kon-Sequenz ----------
+// ---------- Hits me baby, one more time ----------
 function konsequenz(ui, g, st) {
   const i = st.index ?? -1;
   const r = (st.rounds || {})[i];
