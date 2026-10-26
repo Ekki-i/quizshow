@@ -1,6 +1,6 @@
 'use strict';
 
-// Spiel „DankeGleichFalsch“: Board mit 25 Begriffen, 22 passen zur Kategorie,
+// Spiel „Danke, gleichfalsch!“: Board mit 25 Begriffen, 22 passen zur Kategorie,
 // 3 nicht. Die Teams wählen reihum (Startteam je Kategorie ausgelost, danach im
 // Uhrzeigersinn) mit 60 Sekunden pro Auswahl.
 // Richtig: Begriff verschwindet, +1 ungesicherter Rundenpunkt.

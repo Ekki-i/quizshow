@@ -131,6 +131,9 @@ module.exports = {
       const missing = Object.keys(r.answers).filter((id) => r.grades[id] === undefined);
       if (missing.length) fail(`Noch nicht bewertet: ${missing.map((id) => teamName(db, id)).join(', ')}`);
       r.evaluated = true;
+      // Auflösung: erst die Antworten der anderen Teams, danach die Antwort des fragenden Teams.
+      r.showAnswers = true;
+      r.showSolution = true;
       const res = result(r);
       for (const id of Object.keys(r.answers)) {
         bookTarget(db, ctx, `fragen:${game.id}:${st.catIndex}:${id}`, id, r.grades[id] ? 1 : 0, `${game.title}, Frage von ${teamName(db, r.accepted)}`);

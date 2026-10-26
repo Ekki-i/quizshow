@@ -132,6 +132,10 @@ function migrate(db) {
     if (db.project.host === 'Moderation') db.project.host = 'Fabian';
     if (!db.project.coHostDefaulted) { if (!db.project.coHost) db.project.coHost = 'Alexia'; db.project.coHostDefaulted = true; }
     if (!db.project.finale) db.project.finale = clone(FINALE.EXAMPLE);
+    // Spielname korrigiert: „DankeGleichFalsch“ → „Danke, gleichfalsch!“ (nur unveränderte Namen).
+    for (const e of [...db.library, ...db.project.games, ...db.shows.flatMap((x) => x.project.games)]) {
+      if (e.type === 'dgf' && e.title === 'DankeGleichFalsch') e.title = 'Danke, gleichfalsch!';
+    }
     // Neue Spielarten einmalig in die Datenbank aufnehmen – nur ergänzen, nichts ändern.
     db.libraryTypesAdded = db.libraryTypesAdded || [];
     for (const type of EXTRA_ORDER) {

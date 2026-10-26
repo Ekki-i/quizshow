@@ -38,7 +38,7 @@ const DATASET_NAMES = DATASETS.map((d) => d.name);
 
 const EXTRA_TYPES = {
   dgf: {
-    title: 'DankeGleichFalsch',
+    title: 'Danke, gleichfalsch!',
     playable: true,
     summary: 'Board mit 25 Begriffen, 3 passen nicht. Reihum wählen, 60 Sekunden, aussteigen sichert die Punkte.',
     schema: [

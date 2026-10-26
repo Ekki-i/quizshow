@@ -1286,3 +1286,24 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .beamer .rank.zuweit li { min-height: 7.4vh; font-size: clamp(0.9rem, min(2.4vw, 4vh), 2.6rem); }
 .beamer .rank.zuweit li .pos { width: 7.4vh; }
 .beamer .q.compact + .rank.zuweit { margin-top: -1vh; }
+.beamer .dgf-reveal { display: grid; gap: 0.6vh; justify-items: center; margin: 1.6vh auto 0; padding: 1.4vh 2.4vw; width: fit-content; background: var(--box, #201f22); box-shadow: inset 0 -0.6vh 0 var(--bad), 0 1vh 2.4vh rgba(0, 0, 0, 0.5); animation: pop 0.6s ease-out both; }
+.beamer .dgf-reveal span { color: var(--text-muted); font-weight: 700; font-size: 2.4vh; }
+.beamer .dgf-reveal b { color: #ff8a8a; font: 800 4.4vh var(--font-display); text-transform: uppercase; }
+.beamer .fragen-sol { animation: pop 0.6s ease-out both; }
+.beamer .zock-series { display: flex; align-items: center; gap: 1.4vw; width: fit-content; margin: 0 auto 1.8vh; padding: 1vh 1.8vw; background: var(--box, #201f22); box-shadow: inset 0.9vh 0 0 var(--chip), 0 1vh 2.4vh rgba(0, 0, 0, 0.5); font-size: 3vh; }
+.beamer .zock-series b { font-family: var(--font-display); text-transform: uppercase; }
+.beamer .zock-series em { font-style: normal; font: 800 6vh var(--font-display); color: var(--accent-2); }
+.beamer .zock-series.secured span { color: var(--ok); font-weight: 800; }
+.beamer .zock-series.lost span { color: var(--bad); font-weight: 800; }
+.brain-points { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8vh 0.8vw; }
+.beamer .brain-points { position: fixed; z-index: 3; left: 0; right: 0; bottom: 2.2vh; }
+.brain-points .bp { display: flex; align-items: center; gap: 0.8em; padding: 0.5em 1em; background: var(--box, #201f22); box-shadow: inset 0.5em 0 0 var(--chip); font-weight: 700; }
+.beamer .brain-points .bp { font-size: 2.4vh; }
+.brain-points .bp b { color: var(--accent-2); font-family: var(--font-display); font-size: 1.3em; }
+.brain-points.ipad { margin: 10px 0; justify-content: flex-start; }
+.brain-points.ipad .bp { background: var(--surface); border-radius: 6px; }
+.beamer .fragen-q.small { width: min(46vw, 80vh); }
+.beamer .fragen-q.small .ink-board { max-height: 17vh; }
+.beamer .fragen-q.small + .answers, .beamer .fragen-q.small ~ .answers { margin-top: 1.4vh; }
+.beamer .fragen-sol .ink-board.small { max-height: 11vh; }
+.beamer .dgf-tile { min-height: 8vh; }
