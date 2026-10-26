@@ -289,28 +289,32 @@ function buildGameIntro(g, pos, set = (media) => act('game.setIntro', { gameId: 
       m ? h('button', { class: 'btn small ghost', onclick: () => set(null) }, 'Entfernen') : null));
 }
 
-// Spieltitel der Gewinnstufen: je Stufe ein Lied und ein Cover (ohne Cover groß die Zahl).
+// Farbe einer Spieltitel-Folie wählen. Vorschau: Farbe in der Mitte, Rahmen in dunklerer Abstufung.
+const GAME_COLORS = ['#ff8a7a', '#3fd3ea', '#ff63b1', '#f4b740', '#ab8dff', '#4fdca4', '#ff9d45', '#7fb0ff'];
+const STAGE_COLOR = '#1d9bf5';
+function titleColorPicker(label, current, fallback, sample, set) {
+  const color = current || fallback;
+  let timer = null;
+  const input = h('input', {
+    type: 'color', value: color, 'aria-label': label,
+    oninput: (ev) => { const v = ev.target.value; ev.target.closest('.title-color').style.setProperty('--c', v); clearTimeout(timer); timer = setTimeout(() => set(v), 250); },
+  });
+  return h('div', { class: 'title-color', '--c': color },
+    h('div', { class: 'title-swatch', 'aria-hidden': 'true' }, h('span', {}, sample)),
+    h('label', { class: 'btn small ghost' }, input, '🎨 Farbe ändern'),
+    current ? h('button', { class: 'btn small ghost', onclick: () => set(null) }, 'Standardfarbe') : h('span', { class: 'muted' }, 'Standardfarbe'));
+}
+
+// Spieltitel der Gewinnstufen: je Stufe ein Lied und eine Farbe.
 function buildStageTitles() {
   const stages = S.project.stages || {};
   return card('Spieltitel der Gewinnstufen',
     h('p', { class: 'muted' }, 'Zu Beginn jeder Gewinnstufe (vor Spiel 1, nach der Münzvergabe von Spiel 4 und 6) kündigt der Beamer die Stufe an. Ist das Lied zu Ende, geht es automatisch weiter.'),
     h('div', { class: 'stage-grid' }, [1, 2, 3].map((n) => {
       const st = stages[n] || {};
-      const input = h('input', {
-        type: 'file', accept: 'image/png,image/webp,image/jpeg', class: 'visually-hidden', 'aria-label': `Cover für Gewinnstufe ${n} wählen`,
-        onchange: async (ev) => {
-          const file = ev.target.files && ev.target.files[0];
-          ev.target.value = '';
-          if (!file) return;
-          try { await act('stage.set', { stage: n, cover: await shrinkImage(file) }); } catch (err) { toast(err.message); }
-        },
-      });
       return h('div', { class: 'stage-cell' },
         h('b', {}, `Gewinnstufe ${n}`),
-        h('div', { class: 'avatar-cell' },
-          st.cover ? h('img', { class: 'avatar-thumb', src: st.cover, alt: `Cover Gewinnstufe ${n}` }) : h('div', { class: 'stage-thumb' }, String(n)),
-          h('label', { class: 'btn small ghost' }, input, st.cover ? 'Cover ändern' : 'Cover wählen'),
-          st.cover ? h('button', { class: 'btn small ghost', onclick: () => act('stage.set', { stage: n, cover: null }) }, 'Entfernen') : null),
+        titleColorPicker(`Farbe Gewinnstufe ${n}`, st.color, STAGE_COLOR, String(n), (color) => act('stage.set', { stage: n, color })),
         buildGameIntro({ id: `stage${n}`, intro: st.intro }, `Gewinnstufe ${n}`, (media) => act('stage.set', { stage: n, intro: media })));
     })));
 }
@@ -910,6 +914,7 @@ function buildGameEditor(kind, item) {
       ? 'Änderungen gelten nur für diese Show. Der Eintrag in der Datenbank bleibt unverändert.'
       : 'Änderungen gelten für künftige Shows. Spiele, die schon in einer Show sind, bleiben unverändert.'),
     running ? h('p', { class: 'notice warn' }, 'Dieses Spiel läuft gerade. Inhalte erst nach dem Beenden ändern.') : null,
+    kind === 'game' ? titleColorPicker(`Farbe der Spieltitel-Folie für Spiel ${pos}`, item.color, GAME_COLORS[(pos - 1) % GAME_COLORS.length], String(pos), (color) => act('game.setColor', { gameId: item.id, color })) : null,
     kind === 'game' ? buildGameIntro(item, pos) : null,
     h('fieldset', { disabled: running, class: 'plain' },
       h('label', { for: `${key}-title` }, 'Name in der Show (erscheint im Spieltitel auf dem Beamer)'),

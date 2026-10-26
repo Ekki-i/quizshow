@@ -336,6 +336,10 @@ function stepLabel(db, st) {
 const STAGE_LABEL = { 4: 1, 6: 2, 8: 3 };
 const STAGE_START = { 1: 1, 5: 2, 7: 3 };
 const STAGES = [1, 2, 3];
+function cleanColor(c) {
+  if (typeof c !== 'string' || !/^#[0-9a-f]{6}$/i.test(c)) fail('Ungültige Farbe.');
+  return c.toLowerCase();
+}
 const stageOf = (db, n) => (db.project.stages && db.project.stages[n]) || {};
 
 function cleanRundown(db, steps) {
@@ -506,8 +510,14 @@ const moderatorActions = {
     log(db, ctx, 'editor', `Intro-Lied „${game.intro.name}“ für „${game.title}“ gesetzt`);
   },
 
-  // Teams gehören zur jeweiligen Show. Mit showId lassen sich auch die Teams einer
-  // anderen (noch nicht geöffneten) Show vorbereiten.
+  // Farbe der Spieltitel-Folie dieses Spiels (null = Standardfarbe der Position).
+  'game.setColor'(db, ctx, p) {
+    const game = findGame(db, p.gameId);
+    if (p.color === null) delete game.color;
+    else game.color = cleanColor(p.color);
+    log(db, ctx, 'editor', `Farbe der Spieltitel-Folie von „${game.title}“ geändert`);
+  },
+
   // Intro-Lied für die Spieltitel-Folie des Finales.
   'finale.setIntro'(db, ctx, p) {
     if (p.media === null) {
@@ -522,7 +532,7 @@ const moderatorActions = {
     log(db, ctx, 'editor', `Intro-Lied „${db.project.finaleIntro.name}“ für das Finale gesetzt`);
   },
 
-  // Gewinnstufe ankündigen: Lied (MP3/MP4) und Cover-Bild je Stufe; null entfernt.
+  // Gewinnstufe ankündigen: Lied (MP3/MP4) und Farbe je Stufe; null entfernt.
   'stage.set'(db, ctx, p) {
     const n = Number(p.stage);
     if (!STAGES.includes(n)) fail('Gewinnstufe muss 1, 2 oder 3 sein.');
@@ -537,9 +547,9 @@ const moderatorActions = {
         st.intro = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Lied'), 100) || 'Lied', size: Number(m.size) || 0 };
       }
     }
-    if ('cover' in p) {
-      if (p.cover) st.cover = cleanImage(p.cover);
-      else delete st.cover;
+    if ('color' in p) {
+      if (p.color === null) delete st.color;
+      else st.color = cleanColor(p.color);
     }
     db.project.stages[n] = st;
     log(db, ctx, 'editor', `Spieltitel der Gewinnstufe ${n} geändert`);
@@ -960,7 +970,7 @@ function findTeamByCode(db, code) {
 
 function gameHeader(db) {
   const g = activeGame(db);
-  return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null } : null;
+  return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null, color: g.color || null } : null;
 }
 
 function teamView(db, teamId, now = Date.now()) {
@@ -1037,7 +1047,7 @@ function beamerView(db) {
   if (b.view === 'stageTitle') {
     const n = (b.data && b.data.stage) || 1;
     const st = stageOf(db, n);
-    view.stage = { n, cover: st.cover || null, intro: st.intro ? { id: st.intro.id, type: st.intro.type } : null };
+    view.stage = { n, color: st.color || null, intro: st.intro ? { id: st.intro.id, type: st.intro.type } : null };
   }
   if (b.view === 'finaleTitle') view.finaleIntro = pr.finaleIntro ? { id: pr.finaleIntro.id, type: pr.finaleIntro.type } : null;
   if (b.view === 'pyramid' || b.view === 'intro') {

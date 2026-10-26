@@ -35,7 +35,9 @@ function highestTeams(bids, exclude = []) {
 function startAttempt(db, ctx, r, which, teamId) {
   const target = which === 'first' ? r.bids[teamId] : r.first.bid;
   r[which] = { teamId, bid: r.bids[teamId] };
-  r.attempt = { which, teamId, target, maxErrors: which === 'first' ? 3 : 2, given: [], correct: 0, errors: 0, done: null };
+  // Der zweite Versuch übernimmt die richtigen Antworten des ersten Teams und füllt nur noch auf.
+  const kept = which === 'second' && r.attempt ? r.attempt.given.filter((g) => g.ok).map((g) => ({ text: g.text, ok: true, kept: true })) : [];
+  r.attempt = { which, teamId, target, maxErrors: which === 'first' ? 3 : 2, given: kept, correct: kept.length, errors: 0, done: null };
   r.phase = which;
   r.choose = null;
   log(db, ctx, 'ablauf', `${teamName(db, teamId)} versucht ${target} Antworten (${which === 'first' ? 'erster' : 'zweiter'} Versuch)`);
@@ -77,7 +79,7 @@ function finishAttempt(db, ctx, game, st, r, success) {
 function attemptView(r) {
   if (!r.attempt) return null;
   const a = r.attempt;
-  return { which: a.which, teamId: a.teamId, target: a.target, maxErrors: a.maxErrors, correct: a.correct, errors: a.errors, done: a.done, named: a.given.filter((g) => g.ok).map((g) => g.text) };
+  return { which: a.which, teamId: a.teamId, target: a.target, maxErrors: a.maxErrors, correct: a.correct, errors: a.errors, done: a.done, named: a.given.filter((g) => g.ok).map((g) => g.text), kept: a.given.filter((g) => g.kept).length };
 }
 
 function publicRound(db, game, st, r) {
@@ -87,6 +89,7 @@ function publicRound(db, game, st, r) {
     count: game.content.categories.length,
     finale: st.catIndex === game.content.categories.length - 1,
     category: cat.name,
+    possible: validAnswers(cat).length,
     phase: r.phase,
     bidCount: Object.keys(r.bids).length,
     teamCount: db.project.teams.length,
@@ -181,7 +184,7 @@ module.exports = {
     unmark(db, ctx, game, st) {
       const r = current(st);
       const a = r.attempt;
-      if (!a || a.done || !a.given.length) fail('Nichts zum Zurücknehmen.');
+      if (!a || a.done || !a.given.length || a.given[a.given.length - 1].kept) fail('Nichts zum Zurücknehmen.');
       const g = a.given.pop();
       if (g.ok) a.correct -= 1;
       else a.errors -= 1;

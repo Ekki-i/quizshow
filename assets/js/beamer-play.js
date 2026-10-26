@@ -12,8 +12,8 @@ const chip = (t, extra = '', ...rest) => h('span', { class: `chip ${extra}` }, h
 export function renderGame(v, s, teamOf) {
   const fn = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd }[v.type];
   if (v.type === 'jauch') return jauch(v, teamOf, s); // eigenes, bildschirmfüllendes Design
-  const head = sub(`Spiel ${s.game.position} · ${s.game.title}`, { marginBottom: '3vh' });
-  return fn ? [head, ...fn(v, teamOf)].filter(Boolean) : [h('div', { class: 'mega' }, s.game.title)];
+  // Schlank: keine Spielnummer, kein Spielname, kein Fragezähler – nur Frage und Antworten.
+  return fn ? fn(v, teamOf).filter(Boolean) : [h('div', { class: 'mega' }, s.game.title)];
 }
 
 function options(v, { correct = null, marks = {}, compact = false } = {}) {
@@ -33,7 +33,7 @@ const dot = (t) => h('span', { class: 'dot', title: t.name, style: { background:
 
 // ---------- 1 ----------
 function leichte5(v, teamOf) {
-  const out = [sub(`Frage ${v.qIndex + 1}`), h('div', { class: 'q' }, v.question || '…')];
+  const out = [h('div', { class: 'q' }, v.question || '…')];
   if (!v.answers.length && v.question && !v.solution) out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '2vh' }));
   out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
     const t = teamOf(a.teamId);
@@ -48,7 +48,7 @@ function leichte5(v, teamOf) {
 function dummes(v, teamOf) {
   const marks = {};
   for (const f of v.finals) (marks[f.choice] ||= []).push(dot(teamOf(f.teamId)));
-  const out = [sub(`Frage ${v.qIndex + 1}`), h('div', { class: 'q compact' }, v.question), options(v, { correct: v.correct, marks, compact: v.evaluated })];
+  const out = [h('div', { class: 'q compact' }, v.question), options(v, { correct: v.correct, marks, compact: v.evaluated })];
   if (!v.evaluated) out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben gesperrt`, { marginTop: '2vh' }));
   if (v.buzz && !v.evaluated) out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '2vh' } }, chip(teamOf(v.buzz), 'answering', ' 🔔 war am schnellsten'), v.windowEnds ? h('span', { class: 'chip' }, '⏱ ', h('b', { 'data-deadline': v.windowEnds }, '')) : null));
   if (v.swap) out.push(h('div', { class: 'solution' }, `🔁 ${teamOf(v.swap.by).name} hat mit ${teamOf(v.swap.with).name} getauscht`));
@@ -77,9 +77,8 @@ function kassenschlager(v, teamOf) {
         h('span', {}, '💰'), h('span', {}, teamOf(id).name), h('span', { class: 'pts' }, `${c.money} $ → ${c.points}`))))];
   }
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, 'Das ist ein echter Kassenschlager'), sub('Jedes Team startet mit 20 $', { marginTop: '3vh' })];
-  const out = [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, `🎬 Film ${v.movieIndex + 1}`)];
+  const out = [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, '🎬 Welcher Film ist gesucht?')];
   if (v.finished) out.push(h('div', { class: 'solution' }, v.title));
-  else out.push(sub(`Zyklus ${v.cycle} von ${v.maxCycles}`, { marginTop: '2vh' }));
   if (v.turn) {
     const phase = { buy: 'kauft einen Hinweis …', answer: 'schreibt …', grading: 'hat geantwortet' }[v.turn.phase];
     out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '3vh' } }, v.order.map((id) => chip(teamOf(id), id === v.turn.teamId ? 'answering' : ''))));
@@ -104,7 +103,7 @@ function trumpf5(v, teamOf) {
   if (!v.resolved && v.hints.length) foot.push(h('span', { class: 't5-value' }, `Jetzt noch ${pts(v.value)}`));
   const buzz = buzzRow(v, teamOf, v.buzzOrder, v.answering);
   return [h('div', { class: 't5' },
-    h('div', { class: 't5-cat' }, h('small', {}, `Begriff ${v.termIndex + 1} · Kategorie`), v.category),
+    h('div', { class: 't5-cat' }, h('small', {}, 'Kategorie'), v.category),
     h('ol', { class: 'hints' }, slots),
     foot.length || buzz ? h('div', { class: 't5-foot' }, ...foot, buzz) : null,
     v.term ? h('div', { class: 'solution' }, `${v.term}${v.winner ? ` – ${teamOf(v.winner).name}` : ''}`) : null)];
@@ -135,7 +134,7 @@ function hexBar(cls, ...children) {
 
 function jauch(v, teamOf, s) {
   const title = s ? s.game.title : 'Ein Hauch von Günther Jauch';
-  const top = h('div', { class: 'wwm-top' }, h('span', {}, `Spiel ${s ? s.game.position : 7} · ${title}`));
+  const top = null;
   const ladder = h('div', { class: 'wwm-ladder' }, v.ladder.map((p, i) => ({ p, i })).reverse().map(({ p, i }) =>
     h('div', { class: `wwm-step${i === v.qIndex ? ' current' : ''}${i === (v.safeIndex ?? 3) || i === v.ladder.length - 1 ? ' safe' : ''}${v.qIndex !== undefined && i < v.qIndex ? ' done' : ''}` },
       h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'dotsep' }, '◆'), h('span', { class: 'p' }, `${p} P`))));
@@ -166,7 +165,7 @@ function jauch(v, teamOf, s) {
   const out = [top,
     h('div', { class: 'wwm-mid' },
       h('div', { class: 'wwm-jokers' }, jokerBtn('fifty', h('b', {}, '50:50')), jokerBtn('phone', PHONE_ICON)),
-      h('div', { class: 'wwm-center' }, ring, h('div', { class: 'wwm-value' }, `Frage ${v.qIndex + 1} · ${v.ladder[v.qIndex]} P`)),
+      h('div', { class: 'wwm-center' }, ring, h('div', { class: 'wwm-value' }, `${v.ladder[v.qIndex]} P`)),
       ladder),
     hexBar('wwm-q', v.question),
     h('div', { class: 'wwm-answers' }, opt('A'), opt('B'), opt('C'), opt('D'))];
@@ -180,7 +179,8 @@ function jauch(v, teamOf, s) {
 // ---------- 8 ----------
 function nerd(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2.4rem,6vw,6rem)' } }, 'Wer nix werd, werd Nerd')];
-  const out = [sub(v.finale ? '★ Die große Finalkategorie ★' : `Kategorie ${v.catIndex + 1}`), h('div', { class: `q ${v.finale ? 'finale' : ''}` }, v.category)];
+  const out = [v.finale ? sub('★ Die große Finalkategorie ★') : null, h('div', { class: `q ${v.finale ? 'finale' : ''}` }, v.category),
+    v.possible ? h('div', { class: 'nerd-possible' }, 'maximal ', h('b', {}, String(v.possible)), ` richtige ${v.possible === 1 ? 'Antwort' : 'Antworten'} möglich`) : null];
   if (v.phase === 'bidding') {
     out.push(sub(`${v.bidCount} von ${v.teamCount} geheimen Geboten abgegeben`, { marginTop: '3vh' }));
     return out;
@@ -194,7 +194,8 @@ function nerd(v, teamOf) {
       h('span', { style: { color: t.color } }, t.name),
       h('span', { class: 'big-num' }, `${a.correct} / ${a.target}`),
       h('span', { class: 'errors' }, Array.from({ length: a.maxErrors }, (_, i) => h('span', { class: i < a.errors ? 'x on' : 'x' }, '✗')))));
-    if (a.named.length) out.push(h('div', { class: 'named' }, a.named.map((n) => h('span', { class: 'chip' }, n))));
+    if (a.which === 'second' && a.kept) out.push(sub(`${a.kept} richtige ${a.kept === 1 ? 'Antwort bleibt' : 'Antworten bleiben'} stehen – ${t.name} füllt auf`, { marginTop: '1vh' }));
+    if (a.named.length) out.push(h('div', { class: 'named' }, a.named.map((n, i) => h('span', { class: `chip${i < (a.kept || 0) ? ' kept' : ''}` }, n))));
   }
   for (const r of v.results) {
     out.push(h('div', { class: 'solution' }, `${teamOf(r.teamId).name}: ${r.success ? 'geschafft' : 'gescheitert'} (${r.points > 0 ? '+' : ''}${r.points})`));

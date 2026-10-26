@@ -1054,15 +1054,12 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .ft-stage .ft-edge.top .ft-run { animation-direction: reverse, normal; }
 .ft-stage .ft-edge.right .ft-run { animation-direction: reverse, normal; }
 /* Gewinnstufen-Spieltitel: blauer Screen, große schwarze Zahl, ringsum „GEWINNSTUFE“ */
-.ft-stagecol .ft-screen { background: #1d9bf5; }
+.ft-stagecol .ft-screen { background: var(--stage, #1d9bf5); box-shadow: inset 0 0 0 0.45cqw color-mix(in srgb, var(--stage, #1d9bf5) 55%, #000), inset 0 0 1.2cqw rgba(0, 0, 0, 0.35); }
 .ft-stagecol .ft-box { background: none; box-shadow: none; left: 14%; right: 14%; top: 20%; bottom: 20%; }
 .ft-stagecol .ft-big.num { font-size: 9.5cqw; color: #050608; -webkit-text-stroke: 0; text-shadow: 0.08cqw 0.08cqw 0.25cqw rgba(0, 0, 0, 0.45); font-stretch: condensed; transform: scaleX(0.8); }
 .ft-stagecol .ft-run { font-size: 1.15cqw; }
 .ft-stagecol .ft-edge.top .ft-run, .ft-stagecol .ft-edge.bottom .ft-run { color: #fff; text-shadow: none; -webkit-text-stroke: 0.035cqw #050608; paint-order: stroke fill; }
 .ft-stagecol .ft-edge.left .ft-run, .ft-stagecol .ft-edge.right .ft-run { color: #050608; -webkit-text-stroke: 0.03cqw #fff; paint-order: stroke fill; }
-.ft-cover { position: relative; height: 100%; aspect-ratio: 1; display: grid; place-items: center; animation: letterDrop calc(0.7s * var(--speed)) calc(0.4s * var(--speed)) cubic-bezier(.2,1.4,.4,1) both; }
-.ft-cover img { width: 100%; height: 100%; object-fit: cover; border-radius: 0.3cqw; box-shadow: 0 0.3cqw 1cqw rgba(0, 0, 0, 0.45); }
-.ft-cover b { position: absolute; right: -14%; bottom: -10%; font-family: var(--font-display); font-weight: 900; font-size: 4cqw; color: #050608; -webkit-text-stroke: 0.05cqw #fff; paint-order: stroke fill; line-height: 1; }
 .stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .stage-cell { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line, rgba(255,255,255,.15)); border-radius: 10px; }
 .stage-thumb { width: 48px; height: 48px; display: grid; place-items: center; background: #1d9bf5; color: #050608; font-weight: 900; font-size: 26px; border-radius: 6px; }
@@ -1080,7 +1077,15 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .ft-stage .ft-edge.left .ft-run { transform: none; }
 .ft-stage .ft-edge.right .ft-run { transform: rotate(180deg); }
 .ft-finale .ft-big { font-size: 2.5cqw; }
-.ft-cover { height: 100%; width: auto; }
-.ft-cover img { position: absolute; inset: 0; }
-.ft-stagecol .ft-box.cover { top: 22%; bottom: 22%; }
 .ft-stage .ft-edge.top .ft-run { transform: rotate(180deg); }
+.beamer .nerd-possible { margin-top: 1.4vh; font-size: 2.6vh; color: var(--muted, #c9c3e6); letter-spacing: .02em; }
+.beamer .nerd-possible b { color: var(--yellow, #ffc23d); font-size: 1.25em; }
+.beamer .named .chip.kept { opacity: .85; border-style: dashed; }
+
+/* Spieltitel: Rahmen ist immer eine dunklere Abstufung der Farbe in der Mitte */
+.tv { background: linear-gradient(color-mix(in srgb, var(--tv, var(--salmon)) 55%, #000), color-mix(in srgb, var(--tv, var(--salmon)) 30%, #000)); box-shadow: 0 0 0 0.5vh color-mix(in srgb, var(--tv, var(--salmon)) 70%, #000), 0 3vh 6vh rgba(0, 0, 0, 0.7); }
+.title-color { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.title-color input[type=color] { width: 1px; height: 1px; opacity: 0; position: absolute; }
+.title-color label.btn { position: relative; }
+.title-swatch { width: 64px; height: 42px; border-radius: 6px; padding: 5px; background: color-mix(in srgb, var(--c) 55%, #000); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 70%, #000); }
+.title-swatch span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 3px; background: var(--c); color: #050608; font-weight: 900; font-size: 18px; }

@@ -342,7 +342,7 @@
     function titleCard(s, opts = {}) {
       const pos = s.game.position;
       const label = `Kategorie ${pos}`;
-      const color = GAME_COLORS[(pos - 1) % GAME_COLORS.length];
+      const color = s.game.color || GAME_COLORS[(pos - 1) % GAME_COLORS.length];
       const line = Array(14).fill(label).join(' ');
       const tiles = h('div', { class: 'tv-tiles', 'aria-hidden': 'true' },
         Array.from({ length: 10 }, (_, i) => h('div', { class: i % 3 === 1 ? 'ghost' : '' }, `${line} ${line}`)));
@@ -411,8 +411,9 @@
     function stageTitle(s) {
       const st = s.stage || { n: 1 };
       playGameIntro(s, { stage: st.n });
-      const cover = st.cover ? h('div', { class: 'ft-cover' }, h('img', { src: st.cover, alt: `Gewinnstufe ${st.n}` }), h('b', {}, String(st.n))) : null;
-      return screenTitle('GEWINNSTUFE', String(st.n), 'ft-stagecol', cover);
+      const out = screenTitle('GEWINNSTUFE', String(st.n), 'ft-stagecol');
+      if (st.color) out[0].style.setProperty('--stage', st.color);
+      return out;
     }
 
     function title(s) {

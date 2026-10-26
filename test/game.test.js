@@ -850,7 +850,12 @@ test('Spieltitel für Gewinnstufen und Finale: im Ablauf, Lied + Cover, automati
   game.applyAction(db, mod(), 'run.goto', { index: s2 });
   const v = game.beamerView(db);
   assert.equal(v.view, 'stageTitle');
-  assert.deepEqual(v.stage, { n: 2, cover: null, intro: { id: 'media_bbbbbbbbbbbb22', type: 'audio/mpeg' } });
+  assert.deepEqual(v.stage, { n: 2, color: null, intro: { id: 'media_bbbbbbbbbbbb22', type: 'audio/mpeg' } });
+  game.applyAction(db, mod(), 'stage.set', { stage: 2, color: '#22AA44' });
+  assert.equal(game.beamerView(db).stage.color, '#22aa44');
+  assert.throws(() => game.applyAction(db, mod(), 'stage.set', { stage: 2, color: 'red; x' }), /Farbe/);
+  game.applyAction(db, mod(), 'game.setColor', { gameId: db.project.games[0].id, color: '#123456' });
+  assert.equal(db.project.games[0].color, '#123456');
   game.applyAction(db, beamer, 'beamer.introEnded', { pos: 'stage', stage: 3 }); // falsche Stufe
   assert.equal(db.live.run, s2);
   game.applyAction(db, beamer, 'beamer.introEnded', { pos: 'stage', stage: 2 });
@@ -860,4 +865,31 @@ test('Spieltitel für Gewinnstufen und Finale: im Ablauf, Lied + Cover, automati
   assert.deepEqual(game.beamerView(db).finaleIntro, { id: 'media_cccccccccccc33', type: 'video/mp4' });
   game.applyAction(db, beamer, 'beamer.introEnded', { pos: 'finale' });
   assert.equal(db.live.beamer.view, 'finale');
+});
+
+test('Spiel 8: zweites Team übernimmt die richtigen Antworten des ersten und füllt auf', () => {
+  const { db, ids } = setup(2);
+  const g = db.project.games[7];
+  game.applyAction(db, mod(), 'show.activate', { gameId: g.id });
+  db.live.beamer = { view: 'game', data: {} };
+  game.applyAction(db, mod(), 'play.open', { catIndex: 0 });
+  const cat = g.content.categories[0];
+  const valid = cat.answers.split('\n').map((l) => l.trim()).filter(Boolean);
+  game.applyAction(db, team(ids[0]), 'play.bid', { bid: 5 });
+  game.applyAction(db, team(ids[1]), 'play.bid', { bid: 3 });
+  game.applyAction(db, mod(), 'play.revealBids', { force: true });
+  assert.equal(game.beamerView(db).gameView.possible, valid.length);
+  game.applyAction(db, mod(), 'play.mark', { answer: valid[0] });
+  game.applyAction(db, mod(), 'play.mark', { answer: valid[1] });
+  for (let i = 0; i < 3; i++) game.applyAction(db, mod(), 'play.mark', { text: 'falsch' });
+  const a = game.beamerView(db).gameView.attempt;
+  assert.equal(a.teamId, ids[1]);
+  assert.equal(a.which, 'second');
+  assert.equal(a.correct, 2);
+  assert.equal(a.kept, 2);
+  assert.deepEqual(a.named, [valid[0], valid[1]]);
+  assert.throws(() => game.applyAction(db, mod(), 'play.unmark', {}), /Nichts/);
+  game.applyAction(db, mod(), 'play.mark', { answer: valid[0] }); // schon genannt → Fehler
+  for (const v of valid.slice(2, 5)) game.applyAction(db, mod(), 'play.mark', { answer: v });
+  assert.equal(game.beamerView(db).gameView.attempt.done, 'success');
 });
