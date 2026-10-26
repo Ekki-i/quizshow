@@ -9,11 +9,11 @@ let S = null; // letzter Zustand vom Server
 // Ansicht: ?view=live (nur Moderation), ?view=editor (nur Editor), sonst beides.
 const VIEW = new URLSearchParams(location.search).get('view');
 const LIVE_TABS = ['live'];
-const EDITOR_TABS = ['teams', 'editor', 'library'];
+const EDITOR_TABS = ['editor', 'library'];
 const ALLOWED = VIEW === 'editor' ? EDITOR_TABS : VIEW === 'live' ? LIVE_TABS : [...LIVE_TABS, ...EDITOR_TABS];
 const TAB_KEY = `quiz.modTab${VIEW ? `.${VIEW}` : ''}`;
-let tab = ALLOWED.includes(store(TAB_KEY)) ? store(TAB_KEY) : ALLOWED[0];
-let lastEditorTab = EDITOR_TABS.includes(tab) ? tab : 'teams';
+let tab = store(TAB_KEY) === 'teams' ? 'editor' : ALLOWED.includes(store(TAB_KEY)) ? store(TAB_KEY) : ALLOWED[0];
+let lastEditorTab = EDITOR_TABS.includes(tab) ? tab : 'editor';
 if (VIEW === 'editor') {
   document.getElementById('main-tabs').classList.add('hidden');
   document.querySelector('.beamer-mini')?.remove(); // Beamer-Vorschau nur in der Moderation
@@ -62,7 +62,7 @@ function renderAll(force = false) {
   for (const id of ['live', 'teams', 'editor', 'library', 'points']) document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tab);
   renderWarning();
   if (tab === 'live') return renderLive();
-  const builders = { teams: buildTeams, editor: buildEditor, library: buildLibrary, points: buildPoints };
+  const builders = { editor: buildEditor, library: buildLibrary };
   renderPanel(tab, builders[tab], force);
 }
 
@@ -624,6 +624,7 @@ function autosave(key, fn) {
 // ---------- Show-Editor ----------
 
 let selectedGame = null;
+let editorSection = store('quiz.editorSection') || 'games';
 let selectedEntry = null;
 const drafts = new Map();
 
@@ -637,26 +638,35 @@ function buildEditor() {
   if (!p.games.some((g) => g.id === selectedGame)) selectedGame = p.games[0]?.id || null;
   const sel = p.games.find((g) => g.id === selectedGame);
 
+  const showCards = h('div', { class: 'grid two', style: { marginTop: '16px' } },
+    card('Show', field('Showname', 'name', 80),
+      h('div', {}, h('label', { for: 'show-date' }, 'Datum der Show'),
+        h('input', { id: 'show-date', type: 'date', value: p.date || '', onchange: (ev) => act('project.update', { date: ev.target.value }) })),
+      field('Untertitel', 'subtitle', 160), field('Moderation (Name)', 'host', 80), hostAvatarCell('Avatar Moderation', 'hostAvatar'),
+      field('Co-Moderation (Name, leitet das Finale)', 'coHost', 80), hostAvatarCell('Avatar Co-Moderation', 'coHostAvatar')),
+    card('Darstellung',
+      check('Animationen reduzieren', 'reducedMotion'),
+      check('Soundeffekte auf dem Beamer', 'sound'),
+      check('Teams dürfen den Punktestand sehen (Standard: aus)', 'publicScores'),
+      h('label', { for: 'show-title-dur' }, 'Dauer der Spieltitel-Animation (Sekunden)'),
+      h('input', { id: 'show-title-dur', type: 'number', min: '3', max: '20', value: p.settings.titleDurationSec, onchange: (ev) => act('project.update', { settings: { titleDurationSec: Number(ev.target.value) } }) })));
+
+  // Unterpunkte des Show-Editors
+  const SECTIONS = [['teams', '1. Teams'], ['games', '2. Spiele'], ['rundown', '3. Showablauf'], ['finale', '4. Finale']];
+  if (!SECTIONS.some(([k]) => k === editorSection)) editorSection = 'games';
+  const nav = h('nav', { class: 'tabs editor-sections', role: 'tablist', 'aria-label': 'Show-Editor' }, SECTIONS.map(([k, label]) =>
+    h('button', { role: 'tab', 'aria-selected': String(k === editorSection), onclick: () => { editorSection = k; store('quiz.editorSection', k); renderAll(true); } }, label)));
+  const content = {
+    teams: () => buildTeams(),
+    games: () => [buildBoard(), sel ? buildGameEditor('game', sel) : null],
+    rundown: () => [buildRundownEditor(), buildIntroVideo(), showCards],
+    finale: () => [buildFinaleEditor({ ...finaleUi(), reset: !saveState.dirty })],
+  }[editorSection]();
   return [
     h('div', { class: 'row', style: { justifyContent: 'space-between', marginBottom: '12px' } }, h('h2', { style: { margin: 0 } }, 'Show-Editor'), saveIndicator()),
     buildShows(),
-    buildBoard(),
-    buildIntroVideo(),
-    buildRundownEditor(),
-    buildFinaleEditor({ ...finaleUi(), reset: !saveState.dirty }),
-    sel ? buildGameEditor('game', sel) : null,
-    h('div', { class: 'grid two', style: { marginTop: '16px' } },
-      card('Show', field('Showname', 'name', 80),
-        h('div', {}, h('label', { for: 'show-date' }, 'Datum der Show'),
-          h('input', { id: 'show-date', type: 'date', value: p.date || '', onchange: (ev) => act('project.update', { date: ev.target.value }) })),
-        field('Untertitel', 'subtitle', 160), field('Moderation (Name)', 'host', 80), hostAvatarCell('Avatar Moderation', 'hostAvatar'),
-        field('Co-Moderation (Name, leitet das Finale)', 'coHost', 80), hostAvatarCell('Avatar Co-Moderation', 'coHostAvatar')),
-      card('Darstellung',
-        check('Animationen reduzieren', 'reducedMotion'),
-        check('Soundeffekte auf dem Beamer', 'sound'),
-        check('Teams dürfen den Punktestand sehen (Standard: aus)', 'publicScores'),
-        h('label', { for: 'show-title-dur' }, 'Dauer der Spieltitel-Animation (Sekunden)'),
-        h('input', { id: 'show-title-dur', type: 'number', min: '3', max: '20', value: p.settings.titleDurationSec, onchange: (ev) => act('project.update', { settings: { titleDurationSec: Number(ev.target.value) } }) }))),
+    nav,
+    ...[].concat(content).filter(Boolean),
   ];
 }
 
@@ -715,25 +725,12 @@ function buildBoard() {
   const games = S.project.games;
   const running = S.live.activeGame !== null;
   const slots = Array.from({ length: S.showSize }, (_, i) => (games[i] ? buildSlot(games[i], i, running) : buildEmptySlot(i, running)));
-  const trash = h('div', {
-    class: 'trash', role: 'note', tabindex: '-1',
-    ondragover: (ev) => { ev.preventDefault(); ev.currentTarget.classList.add('over'); },
-    ondragleave: (ev) => ev.currentTarget.classList.remove('over'),
-    ondrop: (ev) => {
-      ev.preventDefault();
-      ev.currentTarget.classList.remove('over');
-      const id = ev.dataTransfer.getData('text/plain');
-      const g = games.find((x) => x.id === id);
-      if (g) removeGame(g);
-    },
-  }, trashIcon(), h('b', {}, 'Mülleimer'), h('span', {}, 'Spiel hierher ziehen, um es aus der Show zu entfernen'));
-  return card('Showablauf',
-    h('p', { class: 'muted' }, 'Ziehe Spiele, um die Reihenfolge zu ändern, oder in den Mülleimer, um sie zu entfernen. Freie Plätze füllst du mit Spielen aus der Datenbank, auch mehrfach mit demselben Spiel. Nach Platz 4, 6 und 8 gibt es eine Münze.'),
+  return card('Spiele der Show',
+    h('p', { class: 'muted' }, 'Ziehe Spiele, um die Reihenfolge zu ändern. „Ersetzen“ schlägt dir andere Spiele aus der Datenbank vor, das Mülleimer-Symbol entfernt ein Spiel. Freie Plätze füllst du mit Spielen aus der Datenbank, auch mehrfach mit demselben Spiel. Nach Platz 4, 6 und 8 gibt es eine Münze.'),
     running ? h('p', { class: 'notice warn' }, 'Ein Spiel läuft gerade. Der Ablauf lässt sich erst nach dem Beenden ändern.') : null,
     games.length !== S.showSize ? h('p', { class: 'notice warn' }, `Die Show hat ${games.length} von ${S.showSize} Spielen. Vor dem Live-Start müssen alle ${S.showSize} Plätze belegt sein.`) : null,
     h('div', { class: 'board' },
       h('div', { class: 'slots' }, slots.slice(0, 4)),
-      h('div', { class: 'trash-col' }, trash),
       h('div', { class: 'slots' }, slots.slice(4))));
 }
 
@@ -770,7 +767,8 @@ function buildSlot(g, i, running) {
     h('button', { class: `btn small ${g.id === selectedGame ? 'pink' : 'ghost'}`, onclick: () => { selectedGame = g.id; renderAll(true); } }, 'Bearbeiten'),
     h('button', { class: 'btn small ghost', disabled: running || g.locked || i === 0 || (i === 1 && S.project.games[0]?.locked), 'aria-label': `${g.title} nach oben`, onclick: () => act('game.moveTo', { gameId: g.id, index: i - 1 }) }, '↑'),
     h('button', { class: 'btn small ghost', disabled: running || g.locked || i === S.project.games.length - 1, 'aria-label': `${g.title} nach unten`, onclick: () => act('game.moveTo', { gameId: g.id, index: i + 1 }) }, '↓'),
-    h('button', { class: 'btn small ghost icon', disabled: running, 'aria-label': `${g.title} entfernen`, title: 'In den Mülleimer', onclick: () => removeGame(g) }, trashIcon())));
+    h('button', { class: 'btn small ghost', disabled: running, title: 'Durch ein anderes Spiel aus der Datenbank ersetzen', onclick: () => pickFromLibrary(i, g) }, '⇄ Ersetzen'),
+    h('button', { class: 'btn small ghost icon', disabled: running, 'aria-label': `${g.title} entfernen`, title: 'Aus der Show entfernen', onclick: () => removeGame(g) }, trashIcon())));
 }
 
 function buildEmptySlot(i, running) {
@@ -787,27 +785,44 @@ async function removeGame(g) {
     if (ok) act('game.remove', { gameId: g.id, override: 'ENTFERNEN' });
     return;
   }
-  if (await ask(`„${g.title}“ aus der Show entfernen? In der Spiele-Datenbank bleibt es erhalten.`, { confirmLabel: 'In den Mülleimer', danger: true })) {
+  if (await ask(`„${g.title}“ aus der Show entfernen? In der Spiele-Datenbank bleibt es erhalten.`, { confirmLabel: 'Entfernen', danger: true })) {
     act('game.remove', { gameId: g.id });
   }
 }
 
-// Auswahl aus der Datenbank für einen freien Platz.
-function pickFromLibrary(index) {
+// Auswahl aus der Datenbank: für einen freien Platz oder zum Ersetzen eines Spiels.
+// Beim Ersetzen stehen oben Vorschläge derselben Spielart (ohne das aktuelle Spiel).
+function pickFromLibrary(index, replace = null) {
   const overlay = h('div', { class: 'modal-backdrop', onclick: (ev) => ev.target === overlay && overlay.remove() });
   const close = () => overlay.remove();
-  const groups = Object.entries(S.types).map(([type, t]) => {
+  const choose = async (e) => {
+    close();
+    const r = replace ? await act('game.replace', { gameId: replace.id, libraryId: e.id }) : await act('game.add', { libraryId: e.id, index });
+    if (r) selectedGame = r.created || null;
+  };
+  const entryRow = (e) => h('li', {},
+    h('span', { class: 'grow' }, e.title, h('span', { class: 'muted' }, ` · ${S.types[e.type].title} · Version ${e.version}`)),
+    h('button', { class: 'btn small pink', onclick: () => choose(e) }, replace ? 'Ersetzen' : 'Einsetzen'));
+  const used = new Set(S.project.games.map((g) => g.libraryId));
+  const sections = [];
+  if (replace) {
+    const same = S.library.filter((e) => e.type === replace.type && e.id !== replace.libraryId);
+    const fresh = S.library.filter((e) => e.type !== replace.type && !used.has(e.id));
+    sections.push(h('section', { class: 'pick-group' }, h('h4', {}, `Vorschläge: andere Spiele der Art „${S.types[replace.type].title}“`),
+      same.length ? h('ul', { class: 'list' }, same.map(entryRow)) : h('p', { class: 'muted' }, 'Keine weiteren Einträge dieser Art – lege in der Spiele-Datenbank einen an oder dupliziere einen.')));
+    if (fresh.length) sections.push(h('section', { class: 'pick-group' }, h('h4', {}, 'Vorschläge: Spiele, die noch nicht in der Show sind'), h('ul', { class: 'list' }, fresh.map(entryRow))));
+  }
+  for (const [type, t] of Object.entries(S.types)) {
     const entries = S.library.filter((e) => e.type === type);
-    return h('section', { class: 'pick-group' },
-      h('h4', {}, t.title, ' ', t.playable ? h('span', { class: 'badge ok' }, 'spielbar') : h('span', { class: 'badge' }, 'Inhalte bearbeitbar')),
-      entries.length ? h('ul', { class: 'list' }, entries.map((e) => h('li', {},
-        h('span', { class: 'grow' }, e.title, h('span', { class: 'muted' }, ` · Version ${e.version}`)),
-        h('button', { class: 'btn small pink', onclick: async () => { close(); const r = await act('game.add', { libraryId: e.id, index }); if (r) { selectedGame = null; } } }, 'Einsetzen'))))
-        : h('p', { class: 'muted' }, 'Kein Eintrag. Lege in der Spiele-Datenbank einen an.'));
-  });
+    sections.push(h('section', { class: 'pick-group' },
+      h('h4', {}, replace ? `Alle: ${t.title}` : t.title, ' ', t.playable ? h('span', { class: 'badge ok' }, 'spielbar') : h('span', { class: 'badge' }, 'Inhalte bearbeitbar')),
+      entries.length ? h('ul', { class: 'list' }, entries.map(entryRow)) : h('p', { class: 'muted' }, 'Kein Eintrag. Lege in der Spiele-Datenbank einen an.')));
+  }
   overlay.append(h('div', { class: 'modal card wide', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Spiel aus Datenbank wählen' },
-    h('div', { class: 'row', style: { justifyContent: 'space-between' } }, h('h3', { style: { margin: 0 } }, `Platz ${index + 1}: Spiel aus der Datenbank wählen`), h('button', { class: 'btn small ghost', onclick: close }, 'Schließen')),
-    h('div', { class: 'pick-list' }, groups)));
+    h('div', { class: 'row', style: { justifyContent: 'space-between' } },
+      h('h3', { style: { margin: 0 } }, replace ? `Platz ${index + 1}: „${replace.title}“ ersetzen` : `Platz ${index + 1}: Spiel aus der Datenbank wählen`),
+      h('button', { class: 'btn small ghost', onclick: close }, 'Schließen')),
+    h('div', { class: 'pick-list' }, sections)));
   document.body.append(overlay);
 }
 

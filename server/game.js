@@ -595,6 +595,19 @@ const moderatorActions = {
     return { created: game.id };
   },
 
+  // Spiel auf seinem Platz durch ein anderes aus der Datenbank ersetzen.
+  'game.replace'(db, ctx, p) {
+    requireEditable(db);
+    const old = findGame(db, p.gameId);
+    const entry = findEntry(db, p.libraryId);
+    const game = instanceFrom(entry);
+    if (old.locked && entry.type === 'leichte5') game.locked = true;
+    const i = db.project.games.indexOf(old);
+    db.project.games.splice(i, 1, game);
+    log(db, ctx, 'editor', `Platz ${i + 1}: „${old.title}“ durch „${game.title}“ ersetzt`);
+    return { created: game.id };
+  },
+
   'game.remove'(db, ctx, p) {
     requireEditable(db);
     const game = findGame(db, p.gameId);

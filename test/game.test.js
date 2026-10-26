@@ -814,3 +814,18 @@ test('Teams je Show im Voraus vorbereiten, ohne die Show zu öffnen', () => {
   assert.equal(db.project.teams[0].name, 'Gäste A');
   assert.notEqual(db.project.teams[0].id, t2[0].id);
 });
+
+test('Spiel auf seinem Platz durch ein anderes aus der Datenbank ersetzen', () => {
+  const { db } = setup(1);
+  const g = db.project.games[2];
+  game.applyAction(db, mod(), 'library.duplicate', { libraryId: g.libraryId });
+  const copy = db.library.find((e) => e.title.endsWith('(Kopie)'));
+  const r = game.applyAction(db, mod(), 'game.replace', { gameId: g.id, libraryId: copy.id });
+  assert.equal(db.project.games.length, 8);
+  assert.equal(db.project.games[2].id, r.created);
+  assert.equal(db.project.games[2].libraryId, copy.id);
+  // Eröffnungsspiel bleibt fest, wenn es durch „Die leichten 5“ ersetzt wird
+  const first = db.project.games[0];
+  game.applyAction(db, mod(), 'game.replace', { gameId: first.id, libraryId: first.libraryId });
+  assert.equal(db.project.games[0].locked, true);
+});
