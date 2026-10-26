@@ -5,6 +5,7 @@
 
 import { h } from './client.js';
 import { PODIUM_DATA } from './podium-data.js';
+import { studioRoom } from './studio-room.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 let uid = 0;
@@ -160,7 +161,7 @@ function avatarSlot(src, cx, own, def, dx = 0) {
 
 // who: 'both' (Moderation + Co-Moderation) oder 'cohost' (nur Co-Moderation in der Mitte, Finale)
 export function pultLayers(show, who = 'both') {
-  const out = [h('img', { class: 'pult-bg', src: 'assets/img/studio-pult-empty.webp', alt: '' })];
+  const out = [studioRoom('pult-bg')];
   if (who === 'both') {
     out.push(avatarSlot(show.hostAvatar || DEFAULT_AV.host.src, 382, !!show.hostAvatar, DEFAULT_AV.host));
     out.push(avatarSlot(show.coHostAvatar || DEFAULT_AV.cohost.src, 493, !!show.coHostAvatar, DEFAULT_AV.cohost));
@@ -171,6 +172,70 @@ export function pultLayers(show, who = 'both') {
 }
 export const PULT = { W: PW, H: PH, DESK_Y, pc };
 
+// ---------- Avatar füllend hinter ein Pult stellen ----------
+// Ermittelt die sichtbare Figur (Alphakanal) und ihre Kopfbreite. Skaliert wird
+// über den Kopf, damit Brustbilder und Ganzkörperfiguren gleich groß wirken:
+// Kopf ≈ 84 Einheiten, Schultern damit etwa so breit wie die Pultoberseite.
+// Über der Pultkante sind Kopf, Schultern und Oberkörper zu sehen.
+const HEAD_W = 84, VIS_HEADS = 2.7;
+const boxCache = new Map();
+function figureBox(src) {
+  if (boxCache.has(src)) return boxCache.get(src);
+  const p = new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => {
+      const W = im.naturalWidth, H = im.naturalHeight;
+      let box = { W, H, x0: 0, y0: 0, x1: W, y1: H, head: W * 0.4 };
+      try {
+        const k = Math.min(1, 240 / Math.max(W, H));
+        const w = Math.max(1, Math.round(W * k)), hh = Math.max(1, Math.round(H * k));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = hh;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(im, 0, 0, w, hh);
+        const d = ctx.getImageData(0, 0, w, hh).data;
+        const rows = [];
+        let x0 = w, y0 = hh, x1 = -1, y1 = -1;
+        for (let y = 0; y < hh; y++) {
+          let a = -1, b = -1;
+          for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 60) { if (a < 0) a = x; b = x; }
+          rows.push(a < 0 ? null : [a, b]);
+          if (a >= 0) { x0 = Math.min(x0, a); x1 = Math.max(x1, b); if (y < y0) y0 = y; y1 = y; }
+        }
+        if (x1 >= 0) {
+          const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+          // Kopf: breiteste Zeile im oberen Bereich (ca. ein Drittel einer Kopf-und-Schulter-Höhe)
+          const lim = y0 + Math.max(2, Math.round(Math.min(bh, bw * 1.2) * 0.3));
+          let head = 0;
+          for (let y = y0; y <= lim && y < hh; y++) if (rows[y]) head = Math.max(head, rows[y][1] - rows[y][0] + 1);
+          box = { W, H, x0: x0 / k, y0: y0 / k, x1: (x1 + 1) / k, y1: (y1 + 1) / k, head: Math.max(head, bw * 0.25) / k };
+        }
+      } catch { /* fremde Quelle: ganzes Bild nehmen */ }
+      resolve(box);
+    };
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+  boxCache.set(src, p);
+  return p;
+}
+
+function fitAvatar(img, src, cx, deskY) {
+  figureBox(src).then((b) => {
+    if (!b) return;
+    const s = HEAD_W / b.head;
+    const figH = (b.y1 - b.y0) * s;
+    // Unterkante der Figur muss hinter dem Pult bleiben.
+    const vis = Math.min(HEAD_W * VIS_HEADS, figH * 0.86);
+    const top = deskY + 12 - vis;
+    img.setAttribute('preserveAspectRatio', 'none');
+    img.setAttribute('width', b.W * s);
+    img.setAttribute('height', b.H * s);
+    img.setAttribute('x', cx - ((b.x0 + b.x1) / 2) * s);
+    img.setAttribute('y', top - b.y0 * s);
+  });
+}
+
 // ---------- Einzelnes Finalpult (Vorlage: Fabians Finalbild) ----------
 // Das Pult ist ein freigestelltes Bild; rechts wird es gespiegelt. Der Avatar steht
 // dahinter, extra (z. B. die Münzen des Teams) liegt oben auf dem Pult.
@@ -180,9 +245,18 @@ export function singlePodium({ avatar, color, label, mirror = false, extra = nul
   const cx = mirror ? 104 : 290;
   // Avatar so breit wie die Pultoberseite, unten bündig hinter der Pultkante (Oberkörper hinter dem Pult).
   if (avatar) {
-    // Person steht im Raum hinter dem Pult: Oberkörper verschwindet hinter der Pultkante,
-    // Studiolicht (Farbstich, Kantenlicht) statt aufgeklebtem Bild.
-    svg.append(el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet' }));
+    // Person steht im Raum hinter dem Pult: Oberkörper verschwindet hinter der Pultkante.
+    // Größe nach der sichtbaren Figur (ohne leeren Rand) – breit wie die Pultoberseite.
+    // Alles unterhalb der Pultkante ist verdeckt (die Person steht hinter dem Pult).
+    const clipId = `sp${++uid}`;
+    const clip = el('clipPath', { id: clipId });
+    clip.append(el('rect', { x: -400, y: -600, width: VW + 800, height: 600 + PY + 12 }));
+    const defs = el('defs');
+    defs.append(clip);
+    svg.append(defs);
+    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet', 'clip-path': `url(#${clipId})` });
+    svg.append(img);
+    fitAvatar(img, avatar, cx, PY);
     svg.append(el('rect', { x: 0, y: PY - 6, width: VW, height: 30, fill: '#000', opacity: 0.35, filter: 'blur(6px)' }));
   }
   svg.append(el('ellipse', { cx: VW / 2, cy: VH - 8, rx: 180, ry: 12, fill: '#000', opacity: 0.45 }));
