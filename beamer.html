@@ -25,6 +25,7 @@
     import { setMediaEnv, syncMedia, soundEnabled } from './assets/js/beamer-extra.js';
     import { answerContent } from './assets/js/ink.js';
     import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
+    import { studioRoom } from './assets/js/studio-room.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
@@ -404,7 +405,7 @@
       const bigEl = center || h('div', { class: `ft-big${big.length < 3 ? ' num' : ''}`, 'aria-label': big }, [...big].map((ch, i) => h('span', { style: { animationDelay: `${0.5 + i * 0.09}s` } }, ch)));
       return [h('div', { class: `ft-stage ${theme}` },
         h('div', { class: 'ft-zoom' },
-          h('img', { src: 'assets/img/studio-pult-empty.webp', alt: '' }),
+          studioRoom('ft-room'),
           h('div', { class: 'ft-screen', style: { left: pc(389, W), top: pc(34, H), width: pc(159, W), height: pc(124, H) } },
             edge('top', '180deg'), edge('bottom', '0deg'), edge('left', '90deg'), edge('right', '-90deg'),
             h('div', { class: `ft-box${center ? ' cover' : ''}` }, bigEl))))];

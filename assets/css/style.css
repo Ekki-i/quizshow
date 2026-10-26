@@ -901,14 +901,14 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .host-tri { width: 22px; height: 19px; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #555; }
 .host-tri.on { background: var(--side); }
 /* Pult mit Avataren */
-.scene > img.pult-bg { display: block; width: 100%; height: auto; }
+.scene > .pult-bg { display: block; width: 100%; height: auto; aspect-ratio: 938 / 530; }
 .pult-av { position: absolute; overflow: hidden; pointer-events: none; }
 .pult-av img { display: block; width: 100%; height: auto; }
 /* Finale: Pulte und Moderationspult (überschreibt das erste Finale-Layout) */
 .fb-stage.fx { padding: 1vh 1.5vw 2.5vh; }
 .fx-bottom { flex: 1; min-height: 0; align-items: end; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr); }
 .fx-side .single-podium-wrap { position: relative; width: 58%; margin: 0 auto -3vh; z-index: 0; }
-.single-podium { display: block; width: 100%; height: auto; overflow: hidden; filter: drop-shadow(0 0 2.5vh color-mix(in srgb, var(--team) 35%, transparent)); }
+.single-podium { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 0 2.5vh color-mix(in srgb, var(--team) 35%, transparent)); }
 .fx-side > .fx-board, .fx-side > .fx-name, .fx-side > .fx-tris { position: relative; z-index: 1; }
 .fx-side .fx-coins { position: relative; bottom: auto; z-index: 2; justify-content: flex-start; padding: 0 0 0.8vh; min-height: 7vh; align-items: flex-end; }
 .fx-coin.used { visibility: hidden; }
@@ -944,7 +944,7 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 /* Finale: ein ganzer Raum statt Ausschnitt */
 .fb-stage.fx { background: #05060f; }
 .fx-room { position: absolute; left: 50%; top: 0; width: max(100vw, calc(100vh * 938 / 530)); translate: -50% 0; margin: 0; z-index: 0; container-type: inline-size; }
-.fx-room > img.pult-bg { border-radius: 0; }
+.fx-room > .pult-bg { border-radius: 0; }
 .fx-room .fx-glitch { font-size: 3.4cqw; }
 .fx-room::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 60%, rgba(5, 6, 15, 0.55)); pointer-events: none; }
 .fx-top, .fx-bottom { z-index: 2; }
@@ -1033,7 +1033,7 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .ft-stage { position: fixed; inset: 0; z-index: 1; overflow: hidden; background: #05060f; }
 .ft-zoom { position: absolute; width: 255vw; left: calc(50vw - 128.8vw); top: calc(47vh - 26.1vw); container-type: inline-size; animation: ftZoom calc(2.4s * var(--speed)) cubic-bezier(.2,.8,.2,1) both; transform-origin: 50% 18%; }
 @keyframes ftZoom { from { transform: scale(0.42); filter: brightness(0.6); } to { transform: none; filter: none; } }
-.ft-zoom > img { display: block; width: 100%; height: auto; }
+.ft-zoom > .ft-room { display: block; width: 100%; height: auto; aspect-ratio: 938 / 530; }
 .ft-screen { position: absolute; overflow: hidden; background: #b35f32; box-shadow: inset 0 0 1.2cqw rgba(0, 0, 0, 0.35); }
 .ft-box { position: absolute; left: 16%; right: 16%; top: 33%; bottom: 33%; display: flex; align-items: center; justify-content: center; background: #93502b; box-shadow: 0 0 0.6cqw rgba(0, 0, 0, 0.25); animation: ftBox calc(0.8s * var(--speed)) calc(0.3s * var(--speed)) cubic-bezier(.2,1.3,.4,1) both; }
 @keyframes ftBox { from { transform: scaleX(0); } to { transform: none; } }
