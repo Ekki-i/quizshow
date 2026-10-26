@@ -144,7 +144,7 @@ function konsequenz(ui, g, st) {
   if (!s.audio) out.push(h('p', { class: 'notice warn' }, 'Für dieses Lied ist noch keine Datei hochgeladen.'));
   out.push(h('div', { class: 'stage-strip' }, stages.map((x, k) => h('span', { class: `st${k === r.stage ? ' now' : k < r.stage ? ' past' : ''}` }, `${String(x).replace('.', ',')} s`, h('small', {}, pts(pv[k]))))));
   if (!r.awarded) out.push(row(
-    btn('pink', r.stage < 0 ? '▶ Stufe 1 (0,1 s)' : r.stage < stages.length - 1 ? `▶ Nächste Stufe (${String(stages[r.stage + 1]).replace('.', ',')} s)` : 'Letzte Stufe gespielt', () => ui.act('play.next'), !s.audio || r.stage >= stages.length - 1 || r.closed),
+    btn('pink', r.stage < 0 ? '▶ Stufe 1 (0,5 s)' : r.stage < stages.length - 1 ? `▶ Nächste Stufe (${String(stages[r.stage + 1]).replace('.', ',')} s)` : 'Letzte Stufe gespielt', () => ui.act('play.next'), !s.audio || r.stage >= stages.length - 1 || r.closed),
     btn('ghost', '⟲ Stufe wiederholen', () => ui.act('play.replay'), r.stage < 0),
     r.closed ? badge('', 'Abgabe geschlossen') : btn('ghost', 'Abgabe schließen', () => ui.act('play.close'))));
   out.push(h('ul', { class: 'list' }, Object.entries(r.answers).sort((a, b) => a[1].at - b[1].at).map(([id, a]) => teamLi(ui, id,

@@ -88,13 +88,30 @@ export function syncMedia(s) {
       last.audioSeq = `k${kon.seq}`;
       // Genau die Länge der Stufe ab dem Startpunkt spielen.
       clearTimeout(last.stageTimer);
+      cancelAnimationFrame(last.stageRaf);
       au.pause();
-      au.currentTime = kon.start || 0;
-      const ms = kon.stages[kon.stage] * 1000;
-      au.play().then(() => { last.stageTimer = setTimeout(() => au.pause(), ms); }).catch(() => {});
+      const from = kon.start || 0;
+      const len = kon.stages[kon.stage];
+      au.currentTime = from;
+      // Sicher stoppen: an der Abspielposition (jedes Bild geprüft) und zusätzlich per Zeitgeber.
+      const stopAt = from + len;
+      const watch = () => {
+        if (au.paused) return;
+        if (au.currentTime >= stopAt) { au.pause(); return; }
+        last.stageRaf = requestAnimationFrame(watch);
+      };
+      au.addEventListener('playing', () => {
+        clearTimeout(last.stageTimer);
+        last.stageTimer = setTimeout(() => au.pause(), len * 1000 + 150);
+        last.stageRaf = requestAnimationFrame(watch);
+      }, { once: true });
+      // Falls „playing“ ausbleibt: spätestens nach Ladezeit + Stufenlänge anhalten.
+      last.stageTimer = setTimeout(() => au.pause(), len * 1000 + 4000);
+      au.play().catch(() => {});
     });
   } else if (!au.paused) {
     clearTimeout(last.stageTimer);
+    cancelAnimationFrame(last.stageRaf);
     au.pause();
     last.audioSeq = null;
   }
@@ -191,7 +208,7 @@ function stageStrip(v) {
     h('b', {}, `${fmt(s)} s`), h('small', {}, pts(v.points[i])))));
 }
 function konsequenz(v, teamOf) {
-  if (v.waiting) return waitTitle('Keine Kon-Sequenz', '0,1 s · 1 s · 3 s · 5 s · 10 s – je früher, desto mehr Punkte');
+  if (v.waiting) return waitTitle('Keine Kon-Sequenz', '0,5 s · 1 s · 3 s · 5 s · 10 s – je früher, desto mehr Punkte');
   const out = [h('div', { class: `eq${v.stage >= 0 && !v.awarded ? ' live' : ''}`, 'aria-hidden': 'true', key: v.seq }, Array.from({ length: 14 }, (_, i) => h('i', { style: { animationDelay: `${(i % 7) * 0.08}s` } }))), stageStrip(v)];
   if (v.awarded) {
     out.push(h('div', { class: 'solution' }, `🎵 ${v.title || ''}`));

@@ -1,6 +1,6 @@
 'use strict';
 
-// Spiel „Keine Kon-Sequenz“: Ein Lied wird in Stufen angespielt (0,1 s, 1 s,
+// Spiel „Keine Kon-Sequenz“: Ein Lied wird in Stufen angespielt (0,5 s, 1 s,
 // 3 s, 5 s, 10 s). Teams schreiben den Titel und schicken ihn per Buzzer ab –
 // das sperrt keine anderen Teams. Gewertet wird die Stufe, die beim Abschicken
 // lief. Die Punkte je Stufe sind ein Vorschlag aus dem Editor und werden erst
@@ -8,7 +8,7 @@
 
 const { fail, log, effect, teamName, bookTarget, cleanInk } = require('./core');
 
-const STAGES = [0.1, 1, 3, 5, 10];
+const STAGES = [0.5, 1, 3, 5, 10];
 const DEFAULT_POINTS = [5, 4, 3, 2, 1];
 
 // „5, 4, 3, 2, 1“ aus dem Editor; Unlesbares fällt auf den Vorschlag zurück.
