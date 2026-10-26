@@ -65,10 +65,11 @@ const TYPES = {
     playable: true,
     summary: 'Teams setzen einen Punkt auf der Karte, der nächste gewinnt 1 Punkt.',
     schema: [
-      { key: 'map', label: 'Kartenansicht', type: 'select', options: ['Welt', 'Europa', 'Deutschland'] },
+      { key: 'map', label: 'Standard-Karte (gilt für alle Aufgaben ohne eigene Karte)', type: 'select', options: ['Welt', 'Europa', 'Deutschland'] },
       { key: 'tasks', label: 'Aufgaben', type: 'list', min: 1, max: 15, itemLabel: (i) => `Aufgabe ${i + 1}`, addLabel: 'Aufgabe hinzufügen',
         fields: [
           area('question', 'Aufgabe / Frage', 300),
+          { key: 'map', label: 'Karte für diese Aufgabe', type: 'select', options: ['Standard-Karte des Spiels', 'Welt', 'Europa', 'Deutschland'] },
           text('target', 'Gesuchter Ort'),
           { key: 'lat', label: 'Breitengrad (z. B. 48.137)', type: 'number', min: -90, max: 90, step: 0.001 },
           { key: 'lng', label: 'Längengrad (z. B. 11.575)', type: 'number', min: -180, max: 180, step: 0.001 },
