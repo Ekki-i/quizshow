@@ -12,15 +12,21 @@ const DEMO_TEAMS = [
   { name: 'Die Füchse', code: 'FUCHS12345' },
   { name: 'Team Blitz', code: 'BLITZ12345' },
   { name: 'Möwenschwarm', code: 'MOEWE12345' },
+  { name: 'Quizpiraten', code: 'PIRAT12345' },
+  { name: 'Die Schlauberger', code: 'SCHLAU1234' },
+  { name: 'Team Rakete', code: 'RAKETE1234' },
 ];
 
 function seed() {
   const db = game.createState();
   const ctx = { role: 'moderator', actor: 'moderator', now: Date.now() };
+  // Die sechs voreingestellten Teams bekommen Demo-Namen und feste Codes.
   DEMO_TEAMS.forEach((t, i) => {
-    game.applyAction(db, ctx, 'team.add', { name: t.name });
+    if (!db.project.teams[i]) game.applyAction(db, ctx, 'team.add', { name: t.name });
+    db.project.teams[i].name = t.name;
     db.project.teams[i].code = t.code;
   });
+  void ctx;
   db.project.subtitle = 'Prototyp · alle Daten bleiben in diesem Browser';
   return db;
 }
@@ -28,7 +34,20 @@ function seed() {
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return game.migrate(JSON.parse(raw));
+    if (raw) {
+      const db = game.migrate(JSON.parse(raw));
+      // Ältere Demo-Stände hatten drei Teams: fehlende Demo-Teams ergänzen.
+      if (!db.prototypeSix) {
+        const ctx = { role: 'moderator', actor: 'moderator', now: Date.now() };
+        for (const t of DEMO_TEAMS) {
+          if (db.project.teams.some((x) => x.code === t.code) || db.project.teams.length >= 6) continue;
+          game.applyAction(db, ctx, 'team.add', { name: t.name });
+          db.project.teams[db.project.teams.length - 1].code = t.code;
+        }
+        db.prototypeSix = true;
+      }
+      return db;
+    }
   } catch {
     // Kein Speicher verfügbar: Zustand lebt nur bis zum Neuladen.
   }
