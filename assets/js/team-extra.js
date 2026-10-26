@@ -166,7 +166,7 @@ function weissnicht2(g, ui) {
   return out;
 }
 
-// ---------- Keine Kon-Sequenz ----------
+// ---------- Hits me baby, one more time ----------
 function konsequenz(g, ui) {
   const label = (i) => `${String(g.stages[i]).replace('.', ',')} s`;
   const out = [muted(`Lied ${g.index + 1} von ${g.count}`), h('div', { class: 'stage-strip' }, g.stages.map((s, i) => h('span', { class: `st${i === g.stage ? ' now' : i < g.stage ? ' past' : ''}` }, label(i), h('small', {}, pts(g.points[i])))))];

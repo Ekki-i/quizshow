@@ -202,13 +202,13 @@ function weissnicht2(v, teamOf) {
   return out;
 }
 
-// ---------- Keine Kon-Sequenz ----------
+// ---------- Hits me baby, one more time ----------
 function stageStrip(v) {
   return h('div', { class: 'kon-stages' }, v.stages.map((s, i) => h('div', { class: `kon-st${i === v.stage ? ' now' : i < v.stage ? ' past' : ''}` },
     h('b', {}, `${fmt(s)} s`), h('small', {}, pts(v.points[i])))));
 }
 function konsequenz(v, teamOf) {
-  if (v.waiting) return waitTitle('Keine Kon-Sequenz', '0,5 s · 1 s · 3 s · 5 s · 10 s – je früher, desto mehr Punkte');
+  if (v.waiting) return waitTitle('Hits me baby, one more time', '0,5 s · 1 s · 3 s · 5 s · 10 s – je früher, desto mehr Punkte');
   const out = [h('div', { class: `eq${v.stage >= 0 && !v.awarded ? ' live' : ''}`, 'aria-hidden': 'true', key: v.seq }, Array.from({ length: 14 }, (_, i) => h('i', { style: { animationDelay: `${(i % 7) * 0.08}s` } }))), stageStrip(v)];
   if (v.awarded) {
     out.push(h('div', { class: 'solution' }, `🎵 ${v.title || ''}`));
