@@ -32,6 +32,31 @@ function filmEl() {
   }
   return media.film;
 }
+// Hält die Tonausgabe wach (unhörbar leises Rauschen). Lautsprecher über HDMI oder
+// Bluetooth schalten sonst bei Stille ab und verschlucken die ersten Sekundenbruchteile –
+// bei „Hits me baby“ wäre die 0,5-s-Stufe dann stumm.
+let keep = null;
+function keepAudioAwake(on) {
+  const ctx = on && env.audioCtx ? env.audioCtx() : null;
+  if (!ctx) {
+    if (keep) { try { keep.src.stop(); } catch { /* schon gestoppt */ } keep = null; }
+    return;
+  }
+  if (keep && keep.ctx === ctx) return;
+  if (ctx.state === 'suspended') ctx.resume();
+  const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  const g = ctx.createGain();
+  g.gain.value = 0.0004; // etwa −68 dB: nicht hörbar, aber kein „digitales Schweigen“
+  src.connect(g).connect(ctx.destination);
+  src.start();
+  keep = { ctx, src };
+}
+
 function audioEl() {
   if (!media.audio) {
     media.audio = h('audio', { preload: 'auto', 'aria-hidden': 'true' });
@@ -73,6 +98,7 @@ export function syncMedia(s) {
   }
   const song = v && v.type === 'songsong' && !v.waiting ? v : null;
   const kon = v && v.type === 'konsequenz' && !v.waiting ? v : null;
+  keepAudioAwake(!!kon && env.soundOn());
   const au = media.audio || (song || kon ? audioEl() : null);
   if (!au) return;
   au.muted = !env.soundOn();
@@ -84,7 +110,18 @@ export function syncMedia(s) {
     });
   } else if (kon && kon.audio) {
     setSrc(au, kon.audio.id, 'audioId').then(() => {
-      if (last.audioSeq === `k${kon.seq}` || kon.stage < 0) return;
+      // Lied gewählt, aber noch nicht angespielt: schon an den Startpunkt springen und puffern,
+      // damit die erste Stufe sofort und vollständig zu hören ist.
+      if (kon.stage < 0) {
+        if (last.konPrepared !== kon.audio.id) {
+          last.konPrepared = kon.audio.id;
+          au.pause();
+          au.currentTime = kon.start || 0;
+        }
+        return;
+      }
+      last.konPrepared = null;
+      if (last.audioSeq === `k${kon.seq}`) return;
       last.audioSeq = `k${kon.seq}`;
       // Genau die Länge der Stufe ab dem Startpunkt spielen.
       clearTimeout(last.stageTimer);

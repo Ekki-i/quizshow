@@ -57,7 +57,7 @@
       soundEnabled();
     }
     // Filmclips und Musik der Datenbank-Spiele: Ton nur auf dem echten Beamer nach „Ton aktivieren“.
-    setMediaEnv({ soundOn: () => !!audio && !embedded });
+    setMediaEnv({ soundOn: () => !!audio && !embedded, audioCtx: () => audio });
     document.getElementById('sound-on').onclick = enableSound;
 
     // ---------- Vollbild für Leinwand/Beamer ----------
