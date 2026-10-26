@@ -4,6 +4,17 @@ Live-Quizshow als Webanwendung mit vier synchronisierten Oberflächen: Startseit
 Teamansicht (iPad), Moderatorenbereich (Show-Regie) und Beamer-/Publikumsansicht.
 Grundlage ist der Masterprompt (Produktspezifikation, Version 1.0).
 
+## Starten per Doppelklick (Show-Abend im eigenen WLAN)
+
+1. Einmal Node.js installieren (kostenlos, LTS-Version): https://nodejs.org
+2. Dieses Repository als ZIP herunterladen (GitHub → „Code“ → „Download ZIP“) und entpacken.
+3. Doppelklick auf **„Quizshow starten (Windows).bat“** bzw. **„Quizshow starten (Mac).command“**
+   (Mac beim ersten Mal: Rechtsklick → „Öffnen“). Beim ersten Start werden die Bausteine installiert.
+4. Das Fenster zeigt die Adressen für iPads und Beamer (z. B. `http://192.168.178.23:3000`).
+   Passwort für Regie und Editor: `fabian`. Fenster während der Show offen lassen.
+
+Alle Daten (Shows, Spiele, Medien) liegen im Ordner `data` neben den Startdateien.
+
 ## Starten
 
 Voraussetzung: Node.js 20 oder neuer.
