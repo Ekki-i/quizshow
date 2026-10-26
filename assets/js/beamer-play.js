@@ -1,6 +1,6 @@
 // Beamer: Spielansichten für alle acht Spiele. Es kommen nur freigegebene Daten an.
 
-import { h } from './client.js';
+import { h, mediaUrl } from './client.js';
 import { answerContent } from './ink.js';
 import { mapView } from './map.js';
 import { BEAMER_EXTRA } from './beamer-extra.js';
@@ -65,7 +65,16 @@ function land(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, 'Ich sehe ein Land …'), h('div', { class: 'map-box beamer-map' }, mapView(v.map))];
   const markers = (v.guesses || []).map((g) => ({ lat: g.lat, lng: g.lng, color: teamOf(g.teamId).color, label: teamOf(g.teamId).name, showLabel: true }));
   if (v.target) markers.push({ lat: v.target.lat, lng: v.target.lng, kind: 'target', label: v.target.name });
-  const out = [h('div', { class: 'q compact' }, v.question), h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers }))];
+  const map = h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers }));
+  let out;
+  if (v.image) {
+    // Bildfrage (z. B. Wahrzeichen): Bild links, Karte rechts.
+    const img = h('img', { class: 'land-image', alt: '' });
+    mediaUrl(v.image.id).then((url) => { if (url) img.src = url; });
+    out = [v.question ? h('div', { class: 'q compact slim' }, v.question) : null, h('div', { class: 'land-split' }, h('div', { class: 'land-image-box' }, img), map)];
+  } else {
+    out = [h('div', { class: 'q compact' }, v.question), map];
+  }
   if (!v.guesses) out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben ihren Punkt gesetzt`, { marginTop: '2vh' }));
   if (v.target) {
     const w = v.winners.map((id) => teamOf(id).name).join(', ');

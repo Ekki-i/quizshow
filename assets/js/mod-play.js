@@ -1,7 +1,7 @@
 // Spielsteuerung der Moderation für alle acht Spiele. Die Moderation sieht den
 // vollständigen Spielzustand (Antworten, Gebote, Guthaben), Teams und Beamer nicht.
 
-import { h } from './client.js';
+import { h, mediaUrl } from './client.js';
 import { answerContent } from './ink.js';
 import { mapView } from './map.js';
 import { MOD_EXTRA } from './mod-extra.js';
@@ -134,6 +134,11 @@ function land(ui, g, st) {
   const task = g.content.tasks[t];
   const mapName = ['Welt', 'Europa', 'Deutschland'].includes(task.map) ? task.map : g.content.map;
   out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, task.question), h('p', { class: 'muted' }, `Karte dieser Aufgabe: ${mapName}`));
+  if (task.image) {
+    const img = h('img', { class: 'media-preview img', alt: 'Bild zur Aufgabe', style: { width: '220px', height: '140px' } });
+    mediaUrl(task.image.id).then((url) => { if (url) img.src = url; });
+    out.push(img);
+  }
   out.push(h('p', {}, h('span', { class: 'muted' }, 'Ziel (nur für dich): '), h('b', {}, task.target || '–'), h('span', { class: 'muted' }, ` · ${task.lat}, ${task.lng}`)));
   const dist = (gs) => Math.round(haversine(gs, task));
   const list = Object.entries(r.guesses).map(([id, gs]) => ({ id, km: dist(gs), ...gs })).sort((a, b) => a.km - b.km);

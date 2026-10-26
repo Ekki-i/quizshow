@@ -69,6 +69,7 @@ const TYPES = {
       { key: 'tasks', label: 'Aufgaben', type: 'list', min: 1, max: 15, itemLabel: (i) => `Aufgabe ${i + 1}`, addLabel: 'Aufgabe hinzufügen',
         fields: [
           area('question', 'Aufgabe / Frage', 300),
+          { key: 'image', label: 'Bild zur Aufgabe (optional, z. B. Foto eines Wahrzeichens)', type: 'media', accept: 'image' },
           { key: 'map', label: 'Karte für diese Aufgabe', type: 'select', options: ['Standard-Karte des Spiels', 'Welt', 'Europa', 'Deutschland'] },
           text('target', 'Gesuchter Ort'),
           { key: 'lat', label: 'Breitengrad (z. B. 48.137)', type: 'number', min: -90, max: 90, step: 0.001 },

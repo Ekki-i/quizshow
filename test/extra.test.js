@@ -509,3 +509,17 @@ test('Ich sehe ein Land: Karte je Aufgabe, sonst Standard-Karte des Spiels', () 
   act(db, mod(), 'open', { taskIndex: 1 });
   assert.equal(pv(db).map, 'Welt');
 });
+
+test('Ich sehe ein Land: Bild zur Aufgabe geht an Beamer und Teams', () => {
+  const { db, ids } = setup(2);
+  const g = db.project.games.find((x) => x.type === 'land');
+  const content = structuredClone(g.content);
+  content.tasks = [{ question: 'Wo steht dieses Wahrzeichen?', map: 'Welt', image: { id: 'media_abcdefabcdef99', type: 'image/jpeg', name: 'turm.jpg', size: 5 }, target: 'Paris', lat: 48.858, lng: 2.294 }];
+  game.applyAction(db, mod(), 'game.update', { gameId: g.id, content });
+  assert.ok(game.referencedMedia(db).has('media_abcdefabcdef99'));
+  game.applyAction(db, mod(), 'show.activate', { gameId: g.id });
+  db.live.beamer = { view: 'game', data: {} };
+  act(db, mod(), 'open', { taskIndex: 0 });
+  assert.deepEqual(pv(db).image, { id: 'media_abcdefabcdef99', type: 'image/jpeg' });
+  assert.deepEqual(tv(db, ids[0]).image, { id: 'media_abcdefabcdef99', type: 'image/jpeg' });
+});
