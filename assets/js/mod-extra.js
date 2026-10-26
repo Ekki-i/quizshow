@@ -124,7 +124,7 @@ function weissnicht2(ui, g, st) {
   })));
   if (!r.evaluated) out.push(row(
     !allIn ? btn('ghost', 'Abgabe schließen (fehlende Teams auslassen)', () => ui.confirmAct('Abgabe schließen? Teams ohne Antwort werden ausgelassen.', 'play.closeSubmissions')) : null,
-    btn('pink', 'Auswerten', () => ui.confirmAct('Runde auswerten? Einschätzungen: alles oder nichts; eigene richtige Antwort +1.', 'play.evaluate'))));
+    btn('pink', 'Auswerten', () => ui.confirmAct('Runde auswerten? Buzzer-Team: alles oder nichts (bei einer falschen Einschätzung auch kein Punkt für die eigene Antwort). Alle anderen richtigen Teams +1.', 'play.evaluate'))));
   else out.push(row(badge('ok', 'Ausgewertet')));
   return out;
 }

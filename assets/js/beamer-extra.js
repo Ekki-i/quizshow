@@ -174,7 +174,10 @@ function weissnicht2(v, teamOf) {
             a.correct === null ? null : h('span', { class: `mark ${a.correct ? 'ok' : 'bad'}` }, a.correct ? '✓' : '✗'), g),
           h('div', { class: 'ans-name' }, t.name));
       })),
-      s && s.buzzer ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1.5vh' } }, chip(teamOf(s.buzzer), s.allRight ? '' : 'wrong-soft', h('b', {}, ` Einschätzung ${s.allRight ? `+${s.guessPoints}` : '0'} · eigene Antwort +${s.ownPoint}`))) : null];
+      s && s.buzzer ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1.5vh' } }, chip(teamOf(s.buzzer), s.allRight ? '' : 'wrong-soft', h('b', {}, s.allRight ? ` Einschätzung +${s.guessPoints} · eigene Antwort +${s.ownPoint}` : ' Einschätzung falsch – 0 Punkte'))) : null,
+      // Alle anderen richtigen Teams: je +1
+      v.answers.some((a) => a.correct && a.teamId !== (s && s.buzzer)) ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1vh', gap: '1vw' } },
+        v.answers.filter((a) => a.correct && a.teamId !== (s && s.buzzer)).map((a) => chip(teamOf(a.teamId), '', h('b', {}, ' +1')))) : null];
   }
   const out = [v.question ? banner(v.question, 'compact slim') : null, bigImage(v.image)];
   out.push(h('div', { class: 'row img-foot' }, sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`),

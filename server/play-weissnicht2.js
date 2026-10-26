@@ -5,7 +5,8 @@
 // sperrt nur die Buzzer der anderen, nicht deren Abgabe. Erst wenn alle
 // abgegeben haben, schätzt das Buzzer-Team ein, welche Teams richtig liegen
 // (mindestens ein Team). Jede richtige Einschätzung +1, aber eine falsche macht
-// alle Einschätzungspunkte zunichte. Die eigene richtige Antwort bringt +1.
+// alle Punkte des Buzzer-Teams zunichte – auch den für die eigene richtige
+// Antwort. Alle anderen Teams bekommen für ihre richtige Antwort +1.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanInk } = require('./core');
 
@@ -24,15 +25,22 @@ function allIn(db, r) {
   return r.closedSubmissions || teamIds(db).every((id) => r.answers[id]);
 }
 
+// Alle Teams außer dem Buzzer-Team, die richtig geantwortet haben (+1 je Team).
+function othersCorrect(r) {
+  return Object.keys(r.answers).filter((id) => id !== r.buzz?.teamId && r.grades[id] === true);
+}
+
 function score(db, r) {
   if (!r.buzz) return { buzzer: null, guessPoints: 0, ownPoint: 0, allRight: null };
+  // (Punkte der übrigen Teams: siehe othersCorrect)
   const g = r.guesses || {};
   const ids = Object.keys(g);
   const allRight = ids.length > 0 && ids.every((id) => r.grades[id] === g[id]);
   return {
     buzzer: r.buzz.teamId,
     guessPoints: allRight ? ids.length : 0,
-    ownPoint: r.grades[r.buzz.teamId] === true ? 1 : 0,
+    // Eine falsche Einschätzung kostet auch den Punkt für die eigene Antwort.
+    ownPoint: allRight && r.grades[r.buzz.teamId] === true ? 1 : 0,
     allRight,
   };
 }
@@ -119,6 +127,9 @@ module.exports = {
         bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:guess`, s.buzzer, s.guessPoints, `${game.title}, Runde ${st.index + 1}, Einschätzung`);
         bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:own`, s.buzzer, s.ownPoint, `${game.title}, Runde ${st.index + 1}, eigene Antwort`);
       }
+      for (const id of othersCorrect(r)) {
+        bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:own:${id}`, id, 1, `${game.title}, Runde ${st.index + 1}, richtige Antwort`);
+      }
       log(db, ctx, 'ablauf', `Runde ${st.index + 1} ausgewertet${s.buzzer ? ` – ${teamName(db, s.buzzer)}: ${s.guessPoints + s.ownPoint} Punkte` : ''}`);
       effect(db, 'reveal');
     },
@@ -145,6 +156,7 @@ module.exports = {
       guessed: isBuzzer && !!r.guesses,
       evaluated: r.evaluated,
       ownCorrect: r.evaluated ? r.grades[teamId] ?? null : null,
+      ownPoints: r.evaluated && !isBuzzer && r.grades[teamId] === true ? 1 : 0,
       result: s && isBuzzer ? s : null,
       solution: r.evaluated ? game.content.rounds[st.index].solution : null,
     };

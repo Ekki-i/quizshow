@@ -216,7 +216,7 @@ const EXTRA_TYPES = {
   weissnicht2: {
     title: 'Ich weiß nicht, dass du weißt es doch 2.0',
     playable: true,
-    summary: 'Alle schreiben ihre Antwort. Der schnellste Buzzer schätzt danach ein, wer richtig liegt – alles oder nichts.',
+    summary: 'Alle schreiben ihre Antwort. Der schnellste Buzzer schätzt danach ein, wer richtig liegt – alles oder nichts, auch für die eigene Antwort. Alle anderen richtigen Teams +1.',
     schema: [
       { key: 'rounds', label: 'Runden', type: 'list', min: 1, max: 8, itemLabel: (i) => `Runde ${i + 1}`, addLabel: 'Runde hinzufügen',
         fields: [media('image', 'Großes Bild', 'image'), area('question', 'Frage', 300), text('solution', 'Lösung', 200)] },

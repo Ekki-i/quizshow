@@ -76,7 +76,7 @@ freimachen und „In Show einsetzen“ bzw. „⇄ Ersetzen“ wählen.
 | Dumm, dumm, dumm | 5 Fragen A–D, Einsatz 1–5 je einmal, richtig + / falsch − | – |
 | Film ab – Buzzer an! | Filmausschnitt, Buzzer, falsch sperrt | Video je Film |
 | Ich weiß nicht, dass du weißt es doch | Bild, Buzzer wählt ein Team, 10 s | Bild je Runde |
-| … 2.0 | alle schreiben, schnellster Buzzer schätzt ein (alles oder nichts) | Bild je Runde |
+| … 2.0 | alle schreiben, schnellster Buzzer schätzt ein (alles oder nichts, auch die eigene Antwort); alle anderen richtigen Teams +1 | Bild je Runde |
 | Keine Kon-Sequenz | Lied in Stufen 0,1/1/3/5/10 s, Punkte je Stufe (Vorschlag 5–1, bestätigen) | Lied je Runde |
 | Song Song Song | Mash-up, beide Titel schreiben, Buzzer sperrt niemanden | Mash-up je Rätsel |
 | Danke, gleichfalsch! | 25 Begriffe, 3 falsch, reihum mit 60 s, Aussteigen sichert | – |
