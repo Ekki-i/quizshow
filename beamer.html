@@ -177,7 +177,9 @@
       document.title = `${s.show.name} – Beamer`;
       if (!embedded && s.settings.sound) preloadSongs(s.preloadSongs || []);
       const fresh = lastEffect !== null && s.effect.seq !== lastEffect;
-      if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
+      // Spieltitel, Gewinnstufen und Finale: nur der eigene Intro-Song, kein zusätzlicher Effektton.
+      const titleSlide = s.effect.kind === 'title' && ['title', 'stageTitle', 'finaleTitle', 'finale'].includes(s.view);
+      if (fresh && s.settings.sound && !embedded && !titleSlide) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
       const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage]);
