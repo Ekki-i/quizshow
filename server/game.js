@@ -60,6 +60,11 @@ function instanceFrom(entry) {
   return { id: newId('game'), type: entry.type, title: entry.title, content: clone(entry.content), libraryId: entry.id, libraryVersion: entry.version, locked: false };
 }
 
+const DEFAULT_TEAM_COUNT = 6;
+function defaultTeams() {
+  return Array.from({ length: DEFAULT_TEAM_COUNT }, (_, i) => ({ id: newId('team'), name: `Team ${i + 1}`, color: TEAM_COLORS[i % TEAM_COLORS.length], code: newTeamCode() }));
+}
+
 // Eine neue Show mit der Standardreihenfolge, je Spieltyp der erste Eintrag der Datenbank.
 function newProject(library, name = 'Wer stiehlt uns die Show') {
   const games = DEFAULT_ORDER.map((type) => library.find((e) => e.type === type)).filter(Boolean).map(instanceFrom);
@@ -73,7 +78,8 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
     coHost: 'Alexia',
     // Teams sehen standardmäßig keine fremden Punktestände (Abschnitt 4.1).
     settings: { publicScores: false, reducedMotion: false, sound: true, titleDurationSec: 7 },
-    teams: [],
+    // Standardmäßig sechs Teams; im Editor lassen sich Teams hinzufügen und löschen.
+    teams: defaultTeams(),
     games,
     finale: clone(FINALE.EXAMPLE),
   };

@@ -10,6 +10,7 @@ const team = (teamId) => ({ role: 'team', teamId, actor: `team:${teamId}`, now: 
 
 function setup(teamCount = 3) {
   const db = game.createState();
+  db.project.teams = []; // Tests legen ihre Teams selbst an
   for (let i = 0; i < teamCount; i++) game.applyAction(db, mod(), 'team.add', { name: `Team ${i + 1}` });
   return { db, ids: db.project.teams.map((t) => t.id) };
 }
@@ -745,4 +746,16 @@ test('Intro-Lied zu Ende: Beamer schaltet vom Spieltitel automatisch ins Spiel',
   assert.equal(db.live.beamer.view, 'game');
   game.applyAction(db, beamer, 'beamer.introEnded', { pos: 2 }); // zweiter Beamer: kein weiterer Sprung
   assert.equal(db.live.run, t + 1);
+});
+
+test('Neue Shows starten mit sechs Teams, die Anzahl bleibt veränderbar', () => {
+  const db = game.createState();
+  assert.equal(db.project.teams.length, 6);
+  assert.equal(new Set(db.project.teams.map((t) => t.code)).size, 6);
+  game.applyAction(db, mod(), 'team.remove', { teamId: db.project.teams[5].id });
+  game.applyAction(db, mod(), 'team.add', { name: 'Extra' });
+  game.applyAction(db, mod(), 'team.add', { name: 'Extra 2' });
+  assert.equal(db.project.teams.length, 7);
+  game.applyAction(db, mod(), 'shows.create', { name: 'Neu', copyTeams: false });
+  assert.equal(db.project.teams.length, 6);
 });
