@@ -174,7 +174,7 @@
       if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins, s.finale]);
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
@@ -183,8 +183,8 @@
       lastState = s;
       // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
       if (s.view !== 'pause') stopPause();
-      if (s.view !== 'title') stopGameIntro();
-      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, finale, blank: () => [] };
+      if (!['title', 'finaleTitle', 'stageTitle'].includes(s.view)) stopGameIntro();
+      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, stageTitle, finaleTitle, finale, blank: () => [] };
       if (s.view !== 'finale') prevFin = null;
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
@@ -372,14 +372,15 @@
         if (k >= 10) { clearInterval(t); el.pause(); el.remove(); }
       }, 80);
     }
-    function playGameIntro(s) {
+    // which: undefined = Spiel, 'finale' = Finale, { stage: n } = Gewinnstufe
+    function playGameIntro(s, which) {
       stopGameIntro();
-      const m = s.game && s.game.intro;
+      const m = which === 'finale' ? s.finaleIntro : which && which.stage ? s.stage && s.stage.intro : s.game && s.game.intro;
       if (!m || embedded || !s.settings.sound) return;
       const el = h('video', { class: 'game-intro', playsinline: true, preload: 'auto', 'aria-hidden': 'true' });
       el.muted = !audio;
       // Lied zu Ende → automatisch weiter zum Spiel (der Server prüft, ob noch der Spieltitel läuft).
-      el.onended = () => { if (gameIntro === el) conn.action('beamer.introEnded', { pos: s.game.position }).catch(() => {}); };
+      el.onended = () => { if (gameIntro === el) conn.action('beamer.introEnded', which === 'finale' ? { pos: 'finale' } : which && which.stage ? { pos: 'stage', stage: which.stage } : { pos: s.game.position }).catch(() => {}); };
       document.body.append(el);
       gameIntro = el;
       mediaUrl(m.id).then((url) => {
@@ -387,6 +388,31 @@
         el.src = url;
         el.play().catch(() => {});
       });
+    }
+
+    // Spieltitel auf dem Studio-Bildschirm: Kamera fährt auf den Screen, darauf großes Wort bzw. Zahl
+    // und ringsum laufende Schriftzüge (Finale kupferfarben, Gewinnstufen blau).
+    function screenTitle(word, big, theme, center) {
+      const W = 938, H = 530;
+      const pc = (v, t) => `${(v / t) * 100}%`;
+      const edge = (cls, rot) => h('div', { class: `ft-edge ${cls}` }, h('div', { class: 'ft-run', style: { '--rot': rot } }, h('span', {}, word)));
+      const bigEl = center || h('div', { class: `ft-big${big.length < 3 ? ' num' : ''}`, 'aria-label': big }, [...big].map((ch, i) => h('span', { style: { animationDelay: `${0.5 + i * 0.09}s` } }, ch)));
+      return [h('div', { class: `ft-stage ${theme}` },
+        h('div', { class: 'ft-zoom' },
+          h('img', { src: 'assets/img/studio-pult-empty.webp', alt: '' }),
+          h('div', { class: 'ft-screen', style: { left: pc(389, W), top: pc(34, H), width: pc(159, W), height: pc(124, H) } },
+            edge('top', '180deg'), edge('bottom', '0deg'), edge('left', '90deg'), edge('right', '-90deg'),
+            h('div', { class: `ft-box${center ? ' cover' : ''}` }, bigEl))))];
+    }
+    function finaleTitle(s) {
+      playGameIntro(s, 'finale');
+      return screenTitle('FINALE', 'FINALE', 'ft-finale');
+    }
+    function stageTitle(s) {
+      const st = s.stage || { n: 1 };
+      playGameIntro(s, { stage: st.n });
+      const cover = st.cover ? h('div', { class: 'ft-cover' }, h('img', { src: st.cover, alt: `Gewinnstufe ${st.n}` }), h('b', {}, String(st.n))) : null;
+      return screenTitle('GEWINNSTUFE', String(st.n), 'ft-stagecol', cover);
     }
 
     function title(s) {

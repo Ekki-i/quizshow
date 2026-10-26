@@ -565,7 +565,7 @@ test('Avatare: nur gültige Bilder, nur auf dem Beamer bei Intro und Münze, ent
 test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze aus', () => {
   const { db, ids } = setup(2);
   const steps = game.moderatorView(db).rundown;
-  assert.deepEqual(steps.slice(0, 6).map((s) => s.kind), ['start', 'video', 'intro', 'pyramid', 'title', 'game']);
+  assert.deepEqual(steps.slice(0, 7).map((s) => s.kind), ['start', 'video', 'intro', 'pyramid', 'stageTitle', 'title', 'game']);
   assert.equal(steps.filter((s) => s.kind === 'pyramid').length, 1);
   assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
   assert.ok(steps.some((s) => s.kind === 'pause'));
@@ -593,10 +593,12 @@ test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze 
   assert.equal(db.live.beamer.view, 'coin');
   assert.equal(db.live.coins[0].teamId, ids[1]);
   game.applyAction(db, mod(), 'run.next', {});
+  assert.equal(db.live.beamer.view, 'stageTitle'); // Gewinnstufe 2 wird angekündigt
+  game.applyAction(db, mod(), 'run.next', {});
   assert.equal(db.live.beamer.view, 'title');
   assert.equal(db.live.activeGame, db.project.games[4].id);
   // eigener Ablauf mit zusätzlicher Pause; ungültige Schritte werden abgelehnt
-  const custom = steps.map(({ id, kind, pos }) => ({ id, kind, pos }));
+  const custom = steps.map(({ id, kind, pos, stage }) => ({ id, kind, pos, stage }));
   custom.splice(2, 0, { kind: 'pause' });
   game.applyAction(db, mod(), 'rundown.set', { steps: custom });
   assert.equal(game.moderatorView(db).rundown[2].kind, 'pause');
@@ -828,4 +830,34 @@ test('Spiel auf seinem Platz durch ein anderes aus der Datenbank ersetzen', () =
   const first = db.project.games[0];
   game.applyAction(db, mod(), 'game.replace', { gameId: first.id, libraryId: first.libraryId });
   assert.equal(db.project.games[0].locked, true);
+});
+
+test('Spieltitel für Gewinnstufen und Finale: im Ablauf, Lied + Cover, automatisch weiter', () => {
+  const { db } = setup(1);
+  const beamer = { role: 'beamer', actor: 'beamer', now: clock++ };
+  const steps = game.moderatorView(db).rundown;
+  const kinds = steps.map((s) => s.kind + (s.stage || s.pos || ''));
+  assert.ok(kinds.indexOf('stageTitle1') === kinds.indexOf('title1') - 1);
+  assert.ok(kinds.indexOf('stageTitle2') === kinds.indexOf('coin4') + 1);
+  assert.ok(kinds.indexOf('stageTitle3') === kinds.indexOf('coin6') + 1);
+  assert.ok(kinds.indexOf('finaleTitle') === kinds.indexOf('finale') - 1);
+  game.applyAction(db, mod(), 'stage.set', { stage: 2, intro: { id: 'media_bbbbbbbbbbbb22', type: 'audio/mpeg', name: 'Stufe.mp3' } });
+  assert.throws(() => game.applyAction(db, mod(), 'stage.set', { stage: 4, intro: null }), /Gewinnstufe/);
+  game.applyAction(db, mod(), 'finale.setIntro', { media: { id: 'media_cccccccccccc33', type: 'video/mp4', name: 'F.mp4' } });
+  assert.ok(game.referencedMedia(db).has('media_bbbbbbbbbbbb22'));
+  assert.ok(game.referencedMedia(db).has('media_cccccccccccc33'));
+  const s2 = steps.findIndex((s) => s.kind === 'stageTitle' && s.stage === 2);
+  game.applyAction(db, mod(), 'run.goto', { index: s2 });
+  const v = game.beamerView(db);
+  assert.equal(v.view, 'stageTitle');
+  assert.deepEqual(v.stage, { n: 2, cover: null, intro: { id: 'media_bbbbbbbbbbbb22', type: 'audio/mpeg' } });
+  game.applyAction(db, beamer, 'beamer.introEnded', { pos: 'stage', stage: 3 }); // falsche Stufe
+  assert.equal(db.live.run, s2);
+  game.applyAction(db, beamer, 'beamer.introEnded', { pos: 'stage', stage: 2 });
+  assert.equal(db.live.run, s2 + 1);
+  const ft = steps.findIndex((s) => s.kind === 'finaleTitle');
+  game.applyAction(db, mod(), 'run.goto', { index: ft });
+  assert.deepEqual(game.beamerView(db).finaleIntro, { id: 'media_cccccccccccc33', type: 'video/mp4' });
+  game.applyAction(db, beamer, 'beamer.introEnded', { pos: 'finale' });
+  assert.equal(db.live.beamer.view, 'finale');
 });
