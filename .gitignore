@@ -2,3 +2,4 @@ node_modules/
 data/
 dist-prototype/
 dist-single/
+.projekt-out/
