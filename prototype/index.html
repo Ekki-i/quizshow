@@ -67,7 +67,7 @@
   <header class="top">
     <div>
       <h1><span class="show-title">Wer stiehlt <span class="hot">uns</span> die Show</span> <span class="proto">Prototyp</span></h1>
-      <p class="lead">Hier steuerst du die Show. Im Editor pflegst du Teams, Show-Ablauf und Spiele-Datenbank; Beamer, Team-iPads und Startseite laufen im Hintergrund mit.</p>
+      <p class="lead">Hier steuerst du die Show. Im Editor pflegst du Teams, Show-Ablauf und Spiele-Datenbank. Den Beamer zeigst du über „Beamer im Vollbild“.</p>
     </div>
     <div class="top-actions">
       <button class="reset fs-btn" id="beamer-fs" type="button">⛶ Beamer im Vollbild</button>
@@ -292,14 +292,17 @@
     b.dataset.id = v.id;
     b.textContent = v.label;
     b.onclick = () => select(v.id);
+    // Oben nur Moderation und Editor; Beamer, iPads und Startseite laufen im Hintergrund
+    // weiter (Beamer über „Beamer im Vollbild“, die anderen über #beamer, #team1 … in der Adresse).
+    if (!['moderation', 'editor'].includes(v.id)) b.hidden = true;
     tabs.append(b);
   }
   const initial = views.some((v) => v.id === location.hash.slice(1)) ? location.hash.slice(1) : 'moderation';
   select(initial);
+  window.addEventListener('hashchange', () => { const id = location.hash.slice(1); if (views.some((v) => v.id === id)) select(id); });
 
   // Das iPad der Moderation erscheint erst, wenn das Finale läuft.
   (function watchFinale() {
-    const tab = tabs.querySelector('[data-id="host"]');
     const c = server.connect();
     c.onmessage = (e) => {
       const m = JSON.parse(e.data);
@@ -307,7 +310,6 @@
       const st = m.state;
       const step = (st.rundown || [])[st.live.run ?? -1];
       const on = !!st.live.finale || (step && step.kind === 'finale');
-      tab.hidden = !on;
       if (!on && stage.dataset.focus === 'host') select('moderation');
     };
     setTimeout(() => c.send(JSON.stringify({ type: 'hello', role: 'moderator', token: server.demoToken })), 30);
