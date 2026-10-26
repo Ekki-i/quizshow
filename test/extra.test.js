@@ -177,7 +177,7 @@ test('Keine Kon-Sequenz: Stufe beim Abschicken zählt, andere bleiben frei, Punk
   use(db, 'konsequenz', { points: '5, 4, 3, 2, 1', songs: [{ audio: { id: 'media_abcdefabcdef12', type: 'audio/mpeg', name: 's' }, title: 'Song', start: 0 }] });
   act(db, mod(), 'open', { index: 0 });
   assert.throws(() => act(db, team(ids[0]), 'submit', { ink }), /noch nicht angespielt/);
-  act(db, mod(), 'next'); // 0,1 s
+  act(db, mod(), 'next'); // 0,5 s
   act(db, team(ids[0]), 'submit', { ink });
   act(db, mod(), 'next'); // 1 s
   act(db, mod(), 'next'); // 3 s

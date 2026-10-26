@@ -85,9 +85,9 @@ const EXTRA_TYPES = {
   konsequenz: {
     title: 'Keine Kon-Sequenz',
     playable: true,
-    summary: 'Ein Lied in Häppchen: 0,1 s, 1 s, 3 s, 5 s, 10 s. Früher richtig = mehr Punkte.',
+    summary: 'Ein Lied in Häppchen: 0,5 s, 1 s, 3 s, 5 s, 10 s. Früher richtig = mehr Punkte.',
     schema: [
-      text('points', 'Punkte je Stufe (0,1 s / 1 s / 3 s / 5 s / 10 s) – Vorschlag, vor der Vergabe bestätigen', 40),
+      text('points', 'Punkte je Stufe (0,5 s / 1 s / 3 s / 5 s / 10 s) – Vorschlag, vor der Vergabe bestätigen', 40),
       { key: 'songs', label: 'Lieder', type: 'list', min: 1, max: 15, itemLabel: (i) => `Lied ${i + 1}`, addLabel: 'Lied hinzufügen',
         fields: [media('audio', 'Lied (MP3)', 'audio'), text('title', 'Richtiger Titel', 160), num('start', 'Start im Lied (Sekunden)', 0, 600, 0.1)] },
     ],
