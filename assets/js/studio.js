@@ -184,7 +184,7 @@ export const PULT = { W: PW, H: PH, DESK_Y, pc };
 // über den Kopf, damit Brustbilder und Ganzkörperfiguren gleich groß wirken:
 // Kopf ≈ 84 Einheiten, Schultern damit etwa so breit wie die Pultoberseite.
 // Über der Pultkante sind Kopf, Schultern und Oberkörper zu sehen.
-const HEAD_W = 106, VIS_HEADS = 3, DESK_MAX_W = 330;
+const HEAD_W = 106, VIS_HEADS = 3, DESK_MAX_W = 196;
 // Moderationspult in der Mitte (Raumeinheiten 938 × 530): steht etwas weiter hinten,
 // Köpfe daher minimal kleiner als an den Seitenpulten.
 const ROOM_HEAD_W = 50;
@@ -239,11 +239,19 @@ function computeFit(b, headW, maxW) {
   let s = headW / b.head;
   let vis = 0, cut = null;
   for (let pass = 0; pass < 3; pass++) {
+    // etwa drei Kopfhöhen sichtbar (bis zur Brust/Hüfte), bei Brustbildern höchstens 80 %
     vis = Math.min(VIS_HEADS * b.head * s, (b.y1 - b.y0) * s * 0.8);
     cut = null;
     if (b.rows) {
-      const y = Math.min(b.rows.length - 1, Math.round((b.y0 + vis / s) * b.k));
-      for (let yy = y; yy >= 0 && !cut; yy--) if (b.rows[yy]) cut = [b.rows[yy][0] / b.k, (b.rows[yy][1] + 1) / b.k];
+      // breiteste Stelle des sichtbaren Teils (Schultern, Ellbogen)
+      // (Hände direkt an der Pultkante zählen nicht mit)
+      const y = Math.min(b.rows.length - 1, Math.round((b.y0 + 0.85 * vis / s) * b.k));
+      for (let yy = Math.round(b.y0 * b.k); yy <= y; yy++) {
+        const r = b.rows[yy];
+        if (!r) continue;
+        if (!cut) cut = [r[0] / b.k, (r[1] + 1) / b.k];
+        else { cut[0] = Math.min(cut[0], r[0] / b.k); cut[1] = Math.max(cut[1], (r[1] + 1) / b.k); }
+      }
     }
     if (!cut) break;
     const wDesk = (cut[1] - cut[0]) * s;
@@ -276,35 +284,17 @@ export function singlePodium({ avatar, color, label, mirror = false, extra = nul
   const cx = mirror ? 100 : 294;
   // Avatar so breit wie die Pultoberseite, unten bündig hinter der Pultkante (Oberkörper hinter dem Pult).
   if (avatar) {
-    // Person steht im Raum hinter dem Pult: Oberkörper verschwindet hinter der Pultkante.
-    // Größe nach der sichtbaren Figur (ohne leeren Rand) – breit wie die Pultoberseite.
-    // Die Person steht groß hinter dem Pult; neben dem Pult läuft der Körper
-    // nach unten weich ins Dunkel aus (keine harte Schnittkante).
-    const maskId = `sp${++uid}`;
-    const grad = el('linearGradient', { id: `${maskId}-g`, gradientUnits: 'userSpaceOnUse', x1: 0, y1: PY - 10, x2: 0, y2: PY + 80 });
-    grad.append(el('stop', { offset: 0, 'stop-color': '#fff' }), el('stop', { offset: 1, 'stop-color': '#fff', 'stop-opacity': 0 }));
-    const mask = el('mask', { id: maskId, maskUnits: 'userSpaceOnUse', x: -600, y: -800, width: VW + 1200, height: 800 + VH });
-    mask.append(el('rect', { x: -600, y: -800, width: VW + 1200, height: 800 + VH, fill: `url(#${maskId}-g)` }));
-    // Studiolicht: kühle Farbanpassung an den Raum, von hinten Kantenlicht
-    // (links türkis, rechts pink) wie von den Neonleisten.
-    const fx = el('filter', { id: `${maskId}-l`, x: '-10%', y: '-10%', width: '120%', height: '120%', 'color-interpolation-filters': 'sRGB' });
-    const rim = (dx, color, name) => [
-      el('feOffset', { in: 'soft', dx, dy: -2, result: `${name}o` }),
-      el('feComposite', { in: 'SourceAlpha', in2: `${name}o`, operator: 'out', result: `${name}e` }),
-      el('feFlood', { 'flood-color': color, 'flood-opacity': 0.75 }),
-      el('feComposite', { in2: `${name}e`, operator: 'in', result: name }),
-    ];
-    fx.append(
-      el('feColorMatrix', { in: 'SourceGraphic', type: 'matrix', values: '0.86 0 0 0 0  0 0.9 0 0 0.005  0 0 0.98 0 0.02  0 0 0 1 0', result: 'grade' }),
-      el('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 2.2, result: 'soft' }),
-      ...rim(5, '#38e8ff', 'cy'), ...rim(-5, '#ff3d9a', 'pk'),
-      el('feMerge', {}, ));
-    const merge = fx.lastChild;
-    for (const n of ['grade', 'cy', 'pk']) merge.append(el('feMergeNode', { in: n }));
+    // Die Person steht hinter dem Pult: nie breiter als die Pultoberseite und
+    // unterhalb der Pultkante komplett verdeckt.
+    const clipId = `sp${++uid}`;
+    const clip = el('clipPath', { id: clipId });
+    clip.append(el('rect', { x: -400, y: -800, width: VW + 800, height: 800 + PY + 10 }));
+    const fx = el('filter', { id: `${clipId}-l`, 'color-interpolation-filters': 'sRGB' });
+    fx.append(el('feColorMatrix', { type: 'matrix', values: '0.9 0 0 0 0  0 0.92 0 0 0.004  0 0 0.98 0 0.015  0 0 0 1 0' }));
     const defs = el('defs');
-    defs.append(grad, mask, fx);
+    defs.append(clip, fx);
     svg.append(defs);
-    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 112, y: PY - 228, width: 224, height: 270, preserveAspectRatio: 'xMidYMax meet', mask: `url(#${maskId})`, filter: `url(#${maskId}-l)` });
+    const img = el('image', { href: avatar, class: 'sp-avatar', x: cx - 92, y: PY - 228, width: 184, height: 240, preserveAspectRatio: 'xMidYMax meet', 'clip-path': `url(#${clipId})`, filter: `url(#${clipId}-l)` });
     svg.append(img);
     fitAvatar(img, avatar, cx, PY);
   }
