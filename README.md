@@ -54,6 +54,30 @@ per Doppelklick direkt von der Festplatte und auch in abgeschotteten Vorschauen.
    öffnen, dann läuft sie ohne Browserleisten. Die Adresse steht auch in der Live-Regie beim Beamer.
 4. In der **Live-Regie** ein Spiel aktivieren, den Beamer steuern, Fragen freigeben und bewerten.
 
+## Zusätzliche Spiele in der Spiele-Datenbank
+
+Elf weitere Spielarten liegen nur in der **Spiele-Datenbank** (Editor → Spiele-Datenbank) und
+kommen nie automatisch in eine Show. Einsetzen: im Show-Editor unter „2. Spiele“ einen Platz
+freimachen und „In Show einsetzen“ bzw. „⇄ Ersetzen“ wählen.
+
+| Spiel | Kurz | Medien |
+|---|---|---|
+| Dumm, dumm, dumm | 5 Fragen A–D, Einsatz 1–5 je einmal, richtig + / falsch − | – |
+| Film ab – Buzzer an! | Filmausschnitt, Buzzer, falsch sperrt | Video je Film |
+| Ich weiß nicht, dass du weißt es doch | Bild, Buzzer wählt ein Team, 10 s | Bild je Runde |
+| … 2.0 | alle schreiben, schnellster Buzzer schätzt ein (alles oder nichts) | Bild je Runde |
+| Keine Kon-Sequenz | Lied in Stufen 0,1/1/3/5/10 s, Punkte je Stufe (Vorschlag 5–1, bestätigen) | Lied je Runde |
+| Song Song Song | Mash-up, beide Titel schreiben, Buzzer sperrt niemanden | Mash-up je Rätsel |
+| DankeGleichFalsch | 25 Begriffe, 3 falsch, reihum mit 60 s, Aussteigen sichert | – |
+| Erst ich, dann du, dann du, dann du | 24 Felder, sichern oder zocken | – |
+| Habt ihr noch Fragen? | Teams stellen Fragen, 20 s, +1/−1 bzw. +2 | – |
+| Das geht mir zu weit | zwei Einträge aus einer Datenbank, Differenz entscheidet | – |
+| Brain or Dreh'n | 12 Kategorien A–D, Glücksrad mit 16 Feldern, Spielpunkte am Ende | – |
+
+Die Vergleichs-Datenbanken (`server/datasets.js`) nennen Quelle, Datenstand und Rechenweg; im
+Editor lassen sie sich je Runde korrigieren. Die Bundesliga-Tabelle ist kein Live-Abruf und muss
+vor der Show aktualisiert werden.
+
 ## Stand der Umsetzung (erste Phase)
 
 Umgesetzt:

@@ -18,7 +18,9 @@ const MEDIA_MAX_BYTES = Number(process.env.QUIZ_MEDIA_MAX_MB || 1024) * 1024 * 1
 const VIDEO_EXT = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/ogg': '.ogv', 'video/x-m4v': '.m4v' };
 // Lieder für die Pausen.
 const AUDIO_EXT = { 'audio/mpeg': '.mp3', 'audio/mp3': '.mp3', 'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a', 'audio/aac': '.aac', 'audio/wav': '.wav', 'audio/x-wav': '.wav', 'audio/ogg': '.ogg', 'audio/flac': '.flac', 'audio/webm': '.weba' };
-const MEDIA_EXT = { ...VIDEO_EXT, ...AUDIO_EXT };
+// Bilder für Spiele (z. B. „Ich weiß nicht, dass du weißt es doch“).
+const IMAGE_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' };
+const MEDIA_EXT = { ...VIDEO_EXT, ...AUDIO_EXT, ...IMAGE_EXT };
 
 // ---------- Speicher und Moderator-Zugang ----------
 
@@ -114,9 +116,9 @@ function uploadMedia(req, res) {
   if (!validSession(req.headers['x-token'])) return sendJson(res, 401, { error: 'Bitte als Moderation anmelden.' });
   const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
   const ext = MEDIA_EXT[type];
-  if (!ext) return sendJson(res, 415, { error: 'Bitte ein Video (MP4, WebM, MOV) oder ein Lied (MP3, M4A, WAV, OGG) hochladen.' });
+  if (!ext) return sendJson(res, 415, { error: 'Bitte ein Video (MP4, WebM, MOV), ein Lied (MP3, M4A, WAV, OGG) oder ein Bild (PNG, JPEG, WebP) hochladen.' });
   const length = Number(req.headers['content-length'] || 0);
-  if (length > MEDIA_MAX_BYTES) return sendJson(res, 413, { error: 'Das Video ist zu groß.' });
+  if (length > MEDIA_MAX_BYTES) return sendJson(res, 413, { error: 'Die Datei ist zu groß.' });
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
   const id = `media_${crypto.randomBytes(12).toString('hex')}`;
   const file = path.join(MEDIA_DIR, `${id}${ext}`);
@@ -133,11 +135,11 @@ function uploadMedia(req, res) {
   };
   req.on('data', (chunk) => {
     size += chunk.length;
-    if (size > MEDIA_MAX_BYTES) { abort(413, 'Das Video ist zu groß.'); req.destroy(); }
+    if (size > MEDIA_MAX_BYTES) { abort(413, 'Die Datei ist zu groß.'); req.destroy(); }
   });
   req.on('aborted', () => abort(400, 'Upload abgebrochen.'));
   req.pipe(out);
-  out.on('error', () => abort(500, 'Video konnte nicht gespeichert werden.'));
+  out.on('error', () => abort(500, 'Die Datei konnte nicht gespeichert werden.'));
   out.on('finish', () => {
     if (failed) return;
     if (!size) return abort(400, 'Die Datei ist leer.');
@@ -281,7 +283,12 @@ let wakeTimer = null;
 function scheduleWake() {
   clearTimeout(wakeTimer);
   const at = game.nextWake(store.data);
-  if (at) wakeTimer = setTimeout(broadcast, at - Date.now() + 50);
+  if (at) wakeTimer = setTimeout(() => {
+    // Abgelaufene Countdowns übernehmen (z. B. Zeit vorbei = ausgeschieden), dann neu senden.
+    if (game.tick(store.data)) store.save();
+    broadcast();
+    scheduleWake();
+  }, Math.max(0, at - Date.now() + 50));
 }
 
 function kickTeam(teamId) {

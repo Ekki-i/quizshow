@@ -4,6 +4,7 @@
 import { h } from './client.js';
 import { answerContent } from './ink.js';
 import { mapView } from './map.js';
+import { MOD_EXTRA } from './mod-extra.js';
 
 const MOVIE_HINTS = [
   ['Erscheinungsjahr', 1], ['Genre', 2], ['Regie', 2], ['Hauptdarsteller/in', 4], ['Nebenfigur', 2],
@@ -12,7 +13,7 @@ const MOVIE_HINTS = [
 const JAUCH_LADDER = [1, 2, 4, 5, 6, 8, 10, 15];
 
 export function buildPlay(ui, g, st, pos) {
-  const builders = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd };
+  const builders = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd, ...MOD_EXTRA };
   const title = `Spiel ${pos} · ${g.title}`;
   return ui.card(title, ...(builders[g.type] || (() => [h('p', {}, 'Unbekannter Spieltyp.')]))(ui, g, st));
 }

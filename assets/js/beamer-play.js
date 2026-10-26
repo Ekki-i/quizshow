@@ -3,6 +3,7 @@
 import { h } from './client.js';
 import { answerContent } from './ink.js';
 import { mapView } from './map.js';
+import { BEAMER_EXTRA } from './beamer-extra.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
@@ -12,6 +13,7 @@ const chip = (t, extra = '', ...rest) => h('span', { class: `chip team-chip ${ex
 export function renderGame(v, s, teamOf) {
   const fn = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd }[v.type];
   if (v.type === 'jauch') return jauch(v, teamOf, s); // eigenes, bildschirmfüllendes Design
+  if (BEAMER_EXTRA[v.type]) return BEAMER_EXTRA[v.type](v, teamOf, s).filter(Boolean);
   // Schlank: keine Spielnummer, kein Spielname, kein Fragezähler – nur Frage und Antworten.
   return fn ? fn(v, teamOf).filter(Boolean) : [h('div', { class: 'mega' }, s.game.title)];
 }

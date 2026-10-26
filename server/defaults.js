@@ -201,6 +201,11 @@ const TYPES = {
 
 const DEFAULT_ORDER = ['leichte5', 'dummes', 'land', 'kassenschlager', 'trumpf5', 'musik', 'jauch', 'nerd'];
 
+// Weitere Spiele nur für die Spiele-Datenbank (nie automatisch in einer Show).
+const { EXTRA_TYPES, EXTRA_ORDER, WHEEL } = require('./defaults-extra');
+Object.assign(TYPES, EXTRA_TYPES);
+const LIBRARY_ORDER = [...DEFAULT_ORDER, ...EXTRA_ORDER];
+
 // Münzzeremonien nach den aktiven Positionen 4, 6 und 8 (Preisstufen 4–2–2).
 const COIN_POSITIONS = [4, 6, 8];
 const SHOW_SIZE = 8;
@@ -229,4 +234,4 @@ function publicTypes() {
   return out;
 }
 
-module.exports = { TYPES, DEFAULT_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, JAUCH_LADDER, MOVIE_HINTS, publicTypes };
+module.exports = { TYPES, DEFAULT_ORDER, LIBRARY_ORDER, EXTRA_ORDER, WHEEL, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, JAUCH_LADDER, MOVIE_HINTS, publicTypes };

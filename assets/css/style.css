@@ -1146,3 +1146,143 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 /* Deutschlandkarte: Deutschland hell hervorgehoben, Nachbarländer gedämpft */
 .map .land.has-hl path { fill: #2c4a35; stroke: #16281c; stroke-width: 1; }
 .map .land.has-hl path.hl { fill: #4a8a5c; stroke: #e8f5ec; stroke-width: 2.2; }
+/* Editor: Datei-Felder (Video, Audio, Bild) */
+.media-field .media-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.media-field .media-info { display: grid; gap: 6px; flex: 1; min-width: 200px; }
+.media-preview.img { width: 160px; height: 100px; object-fit: contain; background: #000; border-radius: 6px; }
+.media-preview.video { width: 220px; max-height: 130px; background: #000; border-radius: 6px; }
+.media-preview.audio { width: 260px; }
+/* Team-iPad: kleineres Schreibfeld (zwei Felder untereinander) */
+.ink.ink-small .ink-frame { height: 26vh; min-height: 180px; }
+
+/* ===== Zusätzliche Spiele (Spiele-Datenbank) ===== */
+/* Team-iPad */
+.stakes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 6px 0 12px; }
+.stake { min-height: 70px; border: 3px solid var(--surface-2); background: var(--surface); color: var(--text); font: 800 2rem var(--font-display); border-radius: var(--radius); cursor: pointer; }
+.stake.selected, .abcd-opt.selected { border-color: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-2) inset; }
+.stake:disabled { opacity: 0.25; text-decoration: line-through; cursor: not-allowed; }
+.stakes-label { font-weight: 700; margin: 14px 0 0; }
+.dumm-summary { font-weight: 700; color: var(--accent-2); min-height: 1.4em; }
+.team-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 12px 0; }
+.team-pick .btn { border-left: 10px solid var(--team, var(--accent)); justify-content: flex-start; }
+.guess-list { display: grid; gap: 10px; margin: 12px 0; }
+.guess-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface); border-left: 8px solid var(--team); border-radius: var(--radius-sm); }
+.guess-row b { flex: 1; min-width: 140px; }
+.stage-strip { display: flex; gap: 6px; margin: 8px 0 12px; }
+.stage-strip .st { flex: 1; text-align: center; padding: 8px 4px; background: var(--surface); border-radius: 6px; font-weight: 800; display: grid; gap: 2px; }
+.stage-strip .st small { font-weight: 600; color: var(--text-muted); font-size: 0.75rem; }
+.stage-strip .st.now { background: var(--accent); color: #fff; }
+.stage-strip .st.now small { color: #fff; }
+.stage-strip .st.past { opacity: 0.45; }
+.dgf-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+.dgf-term { min-height: 64px; padding: 8px; background: var(--surface); color: var(--text); border: 2px solid var(--surface-2); border-radius: 8px; font: 700 1.05rem var(--font); cursor: pointer; }
+.dgf-term:disabled { opacity: 0.55; cursor: default; }
+.dgf-clock { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 16px; border-radius: 8px; font: 800 2rem var(--font-display); background: #0b0b0d; color: var(--team); box-shadow: inset 0 0 0 3px var(--team); font-variant-numeric: tabular-nums; }
+.zock-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 12px 0; }
+.zock-cell { min-height: 64px; font: 800 1.6rem var(--font-display); background: var(--surface); color: var(--accent-2); border: 2px solid var(--surface-2); border-radius: 8px; cursor: pointer; }
+.zock-cell:disabled { opacity: 0.2; cursor: default; }
+.zock-board.mod .zock-cell { min-height: 44px; font-size: 1.1rem; }
+.zock-cell.now { outline: 3px solid var(--accent); }
+.zock-cell.gone { text-decoration: line-through; }
+.joker-stash { display: grid; gap: 8px; margin: 12px 0; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.joker-card { display: flex; align-items: center; gap: 12px; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; }
+.joker-card .ji { font-size: 1.8rem; }
+.joker-card small { display: block; color: var(--text-muted); font-weight: 500; }
+.ds-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 14px; font-size: 0.85rem; max-height: 260px; overflow: auto; }
+.dgf-mod-board { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.dgf-chip { padding: 4px 8px; border-radius: 6px; background: var(--surface-2); font-size: 0.85rem; }
+.dgf-chip.gone { opacity: 0.35; text-decoration: line-through; }
+.dgf-chip.wrong { box-shadow: inset 0 0 0 2px var(--bad); }
+
+/* Beamer */
+.film-layer { position: fixed; z-index: 2; left: 50%; top: 46%; translate: -50% -50%; width: min(86vw, 150vh); max-height: 74vh; background: #000; box-shadow: 0 0 0 0.6vh #2b2b2e, 0 2vh 5vh rgba(0, 0, 0, 0.7); display: none; }
+.film-layer.on { display: block; }
+.beamer .film-bar { position: fixed; z-index: 3; left: 0; right: 0; bottom: 3vh; display: flex; justify-content: center; align-items: center; gap: 1.2vw; flex-wrap: wrap; }
+.beamer .level-tag { display: inline-block; margin: 0 auto 1.2vh; padding: 0.5vh 1.4vw; background: var(--box-2, #2b2b2e); color: var(--accent-2); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: clamp(0.7rem, 2.2vh, 1.4rem); }
+.beamer .q.slim { min-height: auto; padding-top: 1vh; padding-bottom: 1vh; margin-bottom: 1.6vh; }
+.beamer .stake-dot { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; margin-left: 0.3em; background: var(--chip); color: #0b0b0d; font-weight: 900; font-size: 0.8em; }
+.beamer .chip.wrong-soft { opacity: 0.75; }
+.beamer .big-image-box { display: flex; justify-content: center; }
+.beamer .big-image { max-width: 88vw; max-height: 62vh; object-fit: contain; background: #000; box-shadow: 0 0 0 0.6vh var(--box-2, #2b2b2e), 0 2vh 4vh rgba(0, 0, 0, 0.6); }
+.beamer .no-image { padding: 10vh 10vw; background: var(--box, #201f22); color: var(--text-muted); font-size: 3vh; }
+.beamer .img-foot { justify-content: center; align-items: center; margin-top: 2vh; gap: 1vw; }
+.beamer .big-count { font-family: var(--font-display); font-weight: 800; font-size: 8vh; color: var(--accent-2); margin-left: 2vw; font-variant-numeric: tabular-nums; }
+.beamer .big-count.center { margin: 1vh 0 0; text-align: center; }
+.beamer .guess-tag { position: absolute; left: 0.6vw; top: 0.6vh; padding: 0.3vh 0.6vw; font-size: 1.8vh; font-weight: 800; background: #2b2b2e; }
+.beamer .guess-tag.ok { color: var(--ok); }
+.beamer .guess-tag.bad { color: var(--bad); }
+.beamer .answers.small .answer .ink-answer.beamer { height: 11vh; }
+.beamer .answers.small .ans-body { min-height: 9vh; }
+.beamer .kon-stages { display: flex; gap: 1vw; justify-content: center; margin: 3vh auto 0; width: min(90vw, 150vh); }
+.beamer .kon-st { flex: 1; background: var(--box, #201f22); padding: 1.4vh 1vw; display: grid; gap: 0.4vh; text-align: center; box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.45); }
+.beamer .kon-st b { font-family: var(--font-display); font-size: 5vh; color: #fff; }
+.beamer .kon-st small { color: var(--accent-2); font-weight: 800; font-size: 2.2vh; }
+.beamer .kon-st.now { box-shadow: inset 0 -0.8vh 0 var(--accent), 0 0 3vh rgba(255, 45, 138, 0.45); }
+.beamer .kon-st.past { opacity: 0.4; }
+.beamer .eq { display: flex; gap: 0.8vw; align-items: flex-end; justify-content: center; height: 22vh; }
+.beamer .eq i { width: 2.2vw; height: 12%; background: linear-gradient(var(--accent-2), var(--accent)); }
+.beamer .eq.live i { animation: eqBar 0.6s ease-in-out infinite alternate; }
+@keyframes eqBar { from { height: 12%; } to { height: 100%; } }
+.beamer .vinyl { width: 34vh; height: 34vh; margin: 0 auto 2vh; border-radius: 50%; background: repeating-radial-gradient(circle, #111 0 0.5vh, #1d1d1f 0.5vh 1vh); box-shadow: 0 0 0 1vh #2b2b2e, 0 2vh 5vh rgba(0, 0, 0, 0.6); display: grid; place-items: center; }
+.beamer .vinyl.spin { animation: vinylSpin 1.8s linear infinite; }
+.beamer .vinyl-label { width: 12vh; height: 12vh; border-radius: 50%; background: var(--accent); display: grid; place-items: center; color: #fff; font-size: 6vh; }
+@keyframes vinylSpin { to { transform: rotate(360deg); } }
+.beamer .dgf-head { display: flex; align-items: center; gap: 2vw; justify-content: center; width: min(94vw, 165vh); margin: 0 auto 1.2vh; }
+.beamer .dgf-head .q { margin: 0; flex: 1; }
+.beamer .dgf-clock.bm { display: grid; gap: 0.3vh; place-items: center; padding: 0.8vh 1.6vw; background: #070707; box-shadow: inset 0 0 0 0.4vh var(--chip); color: var(--chip); font: 800 6vh var(--font-display); font-variant-numeric: tabular-nums; }
+.beamer .dgf-clock.bm span { font: 700 1.8vh var(--font); color: #fff; text-transform: uppercase; }
+.beamer .dgf-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.9vh 0.8vw; width: min(94vw, 165vh); margin: 0 auto; }
+.beamer .dgf-tile { min-height: 9vh; display: grid; place-items: center; text-align: center; padding: 0.6vh 0.6vw; background: var(--box, #201f22); color: #fff; font-weight: 700; font-size: clamp(0.8rem, min(1.9vw, 3.3vh), 2rem); box-shadow: 0 0.6vh 1.6vh rgba(0, 0, 0, 0.45); line-height: 1.1; }
+.beamer .dgf-tile.gone { background: rgba(32, 31, 34, 0.35); box-shadow: inset 0 -0.5vh 0 var(--chip); }
+.beamer .dgf-tile.wrong { box-shadow: inset 0 0 0 0.5vh var(--bad); color: #ffb3b3; }
+.beamer .dgf-teams { display: flex; flex-wrap: wrap; gap: 0.8vh 0.8vw; justify-content: center; margin-top: 1.4vh; }
+.beamer .dgf-flash { position: fixed; z-index: 4; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; animation: dgfFlash 2.2s ease-out forwards; }
+.beamer .dgf-flash b { font: 900 18vh var(--font-display); color: var(--bad); text-shadow: 0 0 4vh rgba(0, 0, 0, 0.8); }
+.beamer .dgf-flash.secured b { color: var(--ok); }
+.beamer .dgf-flash span { font: 800 5vh var(--font); color: #fff; }
+@keyframes dgfFlash { 0% { opacity: 0; transform: scale(0.6); } 15% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; } }
+.beamer .zock-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1.2vh 1vw; width: min(80vw, 130vh); margin: 0 auto; }
+.beamer .zock-tile { min-height: 13vh; display: grid; place-items: center; background: var(--box, #201f22); color: var(--accent-2); font: 800 7vh var(--font-display); box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.45); }
+.beamer .zock-tile.gone { opacity: 0.15; }
+.beamer .zock-tile.now { box-shadow: inset 0 0 0 0.6vh var(--accent), 0 0 3vh rgba(255, 45, 138, 0.5); }
+.beamer .zock-num { display: inline-block; margin-bottom: 1.4vh; padding: 0.6vh 1.6vw; background: var(--accent); color: #fff; font: 800 4vh var(--font-display); }
+.beamer .zock-foot { justify-content: center; margin-top: 2vh; }
+.beamer .fragen-q { width: min(70vw, 120vh); margin: 1vh auto 0; background: #fff; box-shadow: 0 0 0 0.6vh #2b2b2e, 0 2vh 4vh rgba(0, 0, 0, 0.6); }
+.beamer .ink-board { display: block; width: 100%; max-height: 36vh; object-fit: contain; background: #fff; }
+.beamer .ink-board.small { max-height: 14vh; width: auto; }
+.beamer .fragen-q .ans-name { background: #2b2b2e; color: #fff; text-align: center; padding: 0.8vh; font-weight: 700; text-transform: uppercase; }
+.beamer .fragen-sol { display: flex; align-items: center; justify-content: center; gap: 1.4vw; margin-top: 1.6vh; }
+.beamer .fragen-sol span { background: var(--ok); color: #062b14; padding: 0.6vh 1vw; font-weight: 800; text-transform: uppercase; }
+.beamer .rank.zuweit li { min-height: 9vh; }
+.beamer .rank.zuweit li .nm { display: grid; gap: 0.3vh; }
+.beamer .rank.zuweit li .nm small { font-family: var(--font); font-weight: 600; text-transform: none; font-size: 0.55em; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.beamer .rank.zuweit li .pts em { font-style: normal; margin-left: 0.6em; }
+.beamer .rank.zuweit li .pts .plus { color: var(--ok); }
+.beamer .rank.zuweit li .pts .minus { color: var(--bad); }
+.beamer .source-line { margin: 1.6vh auto 0; width: min(80vw, 140vh); font-size: 1.7vh; color: var(--text-muted); }
+.beamer .brain-cat { display: inline-block; margin: 2vh auto 3vh; padding: 3vh 5vw; background: var(--box, #201f22); color: #fff; font: 800 clamp(2rem, min(8vw, 14vh), 9rem) var(--font-display); text-transform: uppercase; box-shadow: inset 0 -1vh 0 var(--accent), 0 2vh 5vh rgba(0, 0, 0, 0.6); animation: qIn calc(0.6s * var(--speed)) ease-out both; }
+.beamer .brain-events { display: flex; flex-wrap: wrap; gap: 0.8vh 0.8vw; justify-content: center; margin-top: 2vh; }
+.beamer .brain-events span { padding: 0.6vh 1vw; background: var(--box, #201f22); font-size: 2.2vh; font-weight: 600; }
+.beamer .wheel-stage { display: flex; align-items: center; justify-content: center; gap: 4vw; }
+.beamer .wheel-box { width: min(62vh, 46vw); }
+.beamer .wheel-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.beamer .wheel-svg path.good { fill: #1f6b44; stroke: #0b0b0d; stroke-width: 2; }
+.beamer .wheel-svg path.bad { fill: #7a1f2b; stroke: #0b0b0d; stroke-width: 2; }
+.beamer .wheel-svg .wi { font-size: 30px; text-anchor: middle; dominant-baseline: central; }
+.beamer .wheel-svg .hub { fill: #2b2b2e; stroke: var(--accent-2); stroke-width: 4; }
+.beamer .wheel-svg .pointer { fill: var(--accent-2); }
+.beamer .wheel-rot { transform-origin: 0 0; transform-box: view-box; }
+.beamer .wheel-rot.spinning { transition: transform calc(5s * var(--speed)) cubic-bezier(.15,.85,.2,1); }
+.beamer .wheel-card { width: min(40vw, 70vh); padding: 3vh 2vw; background: var(--box, #201f22); text-align: center; display: grid; gap: 1vh; box-shadow: 0 2vh 5vh rgba(0, 0, 0, 0.6); animation: cardFlip calc(0.7s * var(--speed)) ease-out both; }
+.beamer .wheel-card.later { animation-delay: calc(5s * var(--speed)); }
+.beamer .wheel-card.good { box-shadow: inset 0 -1vh 0 var(--ok), 0 2vh 5vh rgba(0, 0, 0, 0.6); }
+.beamer .wheel-card.bad { box-shadow: inset 0 -1vh 0 var(--bad), 0 2vh 5vh rgba(0, 0, 0, 0.6); }
+.beamer .wheel-card .wc-icon { font-size: 10vh; }
+.beamer .wheel-card b { font: 800 5vh var(--font-display); text-transform: uppercase; }
+.beamer .wheel-card p { margin: 0; font-size: 3vh; }
+.beamer .wheel-card span { color: var(--text-muted); font-size: 2.2vh; }
+@keyframes cardFlip { from { opacity: 0; transform: perspective(800px) rotateY(90deg); } to { opacity: 1; transform: none; } }
+.beamer .rank.zuweit { gap: 0.9vh; }
+.beamer .rank.zuweit li { min-height: 7.4vh; font-size: clamp(0.9rem, min(2.4vw, 4vh), 2.6rem); }
+.beamer .rank.zuweit li .pos { width: 7.4vh; }
+.beamer .q.compact + .rank.zuweit { margin-top: -1vh; }

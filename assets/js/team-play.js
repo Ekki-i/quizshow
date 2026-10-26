@@ -5,6 +5,7 @@ import { h, run, ask, toast, coinImg } from './client.js';
 import { inkPad, answerContent } from './ink.js';
 import { mapView } from './map.js';
 import { podiumRow } from './studio.js';
+import { TEAM_EXTRA } from './team-extra.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
@@ -18,7 +19,7 @@ const countdown = (deadline) => h('b', { 'data-deadline': deadline }, '');
 
 // ui: { conn, team, setDraft(key) }
 export function renderPlay(p, ui) {
-  const fn = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd }[p.type];
+  const fn = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd, ...TEAM_EXTRA }[p.type];
   return fn ? fn(p, ui) : wait('Gleich geht’s los!');
 }
 

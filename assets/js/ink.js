@@ -73,7 +73,10 @@ function drawStrokes(ctx, strokes, w, hgt, color = '#111', weight = 1) {
 
 // Großes Schreibfeld. onSubmit(dataUrl) wird beim Abgeben sofort aufgerufen und
 // gibt true zurück, wenn die Abgabe geklappt hat.
-export function inkPad({ draftKey, label, button, onSubmit, ask, toast }) {
+// Optionen für Spiele mit Buzzer-Abgabe: onChange(hatSchrift) meldet jeden Strich,
+// noSubmit blendet den eigenen Abgabe-Knopf aus. Das Element trägt dann .inkApi
+// mit hasInk(), png() und clear() für einen gemeinsamen Buzzer.
+export function inkPad({ draftKey, label, button, onSubmit, ask, toast, onChange = null, noSubmit = false, small = false }) {
   const strokes = loadDraft(draftKey);
   const canvas = h('canvas', { class: 'ink-canvas', 'aria-label': `${label} – mit dem Stift hineinschreiben`, role: 'img' });
   const hint = h('p', { class: 'ink-hint' }, 'Mit dem Apple Pencil in das weiße Feld schreiben');
@@ -129,6 +132,7 @@ export function inkPad({ draftKey, label, button, onSubmit, ask, toast }) {
     activeId = null;
     current = null;
     saveDraft(draftKey);
+    if (onChange) onChange(strokes.length > 0);
   };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
@@ -166,10 +170,11 @@ export function inkPad({ draftKey, label, button, onSubmit, ask, toast }) {
   }
 
   const tools = h('div', { class: 'ink-tools' },
-    h('button', { type: 'button', class: 'btn ghost', onclick: () => { strokes.pop(); saveDraft(draftKey); redraw(); } }, '↶ Rückgängig'),
+    h('button', { type: 'button', class: 'btn ghost', onclick: () => { strokes.pop(); saveDraft(draftKey); redraw(); if (onChange) onChange(strokes.length > 0); } }, '↶ Rückgängig'),
     h('button', { type: 'button', class: 'btn ghost', onclick: async () => {
       if (!strokes.length) return;
       strokes.length = 0; saveDraft(draftKey); redraw(); // sofort, ohne Rückfrage
+      if (onChange) onChange(false);
     } }, '✕ Löschen'));
 
   const submit = h('button', { type: 'button', class: 'btn pink huge', style: { width: '100%' }, onclick: async () => {
@@ -182,10 +187,12 @@ export function inkPad({ draftKey, label, button, onSubmit, ask, toast }) {
     }
   } }, button);
 
-  return h('div', { class: 'ink' },
+  const el = h('div', { class: `ink${small ? ' ink-small' : ''}` },
     h('div', { class: 'ink-head' }, h('span', { class: 'ink-label' }, label), tools),
     h('div', { class: 'ink-frame' }, canvas, hint),
-    h('p', {}, submit));
+    noSubmit ? null : h('p', {}, submit));
+  el.inkApi = { hasInk: () => strokes.length > 0, png: () => exportPng(), clear: () => clearInkDraft(draftKey) };
+  return el;
 }
 
 // Antwort anzeigen: Handschrift als Bild, sonst Text.

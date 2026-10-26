@@ -305,6 +305,19 @@ function titleColorPicker(label, current, fallback, sample, set) {
     current ? h('button', { class: 'btn small ghost', onclick: () => set(null) }, 'Standardfarbe') : h('span', { class: 'muted' }, 'Standardfarbe'));
 }
 
+// „Das geht mir zu weit“: Datenbanken mit Quelle, Datenstand und allen Einträgen zum Prüfen.
+function buildDatasetInfo() {
+  const val = (d, e) => (d.kind === 'birth' ? `geb. ${e.born.split('-').reverse().join('.')}` : d.kind === 'geo' ? `${e.lat}, ${e.lng}` : `${String(e.value).replace('.', ',')} ${d.unit}`);
+  return h('div', { class: 'card', style: { margin: '10px 0' } },
+    h('b', {}, 'Vergleichs-Datenbanken'),
+    h('p', { class: 'muted' }, 'Jede Runde nutzt eine Datenbank. Die Teams sehen beim Abgeben alle Einträge (auch außerhalb der Grenzen). Fehler korrigierst du je Runde im Feld „Korrekturen / eigene Einträge“ – eine Zeile pro Eintrag im angegebenen Format.'),
+    (S.datasets || []).map((d) => h('details', { class: 'item' },
+      h('summary', {}, h('b', {}, d.name), h('span', { class: 'muted' }, ` · ${d.entries.length} Einträge · Datenstand ${d.asOf}`)),
+      h('div', { class: 'item-body' },
+        h('p', {}, h('b', {}, 'Quelle: '), d.source), h('p', {}, h('b', {}, 'Rechenweg: '), d.method), h('p', {}, h('b', {}, 'Format für Korrekturen: '), h('code', {}, d.fixHelp)),
+        h('div', { class: 'ds-list' }, d.entries.map((e) => h('span', {}, h('b', {}, e.name), ` · ${val(d, e)}`)))))));
+}
+
 // Spieltitel der Gewinnstufen: je Stufe ein Lied und eine Farbe.
 function buildStageTitles() {
   const stages = S.project.stages || {};
@@ -428,7 +441,7 @@ function buildGameControl() {
   if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Der Showablauf aktiviert die Spiele; Ausnahmen ganz unten unter „Spiele (direkt aktivieren)“.'));
   const st = S.live.games[g.id] || {};
   const pos = S.project.games.indexOf(g) + 1;
-  return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor }, g, st, pos);
+  return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor, ask }, g, st, pos);
 }
 
 // Beamer: Umschalten übernimmt der Showablauf – hier nur, was gerade läuft.
@@ -916,6 +929,7 @@ function buildGameEditor(kind, item) {
     running ? h('p', { class: 'notice warn' }, 'Dieses Spiel läuft gerade. Inhalte erst nach dem Beenden ändern.') : null,
     kind === 'game' ? titleColorPicker(`Farbe der Spieltitel-Folie für Spiel ${pos}`, item.color, GAME_COLORS[(pos - 1) % GAME_COLORS.length], String(pos), (color) => act('game.setColor', { gameId: item.id, color })) : null,
     kind === 'game' ? buildGameIntro(item, pos) : null,
+    item.type === 'zuweit' ? buildDatasetInfo() : null,
     h('fieldset', { disabled: running, class: 'plain' },
       h('label', { for: `${key}-title` }, 'Name in der Show (erscheint im Spieltitel auf dem Beamer)'),
       h('input', { id: `${key}-title`, value: d.title, maxlength: '80', oninput: (ev) => { d.title = ev.target.value; save(); } }),
@@ -965,9 +979,73 @@ function formField(f, holder, k, save, rerender, id) {
         : null;
       return h('fieldset', { class: 'group' }, h('legend', {}, f.label, canChange ? h('span', { class: 'muted' }, ` (${arr.length} von max. ${f.max})`) : null), h('div', { class: f.of === 'text' ? 'field-grid' : 'items' }, items), add);
     }
+    case 'media':
+      return mediaField(f, holder, k, save, rerender, id);
     default:
       return null;
   }
+}
+
+// Datei-Feld (Video, Audio, Bild): hochladen, Vorschau, austauschen, entfernen.
+// Die Datei liegt im Medienspeicher der Anwendung, im Spiel steht nur der Verweis.
+const MEDIA_ACCEPT = {
+  video: 'video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.mov,.webm,.m4v',
+  audio: 'audio/*,video/mp4,.mp3,.m4a,.wav,.ogg,.mp4',
+  image: 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp',
+};
+const mediaUploads = new Map(); // Feld-ID -> { name, progress }
+function mediaField(f, holder, k, save, rerender, id) {
+  const m = holder[k] || null;
+  const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+  const busy = mediaUploads.get(id);
+  const input = h('input', {
+    id, type: 'file', accept: MEDIA_ACCEPT[f.accept] || '', class: 'visually-hidden', 'aria-label': `${f.label} wählen`,
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (f.accept === 'image' && !/^image\/(png|jpeg|webp)$/.test(file.type)) return toast('Bitte ein Bild als PNG, JPEG oder WebP wählen.');
+      if (f.accept === 'video' && !/^video\//.test(file.type)) return toast('Bitte ein Video (MP4, MOV, WebM) wählen.');
+      if (f.accept === 'audio' && !/^(audio|video)\//.test(file.type)) return toast('Bitte eine MP3- oder MP4-Datei wählen.');
+      mediaUploads.set(id, { name: file.name, progress: 0 });
+      renderAll(true);
+      try {
+        const up = await uploadMedia(file, token, (p) => {
+          const st = mediaUploads.get(id);
+          if (st) st.progress = p;
+          const bar = document.getElementById(`${id}-progress`);
+          if (bar) bar.value = p;
+        });
+        holder[k] = { id: up.id, type: up.type, name: file.name, size: up.size };
+        save();
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        mediaUploads.delete(id);
+        renderAll(true);
+      }
+    },
+  });
+  let preview = null;
+  if (m) {
+    const tag = m.type.startsWith('image') ? 'img' : f.accept === 'audio' || m.type.startsWith('audio') ? 'audio' : 'video';
+    preview = h(tag, tag === 'img' ? { class: 'media-preview img', alt: f.label } : { class: `media-preview ${tag}`, controls: true, preload: 'metadata' });
+    mediaUrl(m.id).then((url) => {
+      if (url) preview.src = url;
+      else preview.replaceWith(h('p', { class: 'notice warn' }, 'Die Datei ist auf diesem Gerät nicht mehr vorhanden – bitte neu hochladen.'));
+    });
+  }
+  return h('div', { class: 'field media-field' },
+    h('label', { for: id }, f.label),
+    busy
+      ? h('div', {}, h('p', {}, `„${busy.name}“ wird hochgeladen …`), h('progress', { id: `${id}-progress`, max: '1', value: String(busy.progress), style: { width: '100%' } }))
+      : h('div', { class: 'media-row' },
+        preview,
+        h('div', { class: 'media-info' },
+          h('span', { class: m ? '' : 'muted' }, m ? `${m.name}${m.size ? ` · ${fmtSize(m.size)}` : ''}` : 'Noch keine Datei'),
+          h('div', { class: 'row' },
+            h('label', { class: 'btn small' }, input, m ? 'Austauschen' : '+ Datei hochladen'),
+            m ? h('button', { type: 'button', class: 'btn small ghost', onclick: () => { holder[k] = null; rerender(); } }, 'Entfernen') : null))));
 }
 
 function emptyItem(fields) {
@@ -977,6 +1055,7 @@ function emptyItem(fields) {
     else if (f.type === 'list') out[f.key] = Array.from({ length: f.min }, () => (f.of === 'text' ? '' : emptyItem(f.fields)));
     else if (f.type === 'select') out[f.key] = f.options[0];
     else if (f.type === 'number') out[f.key] = null;
+    else if (f.type === 'media') out[f.key] = null;
     else out[f.key] = '';
   }
   return out;

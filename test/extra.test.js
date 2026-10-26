@@ -1,0 +1,439 @@
+'use strict';
+
+// Tests für die zusätzlichen Spielmodule der Spiele-Datenbank.
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const game = require('../server/game');
+const { totals } = require('../server/core');
+
+let clock = 1_000_000;
+const mod = () => ({ role: 'moderator', actor: 'moderator', now: clock++ });
+const team = (teamId, now) => ({ role: 'team', teamId, actor: `team:${teamId}`, now: now ?? clock++ });
+const ink = 'data:image/png;base64,iVBORw0KGgo=';
+
+function setup(teamCount = 3) {
+  const db = game.createState();
+  db.project.teams = [];
+  for (let i = 0; i < teamCount; i++) game.applyAction(db, mod(), 'team.add', { name: `Team ${i + 1}` });
+  return { db, ids: db.project.teams.map((t) => t.id) };
+}
+
+// Spielart aus der Datenbank in die Show setzen (statt des letzten Spiels) und aktivieren.
+function use(db, type, patch) {
+  const entry = db.library.find((e) => e.type === type);
+  game.applyAction(db, mod(), 'game.remove', { gameId: db.project.games[7].id });
+  game.applyAction(db, mod(), 'game.add', { libraryId: entry.id });
+  const g = db.project.games[7];
+  if (patch) game.applyAction(db, mod(), 'game.update', { gameId: g.id, content: { ...structuredClone(g.content), ...patch } });
+  game.applyAction(db, mod(), 'show.activate', { gameId: g.id });
+  db.live.beamer = { view: 'game', data: {} };
+  return g;
+}
+const act = (db, ctx, name, p = {}) => game.applyAction(db, ctx, `play.${name}`, p);
+const pv = (db) => game.beamerView(db).gameView;
+const tv = (db, id) => game.teamView(db, id).play;
+const media = (type) => ({ id: `media_${'a'.repeat(12)}${Math.floor(Math.random() * 1e6)}`.slice(0, 30), type, name: 'x', size: 1 });
+
+test('Neue Spielarten stehen nur in der Datenbank; Migration ergänzt sie einmalig, ohne Shows zu ändern', () => {
+  const db = game.createState();
+  const showTypes = db.project.games.map((g) => g.type);
+  assert.deepEqual(showTypes, ['leichte5', 'dummes', 'land', 'kassenschlager', 'trumpf5', 'musik', 'jauch', 'nerd']);
+  for (const t of ['dgf', 'filmab', 'songsong', 'konsequenz', 'fragen', 'zuweit', 'zocken', 'brain', 'dumm3', 'weissnicht', 'weissnicht2']) {
+    assert.ok(db.library.some((e) => e.type === t), t);
+  }
+  // Alter Speicherstand ohne die neuen Arten: werden ergänzt, Show bleibt gleich.
+  const old = structuredClone(db);
+  old.library = old.library.filter((e) => !['dgf', 'brain'].includes(e.type));
+  delete old.libraryTypesAdded;
+  const m = game.migrate(old);
+  assert.ok(m.library.some((e) => e.type === 'dgf'));
+  assert.deepEqual(m.project.games.map((g) => g.type), showTypes);
+  // Vom Nutzer gelöschte Einträge kommen nicht wieder.
+  m.library = m.library.filter((e) => e.type !== 'brain');
+  assert.ok(!game.migrate(m).library.some((e) => e.type === 'brain'));
+});
+
+test('Medienfelder: nur passende Dateitypen, Verweise zählen als benutzt', () => {
+  const { db } = setup(2);
+  const entry = db.library.find((e) => e.type === 'filmab');
+  const content = structuredClone(entry.content);
+  content.films[0].clip = { id: 'media_abcdefabcdef12', type: 'audio/mpeg', name: 'x' };
+  assert.throws(() => game.applyAction(db, mod(), 'library.update', { libraryId: entry.id, content }), /falscher Dateityp/);
+  content.films[0].clip = { id: 'media_abcdefabcdef12', type: 'video/mp4', name: 'clip.mp4', size: 5 };
+  game.applyAction(db, mod(), 'library.update', { libraryId: entry.id, content });
+  assert.ok(game.referencedMedia(db).has('media_abcdefabcdef12'));
+});
+
+test('Dumm, dumm, dumm: Einsätze 1–5 je genau einmal, verbindlich, richtig plus / falsch minus', () => {
+  const { db, ids } = setup(2);
+  const g = use(db, 'dumm3');
+  act(db, mod(), 'open', { qIndex: 0 });
+  assert.throws(() => act(db, team(ids[0]), 'submit', { choice: 'C', stake: 7 }), /1 bis 5/);
+  act(db, team(ids[0]), 'submit', { choice: 'C', stake: 5 });
+  assert.throws(() => act(db, team(ids[0]), 'submit', { choice: 'A', stake: 4 }), /schon verbindlich/);
+  act(db, team(ids[1]), 'submit', { choice: 'A', stake: 3 });
+  assert.equal(pv(db).results.length, 0); // vor der Auswertung nichts öffentlich
+  act(db, mod(), 'evaluate');
+  assert.equal(totals(db)[ids[0]], 5);
+  assert.equal(totals(db)[ids[1]], -3);
+  act(db, mod(), 'open', { qIndex: 1 });
+  assert.deepEqual(tv(db, ids[0]).used, [5]);
+  assert.throws(() => act(db, team(ids[0]), 'submit', { choice: 'C', stake: 5 }), /schon verwendet/);
+  assert.equal(g.type, 'dumm3');
+});
+
+test('Film ab: erster Buzzer antwortet, falsch sperrt, alle falsch beendet den Film', () => {
+  const { db, ids } = setup(3);
+  use(db, 'filmab', { films: [{ title: 'Titanic', aliases: '', clip: { id: 'media_abcdefabcdef12', type: 'video/mp4', name: 'c' } }] });
+  act(db, mod(), 'open', { index: 0 });
+  assert.throws(() => act(db, team(ids[0]), 'buzz'), /läuft noch nicht/);
+  act(db, mod(), 'play', { restart: true });
+  const t = clock;
+  act(db, team(ids[1], t), 'buzz');
+  assert.throws(() => act(db, team(ids[0], t), 'buzz'), /antwortet gerade/); // fast gleichzeitig: nur einer
+  assert.equal(pv(db).playback.state, 'paused');
+  act(db, mod(), 'judge', { correct: false });
+  assert.ok(tv(db, ids[1]).locked);
+  act(db, team(ids[0]), 'buzz');
+  act(db, mod(), 'judge', { correct: false });
+  act(db, team(ids[2]), 'buzz');
+  act(db, mod(), 'judge', { correct: false });
+  assert.ok(pv(db).resolved);
+  assert.equal(pv(db).title, 'Titanic');
+  assert.deepEqual(Object.values(totals(db)), [0, 0, 0]);
+});
+
+test('Film ab: richtige Antwort gibt genau einen Punkt', () => {
+  const { db, ids } = setup(2);
+  use(db, 'filmab', { films: [{ title: 'Titanic', aliases: '', clip: { id: 'media_abcdefabcdef12', type: 'video/mp4', name: 'c' } }] });
+  act(db, mod(), 'open', { index: 0 });
+  act(db, mod(), 'play', {});
+  act(db, team(ids[0]), 'buzz');
+  act(db, mod(), 'judge', { correct: true });
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /beendet/);
+  assert.equal(totals(db)[ids[0]], 1);
+});
+
+test('Ich weiß nicht 1.0: erster Buzzer sperrt alle, wählt Team, 10 Sekunden, Punkte je nach Antwort', () => {
+  const { db, ids } = setup(3);
+  use(db, 'weissnicht');
+  act(db, mod(), 'open', { index: 0 });
+  act(db, team(ids[0]), 'buzz');
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /schneller/);
+  assert.throws(() => act(db, team(ids[1]), 'pick', { teamId: ids[2] }), /zuerst gebuzzert/);
+  assert.throws(() => act(db, team(ids[0]), 'pick', { teamId: ids[0] }), /anderes Team/);
+  act(db, team(ids[0]), 'pick', { teamId: ids[2] });
+  assert.ok(pv(db).deadline > clock);
+  act(db, mod(), 'judge', { correct: false });
+  assert.equal(totals(db)[ids[0]], 1);
+  act(db, mod(), 'regrade', { correct: true }); // verklickt → korrigiert
+  assert.equal(totals(db)[ids[0]], 0);
+  assert.equal(totals(db)[ids[2]], 1);
+  // Niemand buzzert: Frage manuell beenden, danach keine Buzzer mehr.
+  act(db, mod(), 'open', { index: 1 });
+  act(db, mod(), 'close');
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /nicht offen/);
+});
+
+test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung erst nach allen, alles oder nichts', () => {
+  const { db, ids } = setup(4);
+  use(db, 'weissnicht2');
+  act(db, mod(), 'open', { index: 0 });
+  assert.throws(() => act(db, team(ids[0]), 'buzz'), /Erst die eigene Antwort/);
+  act(db, team(ids[0]), 'submit', { ink });
+  act(db, team(ids[0]), 'buzz');
+  act(db, team(ids[1]), 'submit', { ink }); // nach dem Buzzer weiter abgeben
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /schneller/);
+  assert.equal(tv(db, ids[0]).guessTeams, null);
+  assert.throws(() => act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true } }), /alle Teams/);
+  act(db, team(ids[2]), 'submit', { ink });
+  act(db, team(ids[3]), 'submit', { ink });
+  assert.deepEqual(tv(db, ids[0]).guessTeams.sort(), [ids[1], ids[2], ids[3]].sort());
+  assert.equal(pv(db).answers.length, 0); // nichts öffentlich vor der Auswertung
+  assert.throws(() => act(db, team(ids[0]), 'guess', { guesses: {} }), /mindestens ein Team/);
+  act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true, [ids[2]]: false } });
+  for (const [i, ok] of [[0, true], [1, true], [2, false], [3, true]]) act(db, mod(), 'grade', { teamId: ids[i], correct: ok });
+  act(db, mod(), 'evaluate');
+  assert.equal(totals(db)[ids[0]], 3); // 2 richtige Einschätzungen + eigene Antwort
+  assert.equal(totals(db)[ids[1]], 0);
+  // Eine falsche Einschätzung → 0 für alle Einschätzungen, eigene Antwort zählt trotzdem.
+  act(db, mod(), 'open', { index: 1 });
+  for (const id of ids) act(db, team(id), 'submit', { ink });
+  act(db, team(ids[1]), 'buzz');
+  act(db, team(ids[1]), 'guess', { guesses: { [ids[0]]: true, [ids[2]]: true } });
+  for (const [i, ok] of [[0, true], [1, true], [2, false], [3, false]]) act(db, mod(), 'grade', { teamId: ids[i], correct: ok });
+  act(db, mod(), 'evaluate');
+  assert.equal(totals(db)[ids[1]], 1);
+});
+
+test('Keine Kon-Sequenz: Stufe beim Abschicken zählt, andere bleiben frei, Punkte erst nach Bestätigung', () => {
+  const { db, ids } = setup(3);
+  use(db, 'konsequenz', { points: '5, 4, 3, 2, 1', songs: [{ audio: { id: 'media_abcdefabcdef12', type: 'audio/mpeg', name: 's' }, title: 'Song', start: 0 }] });
+  act(db, mod(), 'open', { index: 0 });
+  assert.throws(() => act(db, team(ids[0]), 'submit', { ink }), /noch nicht angespielt/);
+  act(db, mod(), 'next'); // 0,1 s
+  act(db, team(ids[0]), 'submit', { ink });
+  act(db, mod(), 'next'); // 1 s
+  act(db, mod(), 'next'); // 3 s
+  act(db, team(ids[1]), 'submit', { ink });
+  assert.throws(() => act(db, team(ids[1]), 'submit', { ink }), /schon/);
+  act(db, mod(), 'grade', { teamId: ids[0], correct: true });
+  assert.throws(() => act(db, mod(), 'award'), /Noch nicht bewertet/);
+  act(db, mod(), 'grade', { teamId: ids[1], correct: true });
+  assert.equal(totals(db)[ids[0]], 0); // erst mit Bestätigung
+  act(db, mod(), 'award');
+  assert.equal(totals(db)[ids[0]], 5);
+  assert.equal(totals(db)[ids[1]], 3);
+  assert.throws(() => act(db, team(ids[2]), 'submit', { ink }), /geschlossen/);
+});
+
+test('Song Song Song: Buzzer sperrt keine anderen Teams, Prüfung in Buzzer-Reihenfolge', () => {
+  const { db, ids } = setup(3);
+  use(db, 'songsong', { puzzles: [{ audio: { id: 'media_abcdefabcdef12', type: 'audio/mpeg', name: 's' }, melody: 'A', lyrics: 'B' }] });
+  act(db, mod(), 'open', { index: 0 });
+  act(db, mod(), 'play');
+  act(db, team(ids[2]), 'submit', { ink });
+  act(db, team(ids[0]), 'submit', { ink }); // andere weiterhin frei
+  assert.ok(tv(db, ids[1]).canSubmit);
+  assert.deepEqual(pv(db).order.map((o) => o.teamId), [ids[2], ids[0]]);
+  act(db, mod(), 'judge', { correct: false }); // ids[2]: nur ein Titel richtig
+  act(db, mod(), 'judge', { correct: true }); // ids[0]: beide richtig
+  assert.equal(totals(db)[ids[0]], 1);
+  assert.equal(totals(db)[ids[2]], 0);
+  assert.throws(() => act(db, team(ids[1]), 'submit', { ink }), /beendet/);
+  assert.deepEqual(pv(db).solution, ['A', 'B']);
+});
+
+test('DankeGleichFalsch: falscher Begriff bleibt geheim, Timeout scheidet aus, Aussteigen sichert', () => {
+  const { db, ids } = setup(3);
+  use(db, 'dgf', { seconds: 60 });
+  act(db, mod(), 'open', { catIndex: 0 });
+  const st = db.live.games[db.live.activeGame];
+  const r = st.rounds[0];
+  const order = r.order;
+  const turnTeam = () => order[r.turn];
+  const right = r.board.filter((b) => !b.wrong);
+  const wrong = r.board.find((b) => b.wrong);
+  // Erstes Team: richtig, dann sichert es.
+  let a = turnTeam();
+  act(db, team(a), 'pick', { termId: right[0].id });
+  act(db, team(a), 'secure');
+  assert.equal(totals(db)[a], 1);
+  // Zweites Team wählt falsch: ausgeschieden, Begriff bleibt, ist nirgends als falsch erkennbar.
+  const b = turnTeam();
+  act(db, team(b), 'pick', { termId: wrong.id });
+  const beamer = pv(db);
+  assert.ok(beamer.board.some((x) => x.id === wrong.id && !x.gone));
+  assert.ok(beamer.board.every((x) => x.wrong === undefined));
+  assert.ok(tv(db, b).board.some((x) => x.id === wrong.id));
+  assert.equal(JSON.stringify(game.teamView(db, a)).includes(wrong.text) && JSON.stringify(game.teamView(db, a)).includes('"wrong":true'), false);
+  assert.equal(tv(db, b).out, 'wrong');
+  assert.equal(totals(db)[b] || 0, 0);
+  // Drittes Team lässt die Zeit ablaufen → ausgeschieden, Kategorie vorbei (niemand mehr im Spiel).
+  const c = turnTeam();
+  assert.notEqual(c, a);
+  game.tick(db, r.deadline + 1);
+  assert.equal(tv(db, c).out, 'timeout');
+  assert.ok(pv(db).done);
+  assert.ok(pv(db).board.some((x) => x.wrong === true)); // erst jetzt aufgedeckt
+});
+
+test('DankeGleichFalsch: alle 22 gefunden → Teams im Spiel bekommen ihre Punkte automatisch', () => {
+  const { db, ids } = setup(2);
+  use(db, 'dgf', { seconds: 60 });
+  act(db, mod(), 'open', { catIndex: 0 });
+  const r = db.live.games[db.live.activeGame].rounds[0];
+  for (const term of r.board.filter((x) => !x.wrong)) act(db, team(r.order[r.turn]), 'pick', { termId: term.id });
+  assert.ok(pv(db).done);
+  assert.equal(totals(db)[ids[0]] + totals(db)[ids[1]], 22);
+});
+
+test('Erst ich, dann du: sichern, zocken, falsch verliert Ungesichertes, Frage bleibt für andere', () => {
+  const { db, ids } = setup(3);
+  use(db, 'zocken');
+  act(db, mod(), 'open', { q: 0 });
+  act(db, team(ids[0]), 'buzz');
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /antwortet gerade/);
+  act(db, mod(), 'judge', { correct: true });
+  assert.equal(tv(db, ids[0]).streak, 1);
+  act(db, team(ids[0]), 'decide', { choice: 'zock' });
+  act(db, team(ids[0]), 'choose', { q: 5 });
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /allein/);
+  act(db, mod(), 'judge', { correct: true });
+  act(db, team(ids[0]), 'decide', { choice: 'zock' });
+  act(db, team(ids[0]), 'choose', { q: 6 });
+  act(db, mod(), 'judge', { correct: false }); // 2 ungesicherte weg
+  assert.equal(tv(db, ids[0]).streak, 0);
+  assert.equal(totals(db)[ids[0]], 0);
+  assert.ok(!pv(db).removed.includes(6));
+  assert.throws(() => act(db, team(ids[0]), 'buzz'), /gesperrt/);
+  act(db, team(ids[1]), 'buzz');
+  act(db, mod(), 'judge', { correct: true });
+  act(db, team(ids[1]), 'decide', { choice: 'secure' });
+  assert.equal(totals(db)[ids[1]], 1);
+  assert.deepEqual(pv(db).removed.sort((x, y) => x - y), [0, 5, 6]);
+});
+
+test('Habt ihr noch Fragen?: nur Frage öffentlich, 20 Sekunden, Wertung +1/−1 bzw. +2', () => {
+  const { db, ids } = setup(3);
+  use(db, 'fragen', { seconds: 20 });
+  act(db, mod(), 'open', { catIndex: 0 });
+  assert.throws(() => act(db, team(ids[0]), 'propose', { qInk: ink }), /Frage UND/);
+  act(db, team(ids[1]), 'propose', { qInk: ink, aInk: 'data:image/png;base64,QUFB' });
+  act(db, team(ids[0]), 'propose', { qInk: ink, aInk: 'data:image/png;base64,QUFB' }); // andere bleiben frei
+  act(db, mod(), 'reject', { teamId: ids[1], reason: 'privat' });
+  act(db, mod(), 'accept', { teamId: ids[0] });
+  const t0 = clock;
+  game.applyAction(db, { ...mod(), now: t0 }, 'play.publish', {});
+  const v = pv(db);
+  assert.equal(v.question, ink);
+  assert.equal(v.solution, null);
+  assert.ok(!JSON.stringify(v).includes('QUFB')); // hinterlegte Antwort nie auf dem Beamer
+  assert.equal(v.deadline - t0, 20000);
+  assert.throws(() => act(db, team(ids[0]), 'answer', { ink }), /eigene Frage/);
+  act(db, team(ids[1], t0 + 5000), 'answer', { ink });
+  assert.throws(() => act(db, team(ids[2], t0 + 25000), 'answer', { ink }), /abgelaufen/);
+  act(db, mod(), 'grade', { teamId: ids[1], correct: true });
+  assert.throws(() => game.applyAction(db, { ...mod(), now: t0 + 1000 }, 'play.evaluate', {}), /läuft noch/);
+  game.applyAction(db, { ...mod(), now: t0 + 21000 }, 'play.evaluate', {});
+  assert.equal(totals(db)[ids[1]], 1);
+  assert.equal(totals(db)[ids[0]], -1);
+});
+
+test('Das geht mir zu weit: Differenzen, Grenzen, +2/−1 und Gleichstand durch die Moderation', () => {
+  const { db, ids } = setup(3);
+  use(db, 'zuweit', { rounds: [
+    { task: 'Elemente', dataset: 'Chemische Elemente (Ordnungszahl)', mode: 'Kleinste Differenz', min: null, max: null, asOf: '', fixes: '', tie: 'Moderation entscheidet' },
+    { task: 'Präsidenten', dataset: 'US-Präsidenten (Alter beim ersten Amtsantritt)', mode: 'Größte Differenz', min: null, max: null, asOf: '', fixes: '', tie: 'Alle Gleichplatzierten bekommen die Punkte' },
+    { task: 'Schauspieler', dataset: 'Schauspieler/innen (Alter)', mode: 'Kleinste Differenz', min: 20, max: 60, asOf: '2026-10-26', fixes: '', tie: 'Moderation entscheidet' },
+  ] });
+  act(db, mod(), 'open', { index: 0 });
+  assert.throws(() => act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Gold' }), /unterschiedliche/);
+  assert.throws(() => act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Kryptonit' }), /aus der Liste/);
+  act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Quecksilber' }); // 79/80 → 1
+  act(db, team(ids[1]), 'submit', { a: 'Wasserstoff', b: 'Helium' }); // 1
+  act(db, team(ids[2]), 'submit', { a: 'Eisen', b: 'Gold' }); // 53
+  const res = act(db, mod(), 'evaluate', {});
+  assert.ok(res.notice); // Gleichstand auf Platz 1
+  act(db, mod(), 'resolveTie', { best: [ids[0], ids[1]] });
+  assert.deepEqual([totals(db)[ids[0]], totals(db)[ids[1]], totals(db)[ids[2]]], [2, 2, -1]);
+  // Trump zählt mit seinem ersten Amtsantritt 2017 (70 Jahre), nicht 2025.
+  act(db, mod(), 'open', { index: 1 });
+  act(db, team(ids[0]), 'submit', { a: 'Donald Trump', b: 'Theodore Roosevelt' });
+  act(db, team(ids[1]), 'submit', { a: 'John F. Kennedy', b: 'Barack Obama' });
+  act(db, team(ids[2]), 'submit', { a: 'Joe Biden', b: 'Ronald Reagan' });
+  act(db, mod(), 'evaluate', {});
+  const rows = pv(db).rows;
+  const trump = rows.find((x) => x.teamId === ids[0]);
+  assert.ok(Math.abs(trump.va - 70.6) < 0.1, String(trump.va));
+  assert.ok(trump.best);
+  // Außerhalb der Grenzen (Clint Eastwood > 60) ist ungültig und zählt als schlechtestes Ergebnis.
+  act(db, mod(), 'open', { index: 2 });
+  act(db, team(ids[0]), 'submit', { a: 'Clint Eastwood', b: 'Judi Dench' });
+  act(db, team(ids[1]), 'submit', { a: 'Emma Watson', b: 'Jennifer Lawrence' });
+  act(db, team(ids[2]), 'submit', { a: 'Ryan Gosling', b: 'Natalie Portman' });
+  const res3 = act(db, mod(), 'evaluate', {});
+  const r3 = pv(db).rows;
+  assert.equal(res3.notice, undefined, JSON.stringify(db.live.games[db.live.activeGame].rounds[2]));
+  assert.equal(r3.at(-1).teamId, ids[0]);
+  assert.equal(r3.at(-1).valid, false);
+  assert.ok(r3.find((x) => x.teamId === ids[1]).best);
+});
+
+test('Das geht mir zu weit: Korrekturen im Editor überschreiben die Datenbank', () => {
+  const { datasetByName, entriesFor } = require('../server/datasets');
+  const ds = datasetByName('Bundesliga-Tabelle (Platz)');
+  const list = entriesFor(ds, 'FC Bayern München; 3\nNeuer Verein; 19');
+  assert.equal(list.find((e) => e.name === 'FC Bayern München').value, 3);
+  assert.equal(list.find((e) => e.name === 'Neuer Verein').value, 19);
+});
+
+test('Brain or Dreh\'n: Joker, Glücksrad, Sperren, Reset nur Spielpunkte, Geheimnisse bleiben geheim', () => {
+  const { db, ids } = setup(3);
+  const [A, B, C] = ids;
+  ids.forEach((id, i) => game.applyAction(db, mod(), 'points.adjust', { teamId: id, points: 10 + i, reason: 'Vorher' }));
+  const g = use(db, 'brain');
+  const st = () => db.live.games[g.id];
+  act(db, mod(), 'start');
+  act(db, mod(), 'showQuestion');
+  const q0 = g.content.rounds[0].correct;
+  const wrong0 = ['A', 'B', 'C', 'D'].find((l) => l !== q0);
+  act(db, team(A), 'answer', { choice: q0 });
+  act(db, team(B), 'answer', { choice: q0 });
+  act(db, team(C), 'answer', { choice: wrong0 });
+  act(db, mod(), 'evaluate');
+  assert.equal(tv(db, A).points, 1);
+  assert.ok(!('points' in pv(db)) || pv(db).points === undefined);
+  act(db, mod(), 'openWheel');
+  assert.throws(() => act(db, team(C), 'wheelBuzz'), /richtiger Antwort/);
+  act(db, team(B), 'wheelBuzz');
+  assert.throws(() => act(db, team(A), 'wheelBuzz'), /schneller/);
+  act(db, team(B), 'spin');
+  assert.ok(pv(db).wheel.spin.field);
+  // Joker gezielt in den Vorrat legen, um die Wirkungen zu prüfen.
+  const s = st();
+  s.t[A].jokers = [{ id: 'jd', key: 'detektiv' }, { id: 'jr', key: 'raeuber' }];
+  s.t[B].jokers = [{ id: 'jt', key: 'tausch' }];
+  s.t[C].jokers = [];
+  act(db, mod(), 'next');
+  // Detektiv: A beobachtet B heimlich.
+  act(db, team(A), 'useJoker', { jokerId: 'jd', target: B });
+  assert.throws(() => act(db, team(B), 'useJoker', { jokerId: 'jt', target: A }), /schon ein Joker/);
+  assert.equal(pv(db).joker.secret, true);
+  assert.ok(!JSON.stringify(game.teamView(db, B)).includes('detektiv'));
+  act(db, mod(), 'showQuestion');
+  assert.throws(() => act(db, team(A), 'answer', { choice: 'A' }), /beobachtete Team/);
+  assert.equal(tv(db, A).detective.answer, null);
+  act(db, team(B), 'answer', { choice: 'C' });
+  assert.equal(tv(db, A).detective.answer, 'C');
+  assert.equal(tv(db, C).detective, null);
+  act(db, team(A), 'answer', { choice: 'C' });
+  act(db, mod(), 'evaluate');
+  // Punkteräuber mit weniger als 2 beim Opfer: nur was da ist, nie unter 0.
+  s.t[C].points = 1;
+  act(db, mod(), 'next');
+  act(db, team(A), 'useJoker', { jokerId: 'jr', target: C });
+  assert.equal(s.t[C].points, 0);
+  // Reset betrifft nur die Spielpunkte, nicht den Show-Gesamtstand.
+  const before = totals(db)[A];
+  s.t[A].points = 5;
+  require('../server/play-brain'); // Wirkung direkt über das Rad simulieren:
+  s.r.phase = 'wheel'; s.r.correct = [A]; s.r.buzz = A; s.r.spin = null;
+  const orig = Math.random;
+  const core = require('../server/core');
+  const ri = core.randomInt;
+  // Rad deterministisch auf „Reset“ (Index 15) stellen.
+  core.randomInt = () => 15;
+  try { act(db, team(A), 'spin'); } finally { core.randomInt = ri; Math.random = orig; }
+  assert.equal(s.t[A].points, 0);
+  assert.equal(totals(db)[A], before);
+  // Spiel beenden: Spielpunkte gehen einmalig in den Gesamtstand.
+  s.t[B].points = 4;
+  act(db, mod(), 'finish');
+  assert.equal(totals(db)[B], 11 + 4);
+  act(db, mod(), 'finish'); // doppelt: keine doppelten Punkte
+  assert.equal(totals(db)[B], 11 + 4);
+});
+
+test('Brain or Dreh\'n: Antworttausch wertet die getauschte Antwort, Original des Gegners bleibt', () => {
+  const { db, ids } = setup(2);
+  const [A, B] = ids;
+  const g = use(db, 'brain');
+  act(db, mod(), 'start');
+  db.live.games[g.id].t[A].jokers = [{ id: 'jt', key: 'tausch' }];
+  act(db, team(A), 'useJoker', { jokerId: 'jt', target: B });
+  act(db, mod(), 'showQuestion');
+  const right = g.content.rounds[0].correct;
+  const wrong = ['A', 'B', 'C', 'D'].find((l) => l !== right);
+  act(db, team(A), 'answer', { choice: wrong });
+  assert.equal(tv(db, A).swap.ready, false);
+  act(db, team(B), 'answer', { choice: right });
+  assert.equal(tv(db, A).swap.theirs, right);
+  assert.equal(tv(db, B).swap, null); // B erfährt nichts
+  act(db, team(A), 'swap', { swap: true });
+  act(db, mod(), 'evaluate');
+  assert.equal(tv(db, A).points, 1);
+  assert.equal(tv(db, B).points, 1);
+  assert.equal(db.live.games[g.id].r.answers[B].choice, right);
+});
