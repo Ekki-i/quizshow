@@ -174,3 +174,7 @@ Noch offen (nächste Phasen laut Masterprompt):
 - Versionen und Archiv-Snapshots von Shows.
 - QR-Codes, Co-Moderator-Rechte, Test-/Vorschaumodus ohne echte Punkte.
 - Medien-Uploads, Musik, editierbare Design-Tokens im Editor, Handschrift-Eingabe mit Stylus.
+
+## Mitspielen per QR-Code
+
+Auf dem Startbild des Beamers erscheint unten rechts ein QR-Code. Er enthält immer die aktuelle WLAN-Adresse des Show-Rechners (z. B. `http://192.168.2.38:3000/`) – an jedem Ort und in jedem WLAN automatisch richtig. Teams scannen ihn mit der Kamera des iPads und landen direkt auf der Startseite zum Beitreten.

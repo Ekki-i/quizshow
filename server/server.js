@@ -197,6 +197,12 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true });
 
+    // Adresse für den QR-Code auf dem Beamer: die aktuelle WLAN-Adresse dieses Rechners
+    // (wechselt mit dem Netz, deshalb bei jedem Aufruf neu ermittelt).
+    if (req.method === 'GET' && url.pathname === '/api/join') {
+      return sendJson(res, 200, { urls: lanAddresses().map((a) => `http://${a}:${PORT}/`) });
+    }
+
     // Teamliste für die Startseite: nur Namen und Farben, niemals Zugangscodes.
     if (req.method === 'GET' && url.pathname === '/api/teams') {
       return sendJson(res, 200, store.data.project.teams.map((t) => ({ id: t.id, name: t.name, color: t.color })));
@@ -386,13 +392,30 @@ setInterval(() => {
 }, 15000).unref();
 
 ensureModeratorPassword();
+// WLAN-Adressen, die beste zuerst: private Netze (192.168…, 10…, 172.16–31…),
+// WLAN/Ethernet (en0, en1, wlan, eth) vor virtuellen Adaptern (VPN, Docker, Bridges).
+function lanAddresses() {
+  const out = [];
+  for (const [name, list] of Object.entries(require('os').networkInterfaces())) {
+    for (const n of list || []) {
+      if (n.family !== 'IPv4' && n.family !== 4) continue;
+      if (n.internal || n.address.startsWith('169.254.')) continue;
+      const a = n.address;
+      const priv = /^192\.168\./.test(a) || /^10\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
+      const real = /^(en|eth|wlan|wl|Wi-?Fi|WLAN|Ethernet)/i.test(name) && !/^(utun|tun|tap|docker|br-|bridge|vbox|vmnet|awdl|llw)/i.test(name);
+      out.push({ a, score: (priv ? 2 : 0) + (real ? 1 : 0) });
+    }
+  }
+  return out.sort((x, y) => y.score - x.score).map((x) => x.a);
+}
+
 server.listen(PORT, () => {
   console.log(`„Wer stiehlt uns die Show“ läuft auf http://localhost:${PORT}`);
   // Adressen im WLAN für iPads und Beamer anzeigen.
-  const nets = Object.values(require('os').networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal);
+  const nets = lanAddresses();
   if (nets.length) {
-    console.log('\n  iPads und Beamer im selben WLAN öffnen:');
-    for (const n of nets) console.log(`    http://${n.address}:${PORT}`);
+    console.log('\n  iPads und Beamer im selben WLAN öffnen (oder QR-Code auf dem Beamer scannen):');
+    for (const a of nets) console.log(`    http://${a}:${PORT}`);
   }
   console.log('\n  Passwort für Regie und Editor: fabian');
   console.log('  Dieses Fenster während der Show offen lassen. Beenden mit Strg+C.\n');

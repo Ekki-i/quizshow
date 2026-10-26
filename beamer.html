@@ -26,6 +26,7 @@
     import { answerContent } from './assets/js/ink.js';
     import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
     import { studioRoom } from './assets/js/studio-room.js';
+    import { qrcode } from './assets/js/vendor/qrcode.js';
     import { startPause, stopPause, bandScene, audioReady, preloadSongs } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
@@ -248,7 +249,37 @@
       return [
         showLogo(s.show.name),
         s.show.subtitle ? h('div', { class: 'sub', style: { marginTop: '3vh' } }, s.show.subtitle) : '',
+        s.view === 'start' ? joinQr() : '',
       ];
+    }
+
+    // QR-Code zum Mitspielen: zeigt immer die aktuelle WLAN-Adresse des Show-Rechners
+    // (an jedem Ort automatisch richtig). Läuft der Beamer selbst über diese Adresse,
+    // wird sie direkt übernommen, sonst fragt er den Server.
+    let joinUrl;
+    function fillQr(box) {
+      if (!joinUrl) { box.hidden = true; return; }
+      const qr = qrcode(0, 'M');
+      qr.addData(joinUrl);
+      qr.make();
+      const img = document.createElement('div');
+      img.className = 'join-qr-code';
+      img.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true, alt: 'QR-Code zum Mitspielen' });
+      box.hidden = false;
+      box.replaceChildren(h('b', {}, 'Mitspielen'), img, h('small', {}, joinUrl.replace(/^http:\/\//, '').replace(/\/$/, '')));
+    }
+    function joinQr() {
+      const box = h('div', { class: 'join-qr', hidden: true });
+      if (embedded) return box;
+      if (joinUrl !== undefined) { fillQr(box); return box; }
+      const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
+      if (/^https?:$/.test(location.protocol) && !local) { joinUrl = `${location.origin}/`; fillQr(box); return box; }
+      joinUrl = null;
+      fetch('api/join').then((r) => r.json()).then((j) => {
+        joinUrl = (j.urls && j.urls[0]) || null;
+        document.querySelectorAll('.join-qr').forEach(fillQr);
+      }).catch(() => {});
+      return box;
     }
 
     // Teampulte (gezeichnet), Avatar im Bogen. Punkte nur, wenn opts.points (Münzvergabe).
