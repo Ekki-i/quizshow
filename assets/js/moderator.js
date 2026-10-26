@@ -8,7 +8,7 @@ if (!token) location.href = 'index.html';
 let S = null; // letzter Zustand vom Server
 // Ansicht: ?view=live (nur Moderation), ?view=editor (nur Editor), sonst beides.
 const VIEW = new URLSearchParams(location.search).get('view');
-const LIVE_TABS = ['live', 'points'];
+const LIVE_TABS = ['live'];
 const EDITOR_TABS = ['teams', 'editor', 'library'];
 const ALLOWED = VIEW === 'editor' ? EDITOR_TABS : VIEW === 'live' ? LIVE_TABS : [...LIVE_TABS, ...EDITOR_TABS];
 const TAB_KEY = `quiz.modTab${VIEW ? `.${VIEW}` : ''}`;
@@ -418,15 +418,39 @@ function buildBeamerControls() {
   return [status, second];
 }
 
+// Rangliste in der Regie: Punkte nachträglich von Hand anpassen (wird protokolliert).
 function buildTeamsLive() {
   const sorted = [...S.project.teams].sort((a, b) => S.totals[b.id] - S.totals[a.id]);
-  return card('Teams live (nur für dich sichtbar)',
-    sorted.length ? h('ul', { class: 'list' }, sorted.map((t) => {
+  const adjust = (t, points, reason = 'Manuell in der Regie') => act('points.adjust', { teamId: t.id, points, reason });
+  const custom = async (t) => {
+    const v = await ask(`Punkte für ${t.name} anpassen`, {
+      confirmLabel: 'Buchen',
+      fields: [{ name: 'points', label: 'Punkte (z. B. 3 oder -2)', type: 'number', value: '' }, { name: 'reason', label: 'Grund (optional)', value: '' }],
+    });
+    if (!v) return;
+    const n = Number(v.points);
+    if (!Number.isInteger(n) || n === 0) return toast('Bitte eine ganze Zahl ungleich 0 eingeben.');
+    adjust(t, n, v.reason ? `Regie: ${v.reason}` : undefined);
+  };
+  return card('Rangliste (nur für dich sichtbar)',
+    sorted.length ? h('ul', { class: 'list leader' }, sorted.map((t, i) => {
       const online = S.connections.teams?.[t.id];
-      return h('li', {}, dot(t.color), h('span', { class: 'grow' }, t.name),
-        h('span', { class: `badge ${online ? 'ok' : 'warn'}` }, online ? '● online' : '○ offline'),
-        h('b', {}, `${S.totals[t.id]} P.`));
-    })) : h('p', { class: 'muted' }, 'Noch keine Teams angelegt.'));
+      return h('li', {}, h('b', { class: 'rank-n' }, `${i + 1}.`), dot(t.color), h('span', { class: 'grow' }, t.name),
+        h('span', { class: `badge ${online ? 'ok' : 'warn'}`, title: online ? 'iPad verbunden' : 'iPad nicht verbunden' }, online ? '●' : '○'),
+        h('button', { class: 'btn small ghost pt-btn', 'aria-label': `${t.name}: 1 Punkt abziehen`, onclick: () => adjust(t, -1) }, '−1'),
+        h('b', { class: 'pts' }, `${S.totals[t.id]} P.`),
+        h('button', { class: 'btn small ghost pt-btn', 'aria-label': `${t.name}: 1 Punkt dazu`, onclick: () => adjust(t, 1) }, '+1'),
+        h('button', { class: 'btn small ghost pt-btn', title: 'Andere Punktzahl', 'aria-label': `${t.name}: Punkte anpassen`, onclick: () => custom(t) }, '±'));
+    })) : h('p', { class: 'muted' }, 'Noch keine Teams angelegt.'),
+    lastManual());
+}
+
+// Letzte Handbuchung mit Rückgängig-Knopf (Gegenbuchung).
+function lastManual() {
+  const e = [...(S.ledger || [])].reverse().find((x) => x.ref && x.ref.startsWith('manual:') && !x.reversedBy && !x.reverses);
+  if (!e) return null;
+  return h('p', { class: 'muted', style: { fontSize: '0.85rem', marginTop: '8px' } }, `Zuletzt: ${teamName(e.teamId)} ${e.points > 0 ? '+' : ''}${e.points} `,
+    h('button', { class: 'btn small ghost', onclick: () => act('points.undo', { entryId: e.id }) }, '↶ rückgängig'));
 }
 
 function buildCoins() {
@@ -472,7 +496,7 @@ async function shrinkImage(file) {
   }
 }
 
-function avatarCell(t) {
+function avatarCell(t, showId) {
   const input = h('input', {
     type: 'file', accept: 'image/png,image/webp,image/jpeg', class: 'visually-hidden', 'aria-label': `3D-Avatar für ${t.name} wählen`,
     onchange: async (ev) => {
@@ -480,16 +504,16 @@ function avatarCell(t) {
       ev.target.value = '';
       if (!file) return;
       try {
-        act('team.update', { teamId: t.id, avatar: await shrinkImage(file) });
+        act('team.update', { showId, teamId: t.id, avatar: await shrinkImage(file) });
       } catch (err) {
         toast(err.message);
       }
     },
   });
   return h('div', { class: 'avatar-cell' },
-    t.avatar ? h('img', { class: 'avatar-thumb', src: t.avatar, alt: `Avatar von ${t.name}` }) : h('span', { class: 'avatar-empty', title: 'Kein Avatar – das Pult bleibt leer' }, '–'),
-    h('label', { class: 'btn small ghost' }, input, t.avatar ? 'Ändern' : 'Avatar wählen'),
-    t.avatar ? h('button', { class: 'btn small ghost', onclick: () => act('team.update', { teamId: t.id, avatar: null }) }, 'Entfernen') : null);
+    t.avatar ? h('img', { class: 'avatar-thumb', src: t.avatar, alt: `Avatar von ${t.name}` }) : t.hasAvatar ? h('span', { class: 'badge ok' }, '✓ Avatar') : h('span', { class: 'avatar-empty', title: 'Kein Avatar – das Pult bleibt leer' }, '–'),
+    h('label', { class: 'btn small ghost' }, input, t.avatar || t.hasAvatar ? 'Ändern' : 'Avatar wählen'),
+    t.avatar || t.hasAvatar ? h('button', { class: 'btn small ghost', onclick: () => act('team.update', { showId, teamId: t.id, avatar: null }) }, 'Entfernen') : null);
 }
 
 // 3D-Avatar für Moderation bzw. Co-Moderation (steht hinter dem Moderationspult; ohne Bild der Standard-Avatar)
@@ -511,33 +535,55 @@ function hostAvatarCell(label, key) {
     cur ? h('button', { class: 'btn small ghost', onclick: () => act('project.update', { [key]: null }) }, 'Standard-Avatar') : h('span', { class: 'muted' }, 'Standard-Avatar')));
 }
 
+// Teams je Show: Die Auswahl oben legt fest, für welche Show die Teams bearbeitet werden –
+// so lassen sich mehrere Shows mit wechselnden Teams im Voraus vorbereiten.
+let teamsShow = null;
 function buildTeams() {
   const base = `${location.origin}${location.pathname.replace(/moderator\.html$/, '')}team.html?code=`;
+  const others = S.showTeams || [];
+  if (teamsShow && !others.some((x) => x.id === teamsShow)) teamsShow = null;
+  const other = teamsShow ? others.find((x) => x.id === teamsShow) : null;
+  const showId = other ? other.id : undefined;
+  const teams = other ? other.teams : S.project.teams;
+  const showName = other ? other.name : S.project.name;
+  const sel = h('select', { id: 'teams-show', onchange: (ev) => { teamsShow = ev.target.value === 'current' ? null : ev.target.value; renderAll(true); } },
+    h('option', { value: 'current', selected: !other }, `${S.project.name} (geöffnet)`),
+    others.map((x) => h('option', { value: x.id, selected: other && other.id === x.id }, `${x.name}${x.date ? ` · ${fmtDate(x.date)}` : ''}`)));
+  const allShows = [{ id: S.project.id, name: S.project.name }, ...others].filter((x) => x.id !== (other ? other.id : S.project.id));
+  const copySel = h('select', { 'aria-label': 'Teams übernehmen aus' }, allShows.map((x) => h('option', { value: x.id }, x.name)));
+  const hasPoints = other ? other.hasPoints : (S.ledger || []).length > 0;
   return [
+    card('Teams für Show',
+      h('div', { class: 'row' }, h('label', { for: 'teams-show', style: { margin: 0 } }, 'Show:'), sel),
+      h('p', { class: 'muted' }, 'Jede Show hat ihre eigenen Teams mit eigenen Zugangscodes. Wähle eine Show, um ihre Teams schon vorab einzutragen – auch ohne sie zu öffnen.'),
+      allShows.length ? h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Teams übernehmen aus:'), copySel,
+        h('button', { class: 'btn small ghost', disabled: hasPoints, title: hasPoints ? 'Diese Show hat schon Punkte.' : '',
+          onclick: () => confirmAct(`Die Teams von „${showName}“ durch die Teams der gewählten Show ersetzen? (neue Zugangscodes)`, 'teams.copyFrom', { showId: other ? other.id : S.project.id, fromShowId: copySel.value }) }, 'Übernehmen')) : null),
     card('Team anlegen',
       h('form', {
         class: 'row', onsubmit: (ev) => {
           ev.preventDefault();
           const name = ev.target.elements.name.value;
-          act('team.add', { name });
+          act('team.add', { showId, name });
           ev.target.reset();
         },
       }, h('input', { name: 'name', placeholder: 'Teamname', maxlength: '40', style: { flex: '1 1 220px', width: 'auto' } }),
       h('button', { class: 'btn', type: 'submit' }, '+ Team hinzufügen')),
-      h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen geheimen Zugangscode und einen persönlichen Link.'),
+      h('p', { class: 'muted' }, 'Standard sind sechs Teams. Jedes Team bekommt einen kurzen Zugangscode (4 Ziffern) und einen persönlichen Link.'),
       h('p', { class: 'muted' }, '3D-Avatar: am besten ein freigestelltes PNG (transparenter Hintergrund), hochkant. Er steht auf dem Beamer im Bogen hinter dem Pult; ohne Avatar bleibt das Pult leer.')),
-    card(`Teams (${S.project.teams.length})`,
-      S.project.teams.length ? h('table', {},
+    card(`Teams von „${showName}“ (${teams.length})`,
+      teams.length ? h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, 'Farbe'), h('th', {}, 'Name'), h('th', {}, '3D-Avatar'), h('th', {}, 'Zugangscode / Link'), h('th', {}, ''))),
-        h('tbody', {}, S.project.teams.map((t) => h('tr', {},
-          h('td', {}, h('input', { type: 'color', value: t.color, 'aria-label': `Farbe ${t.name}`, style: { width: '56px', padding: '2px' }, onchange: (ev) => act('team.update', { teamId: t.id, color: ev.target.value }) })),
-          h('td', {}, h('input', { value: t.name, maxlength: '40', 'aria-label': 'Teamname', onchange: (ev) => act('team.update', { teamId: t.id, name: ev.target.value }) })),
-          h('td', {}, avatarCell(t)),
+        h('tbody', {}, teams.map((t) => h('tr', {},
+          h('td', {}, h('input', { type: 'color', value: t.color, 'aria-label': `Farbe ${t.name}`, style: { width: '56px', padding: '2px' }, onchange: (ev) => act('team.update', { showId, teamId: t.id, color: ev.target.value }) })),
+          h('td', {}, h('input', { value: t.name, maxlength: '40', 'aria-label': 'Teamname', onchange: (ev) => act('team.update', { showId, teamId: t.id, name: ev.target.value }) })),
+          h('td', {}, avatarCell(t, showId)),
           h('td', {}, h('div', { class: 'code' }, t.code),
-            h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(base + t.code)).then(() => toast('Link kopiert', 'info'), () => toast(`Kopieren nicht möglich. Link: ${base + t.code}`, 'info')) }, 'Link kopieren')),
+            other ? h('span', { class: 'muted', style: { fontSize: '0.8rem' } }, 'gilt, sobald die Show geöffnet ist')
+              : h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(base + t.code)).then(() => toast('Link kopiert', 'info'), () => toast(`Kopieren nicht möglich. Link: ${base + t.code}`, 'info')) }, 'Link kopieren')),
           h('td', {}, h('div', { class: 'row' },
-            h('button', { class: 'btn small ghost', onclick: () => confirmAct(`Neuen Code für ${t.name} erzeugen? Der alte Code und verbundene Geräte werden ungültig.`, 'team.regenCode', { teamId: t.id }) }, 'Neuer Code'),
-            h('button', { class: 'btn small bad', onclick: () => confirmAct(`Team ${t.name} löschen?`, 'team.remove', { teamId: t.id }) }, 'Löschen'))))))) : h('p', { class: 'muted' }, 'Noch keine Teams.')),
+            h('button', { class: 'btn small ghost', onclick: () => confirmAct(`Neuen Code für ${t.name} erzeugen? Der alte Code und verbundene Geräte werden ungültig.`, 'team.regenCode', { showId, teamId: t.id }) }, 'Neuer Code'),
+            h('button', { class: 'btn small bad', onclick: () => confirmAct(`Team ${t.name} löschen?`, 'team.remove', { showId, teamId: t.id }) }, 'Löschen'))))))) : h('p', { class: 'muted' }, 'Noch keine Teams.')),
   ];
 }
 

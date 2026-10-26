@@ -4,6 +4,7 @@
 import { h, run, ask, toast, coinImg } from './client.js';
 import { inkPad, answerContent } from './ink.js';
 import { mapView } from './map.js';
+import { podiumRow } from './studio.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
@@ -110,12 +111,14 @@ function dummes(g, ui) {
     return out;
   }
   if (g.swapTargets) {
-    out.push(stateBox('ok', '🔔', 'Ihr wart am schnellsten! Mit wem tauscht ihr eure Antwort?'));
-    out.push(h('div', { class: 'row' }, g.swapTargets.map((t) => h('button', {
-      class: 'btn huge', onclick: async () => {
-        run(ui.conn, 'play.swap', { teamId: t.id }); // sofort, ohne Rückfrage
-      },
-    }, t.name))));
+    out.push(stateBox('ok', '🔔', 'Ihr wart am schnellsten! Tippt auf das Pult des Teams, mit dem ihr eure Antwort tauscht.'));
+    // Teampulte wie auf dem Beamer; das eigene Team (und nicht wählbare) sind ausgegraut.
+    const allowed = new Set(g.swapTargets.map((t) => t.id));
+    const teams = (ui.teams || []).length ? ui.teams : g.swapTargets;
+    out.push(h('div', { class: 'swap-podiums' }, podiumRow(teams, {
+      onPick: (id) => run(ui.conn, 'play.swap', { teamId: id }), // sofort, ohne Rückfrage
+      disabledIds: teams.filter((t) => !allowed.has(t.id)).map((t) => t.id),
+    })));
     return out;
   }
   if (g.swapDone) return [...out, stateBox('ok', '🔁', 'Tausch erledigt – gleich wird aufgelöst.')];
