@@ -69,7 +69,7 @@ function listen(port) {
     console.log('');
     console.log('  Prototyp „Wer stiehlt uns die Show“ läuft:');
     console.log(`  ${url}`);
-    console.log('  Moderator-Passwort: demo');
+    console.log('  Moderator-Passwort: fabian');
     console.log('');
     console.log('  Dieses Fenster offen lassen. Zum Beenden schließen oder Strg+C drücken.');
     if (!process.argv.includes('--no-open')) openBrowser(url);

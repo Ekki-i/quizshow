@@ -7,7 +7,7 @@ elif command -v python3 >/dev/null 2>&1; then
   PORT=8080
   echo ""
   echo "  Quizshow-Prototyp läuft: http://localhost:$PORT/prototype.html"
-  echo "  Moderator-Passwort: demo"
+  echo "  Moderator-Passwort: fabian"
   echo "  Dieses Fenster offen lassen. Zum Beenden schließen oder Ctrl+C drücken."
   (sleep 1; open "http://localhost:$PORT/prototype.html") &
   python3 -m http.server "$PORT" --bind 127.0.0.1

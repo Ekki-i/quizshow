@@ -5,7 +5,7 @@
 
 import { game } from './game-bundle.js';
 
-const PASSWORD = 'demo';
+const PASSWORD = 'fabian';
 const DEMO_TOKEN = 'demo-token';
 const STORAGE_KEY = 'quiz.prototype.state.v4';
 const DEMO_TEAMS = [
@@ -232,7 +232,7 @@ export function createLocalServer() {
     api(name, body) {
       if (name === 'teams') return [200, data.project.teams.map((t) => ({ id: t.id, name: t.name, color: t.color }))];
       if (name === 'login') {
-        return body.password === PASSWORD ? [200, { token: DEMO_TOKEN }] : [401, { error: 'Passwort ist falsch. Im Prototyp lautet es „demo“.' }];
+        return body.password === PASSWORD ? [200, { token: DEMO_TOKEN }] : [401, { error: 'Passwort ist falsch. Es lautet „fabian“.' }];
       }
       return [200, { ok: true }];
     },
