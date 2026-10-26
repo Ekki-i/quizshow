@@ -22,6 +22,7 @@
   <script type="module">
     import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
     import { renderGame } from './assets/js/beamer-play.js';
+    import { setMediaEnv, syncMedia, soundEnabled } from './assets/js/beamer-extra.js';
     import { answerContent } from './assets/js/ink.js';
     import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
     import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
@@ -52,7 +53,10 @@
       const v = document.querySelector('video.intro-video');
       if (v) v.muted = false;
       if (gameIntro) { gameIntro.muted = false; gameIntro.play().catch(() => {}); }
+      soundEnabled();
     }
+    // Filmclips und Musik der Datenbank-Spiele: Ton nur auf dem echten Beamer nach „Ton aktivieren“.
+    setMediaEnv({ soundOn: () => !!audio && !embedded });
     document.getElementById('sound-on').onclick = enableSound;
 
     // ---------- Vollbild für Leinwand/Beamer ----------
@@ -181,6 +185,7 @@
       clearTimeout(titleTimer);
 
       lastState = s;
+      syncMedia(s);
       // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
       if (s.view !== 'pause') stopPause();
       if (!['title', 'finaleTitle', 'stageTitle'].includes(s.view)) stopGameIntro();

@@ -4,7 +4,8 @@
 // WebSockets, damit sie direkt getestet werden kann.
 
 const crypto = require('crypto');
-const { TYPES, DEFAULT_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
+const { DATASETS } = require('./datasets');
+const { TYPES, DEFAULT_ORDER, LIBRARY_ORDER, EXTRA_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
 const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage } = require('./core');
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
@@ -20,6 +21,17 @@ const PLAY = {
   musik: require('./play-musik'),
   jauch: require('./play-jauch'),
   nerd: require('./play-nerd'),
+  dumm3: require('./play-dumm3'),
+  filmab: require('./play-filmab'),
+  weissnicht: require('./play-weissnicht'),
+  weissnicht2: require('./play-weissnicht2'),
+  konsequenz: require('./play-konsequenz'),
+  songsong: require('./play-songsong'),
+  dgf: require('./play-dgf'),
+  zocken: require('./play-zocken'),
+  fragen: require('./play-fragen'),
+  zuweit: require('./play-zuweit'),
+  brain: require('./play-brain'),
 };
 
 const STATE_VERSION = 2;
@@ -94,10 +106,12 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
 }
 
 function createState(now = Date.now()) {
-  const library = DEFAULT_ORDER.map((type) => libraryEntry(type, now));
+  // Die Datenbank enthält alle Spielarten; die neue Show nur die acht Standardspiele.
+  const library = LIBRARY_ORDER.map((type) => libraryEntry(type, now));
   return {
     version: STATE_VERSION,
     library,
+    libraryTypesAdded: [...EXTRA_ORDER],
     project: newProject(library),
     live: freshLive(),
     ledger: [],
@@ -118,6 +132,13 @@ function migrate(db) {
     if (db.project.host === 'Moderation') db.project.host = 'Fabian';
     if (!db.project.coHostDefaulted) { if (!db.project.coHost) db.project.coHost = 'Alexia'; db.project.coHostDefaulted = true; }
     if (!db.project.finale) db.project.finale = clone(FINALE.EXAMPLE);
+    // Neue Spielarten einmalig in die Datenbank aufnehmen – nur ergänzen, nichts ändern.
+    db.libraryTypesAdded = db.libraryTypesAdded || [];
+    for (const type of EXTRA_ORDER) {
+      if (db.libraryTypesAdded.includes(type)) continue;
+      if (!db.library.some((e) => e.type === type)) db.library.push(libraryEntry(type, Date.now()));
+      db.libraryTypesAdded.push(type);
+    }
     for (const sh of db.shows) {
       if (!sh.project.finale) sh.project.finale = clone(FINALE.EXAMPLE);
       if (sh.live.finale === undefined) sh.live.finale = null;
@@ -230,6 +251,14 @@ function sanitizeField(f, v) {
       return v;
     case 'object':
       return sanitizeFields(f.fields, v);
+    case 'media': {
+      // Verweis auf eine hochgeladene Datei (Video, Audio oder Bild) im Medienspeicher.
+      if (v === undefined || v === null || v === '') return null;
+      if (typeof v !== 'object' || typeof v.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(v.id)) fail(`„${f.label}“: ungültige Datei.`);
+      const ok = { video: /^video\//, audio: /^(audio|video)\//, image: /^image\/(png|jpeg|webp)$/ }[f.accept] || /^$/;
+      if (typeof v.type !== 'string' || !ok.test(v.type)) fail(`„${f.label}“: falscher Dateityp.`);
+      return { id: v.id, type: v.type, name: String(v.name || 'Datei').slice(0, 100), size: Number(v.size) || 0 };
+    }
     case 'list': {
       const arr = Array.isArray(v) ? v : [];
       if (arr.length < f.min || arr.length > f.max) {
@@ -908,8 +937,18 @@ const moderatorActions = {
 
 // Führt eine Aktion aus. Eine Aktions-ID wird nur einmal verarbeitet, sodass
 // doppelt gesendete Nachrichten keine doppelten Punkte oder Abgaben erzeugen.
+// Zeitabläufe (z. B. abgelaufene Countdowns) in den Spielzustand übernehmen.
+// Gibt true zurück, wenn sich etwas geändert hat.
+function tick(db, now = Date.now()) {
+  const g = activeGame(db);
+  const fn = g && PLAY[g.type].tick;
+  if (!fn) return false;
+  return !!fn(db, { role: 'system', actor: 'system', now }, g, gameState(db, g));
+}
+
 function applyAction(db, ctx, name, payload, actionId) {
   if (actionId && db.processed.includes(actionId)) return { duplicate: true };
+  tick(db, ctx.now);
   let result;
   // Für „Rückgängig“ im Finale: Zustand vor jeder Finale-Aktion merken.
   const before = typeof name === 'string' && FINALE_UNDOABLE(name) && db.live.finale ? clone(db.live.finale) : null;
@@ -948,11 +987,20 @@ function rememberFinale(db, name, before) {
 }
 
 // Alle Medien, auf die irgendeine Show noch verweist (für das Aufräumen).
+// Alle Medienverweise in Spielinhalten (Datenbank und Shows), z. B. Filmclips oder Bilder.
+function collectMedia(v, ids) {
+  if (!v || typeof v !== 'object') return;
+  if (Array.isArray(v)) { v.forEach((x) => collectMedia(x, ids)); return; }
+  if (typeof v.id === 'string' && /^media_/.test(v.id) && typeof v.type === 'string') ids.add(v.id);
+  for (const x of Object.values(v)) collectMedia(x, ids);
+}
+
 function referencedMedia(db) {
   const ids = new Set();
+  for (const e of db.library || []) collectMedia(e.content, ids);
   for (const pr of [db.project, ...db.shows.map((x) => x.project)]) {
     if (pr.introVideo) ids.add(pr.introVideo.id);
-    for (const g of pr.games) if (g.intro) ids.add(g.intro.id);
+    for (const g of pr.games) { if (g.intro) ids.add(g.intro.id); collectMedia(g.content, ids); }
     if (pr.finaleIntro) ids.add(pr.finaleIntro.id);
     Object.values(pr.stages || {}).forEach((st) => { if (st && st.intro) ids.add(st.intro.id); });
     for (const st of pr.rundown || []) for (const m of st.songs || []) ids.add(m.id);
@@ -1063,6 +1111,8 @@ function moderatorView(db, connections) {
     shows: showList(db),
     library: db.library,
     types: publicTypes(),
+    // Vergleichs-Datenbanken für „Das geht mir zu weit“ (zum Prüfen im Editor).
+    datasets: DATASETS.map((d) => ({ name: d.name, kind: d.kind, unit: d.unit, source: d.source, asOf: d.asOf, method: d.method, fixHelp: d.fixHelp, entries: d.entries })),
     showSize: SHOW_SIZE,
     live: { ...db.live, finaleHistory: undefined },
     totals: totals(db),
@@ -1083,6 +1133,7 @@ function moderatorView(db, connections) {
 module.exports = {
   QuizError,
   referencedMedia,
+  tick,
   createState,
   migrate,
   applyAction,
