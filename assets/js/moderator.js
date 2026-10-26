@@ -122,7 +122,9 @@ function renderLive() {
   const step = (S.rundown || [])[S.live.run ?? -1];
   const finaleOn = !S.live.activeGame && (S.live.finale || step?.kind === 'finale');
   document.getElementById('live-left').replaceChildren(finaleOn ? buildFinaleLive(finaleUi()) : buildGameControl());
-  document.getElementById('live-bottom').replaceChildren(buildFlow());
+  document.getElementById('live-bottom').replaceChildren(buildFlow(),
+    h('div', { class: 'live-restart' },
+      h('button', { class: 'btn ghost bad-text', onclick: restartShow, title: 'Punkte und Münzen auf 0, alle Fragen unbeantwortet, zurück zur ersten Folie. Editor-Inhalte bleiben.' }, '⟲ Show neu starten …')));
   document.getElementById('beamer-controls').replaceChildren(...buildBeamerControls());
   document.getElementById('live-right').replaceChildren(buildTeamsLive(), buildCoins());
   window.scrollTo(0, scroll);
@@ -190,9 +192,7 @@ function buildRun() {
       onclick: () => act('run.goto', { index: i }),
     }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
   const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
-    h('div', { class: 'row run-foot' },
-      h('p', { class: 'muted run-hint grow' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'),
-      h('button', { class: 'btn small ghost bad-text', onclick: restartShow, title: 'Punkte und Münzen auf 0, alle Fragen unbeantwortet, zurück zur ersten Folie. Editor-Inhalte bleiben.' }, '⟲ Show neu starten …')));
+    h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'));
   // Aktuellen Schritt in der Leiste sichtbar halten.
   requestAnimationFrame(() => panel.querySelector('.run-step.current')?.scrollIntoView({ block: 'nearest', inline: 'center' }));
   return panel;

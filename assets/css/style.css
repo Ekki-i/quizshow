@@ -585,7 +585,7 @@ body.beamer-page { background: #05060f; }
 .run-step.k-title, .run-step.k-game { border-top: 4px solid var(--salmon); }
 .run-step:focus-visible { outline: 3px solid var(--accent-3); outline-offset: 2px; }
 .run-hint { margin: 6px 0 0; font-size: 0.85rem; }
-.run-foot { align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.live-restart { display: flex; justify-content: flex-end; margin-bottom: 48px; }
 .btn.bad-text { color: var(--bad, #e5484d); }
 /* Ablauf im Show-Editor */
 .rundown-list { max-height: 520px; overflow: auto; }
