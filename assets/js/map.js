@@ -32,7 +32,7 @@ export function mapView(name, { markers = [], onPick = null, label = 'Karte' } =
   const r = m.width / 90;
   const svg = el('svg', { viewBox: `0 0 ${m.width} ${m.height}`, class: `map${onPick ? ' pickable' : ''}`, role: 'img', 'aria-label': label });
   svg.append(el('rect', { x: 0, y: 0, width: m.width, height: m.height, class: 'sea' }));
-  svg.append(el('g', { class: 'land' }, ...m.paths.map((d) => el('path', { d }))));
+  svg.append(el('g', { class: `land${m.highlight !== undefined ? ' has-hl' : ''}` }, ...m.paths.map((d, i) => el('path', { d, class: i === m.highlight ? 'hl' : null }))));
   for (const mk of markers) {
     const [x, y] = project(m, mk.lat, mk.lng);
     const title = mk.label ? el('title') : null;
