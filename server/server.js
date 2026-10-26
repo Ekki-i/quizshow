@@ -238,7 +238,8 @@ const server = http.createServer(async (req, res) => {
 
 // ---------- Echtzeit ----------
 
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
+// Nachrichten bis 3 MB: Avatare (bis ca. 900 KB) und Handschrift (bis 2 × 400 KB) passen sicher hinein.
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 3 * 1024 * 1024 });
 const clients = new Set();
 
 function connections() {
