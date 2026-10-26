@@ -118,6 +118,11 @@ Umgesetzt:
 - Spiellogik je Spiel in `server/play-*.js`, gemeinsame Bausteine in `server/core.js`.
   Kartenumrisse: Natural Earth (gemeinfrei), erzeugt mit `scripts/build-maps.mjs`.
 
+- **Rangliste in der Live-Regie** mit −1/+1/± je Team (wird als Korrektur gebucht, letzte Buchung rückgängig).
+- **Teams je Show**: Im Editor unter „Teams“ die Show wählen und ihre Teams vorab eintragen oder aus einer
+  anderen Show übernehmen. Zugangscodes sind vierstellige Zahlen; neue Shows starten mit sechs Teams.
+- **Finale: Rückgängig** für den letzten Schritt (z. B. verklickte Bewertung nach einem Münzeinsatz).
+- **Spiel 2**: Das schnellste Team wählt den Tauschpartner direkt über die Teampulte (eigenes Team ausgegraut).
 - **Intro-Lied je Kategorie**: Im Show-Editor beim Spiel MP3 oder MP4 hochladen; es läuft auf dem Beamer,
   solange die Spieltitel-Folie dieses Spiels steht. Ist es zu Ende, schaltet der Showablauf automatisch
   ins Spiel weiter; wer vorher weiterschaltet, blendet es aus.

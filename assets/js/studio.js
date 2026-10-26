@@ -85,6 +85,21 @@ export function podiumRow(teams, opts = {}) {
       }
       g.append(img);
     });
+    // Auswahl (z. B. Tausch in Spiel 2): Pult anklickbar, ausgeschlossene Teams ausgegraut.
+    if (t && opts.onPick) {
+      const off = (opts.disabledIds || []).includes(t.id);
+      g.classList.add(off ? 'pick-off' : 'pick');
+      if (!off) {
+        g.setAttribute('role', 'button');
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('aria-label', `Mit ${t.name} tauschen`);
+        g.addEventListener('click', () => opts.onPick(t.id));
+        g.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); opts.onPick(t.id); } });
+      }
+      // Das Pult selbst ist Teil des Hintergrundbilds: ausgegraute Teams bekommen einen dunklen Schleier.
+      if (off) g.append(el('rect', { class: 'pick-veil', x: l - 6, y: top - 6, width: r - l + 12, height: 252 - top, rx: 12 }));
+      g.append(el('rect', { class: 'pick-hit', x: l - 8, y: top - 40, width: r - l + 16, height: 250 - top + 40, rx: 14 }));
+    }
     // Teamname gebogen über dem Bogen.
     if (t) {
       const cx = (l + r) / 2;

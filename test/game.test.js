@@ -234,7 +234,7 @@ test('Showablauf ist gesperrt, solange ein Spiel läuft', () => {
 test('Neuer Zugangscode macht den alten ungültig', () => {
   const { db, ids } = setup();
   const old = db.project.teams[0].code;
-  assert.equal(old.length, 10);
+  assert.equal(old.length, 4);
   assert.equal(game.findTeamByCode(db, old.toLowerCase()).id, ids[0]);
   game.applyAction(db, mod(), 'team.regenCode', { teamId: ids[0] });
   assert.equal(game.findTeamByCode(db, old), null);
@@ -758,4 +758,59 @@ test('Neue Shows starten mit sechs Teams, die Anzahl bleibt veränderbar', () =>
   assert.equal(db.project.teams.length, 7);
   game.applyAction(db, mod(), 'shows.create', { name: 'Neu', copyTeams: false });
   assert.equal(db.project.teams.length, 6);
+});
+
+test('Finale: letzten Schritt rückgängig machen (z. B. falsche Bewertung nach Münzeinsatz)', () => {
+  const { db, ids } = setup(2);
+  db.live.coins.push({ position: 8, teamId: ids[0] }, { position: 4, teamId: ids[0] });
+  game.applyAction(db, mod(), 'finale.config', { target: 3, questions: [{ question: 'Q?', answer: 'A' }, { question: 'Q2?', answer: 'B' }] });
+  game.applyAction(db, mod(), 'finale.start', { teamId: ids[0] });
+  assert.throws(() => game.applyAction(db, mod(), 'finale.undo', {}), /keinen Schritt/);
+  game.applyAction(db, mod(), 'finale.next', {});
+  game.applyAction(db, team(ids[0]), 'finale.answer', { text: 'A' });
+  game.applyAction(db, mod(), 'finale.modAnswer', { text: 'A' });
+  game.applyAction(db, mod(), 'finale.gradeTeam', { correct: true });
+  game.applyAction(db, mod(), 'finale.reveal', {});
+  game.applyAction(db, team(ids[0]), 'finale.challenge', {});
+  game.applyAction(db, mod(), 'finale.gradeMod', { correct: true }); // verklickt: Münze weg
+  assert.equal(game.teamView(db, ids[0]).finale.coins, 1);
+  assert.equal(game.moderatorView(db).finale.undoLabel, 'Bewertung der Moderation');
+  game.applyAction(db, mod(), 'finale.undo', {});
+  assert.equal(game.teamView(db, ids[0]).finale.coins, 2);
+  assert.equal(db.live.finale.rounds[0].challenged, true);
+  assert.equal(db.live.finale.rounds[0].modGrade, null);
+  game.applyAction(db, mod(), 'finale.gradeMod', { correct: false });
+  assert.deepEqual(db.live.finale.score, { team: 1, mod: 0 });
+  assert.equal(game.moderatorView(db).live.finaleHistory, undefined);
+});
+
+test('Team-Codes sind kurz (4 Ziffern) und in der Show eindeutig', () => {
+  const db = game.createState();
+  for (let i = 0; i < 6; i++) game.applyAction(db, mod(), 'team.add', { name: `X${i}` });
+  const codes = db.project.teams.map((t) => t.code);
+  assert.ok(codes.every((c) => /^\d{4}$/.test(c)));
+  assert.equal(new Set(codes).size, codes.length);
+  assert.equal(game.findTeamByCode(db, ` ${codes[0]} `).id, db.project.teams[0].id);
+});
+
+test('Teams je Show im Voraus vorbereiten, ohne die Show zu öffnen', () => {
+  const db = game.createState();
+  const first = db.project.id;
+  game.applyAction(db, mod(), 'shows.create', { name: 'Show 2', copyTeams: false });
+  const second = db.project.id;
+  game.applyAction(db, mod(), 'shows.switch', { showId: first });
+  // Teams der (nicht geöffneten) Show 2 bearbeiten
+  const view = game.moderatorView(db);
+  const other = view.showTeams.find((x) => x.id === second);
+  assert.equal(other.teams.length, 6);
+  game.applyAction(db, mod(), 'team.update', { showId: second, teamId: other.teams[0].id, name: 'Gäste A' });
+  game.applyAction(db, mod(), 'team.add', { showId: second, name: 'Gäste G' });
+  game.applyAction(db, mod(), 'team.remove', { showId: second, teamId: other.teams[1].id });
+  assert.equal(db.project.teams[0].name, 'Team 1'); // geöffnete Show unverändert
+  const t2 = game.moderatorView(db).showTeams.find((x) => x.id === second).teams;
+  assert.deepEqual([t2[0].name, t2.length, t2.at(-1).name], ['Gäste A', 6, 'Gäste G']);
+  // Teams der geöffneten Show aus Show 2 übernehmen
+  game.applyAction(db, mod(), 'teams.copyFrom', { showId: first, fromShowId: second });
+  assert.equal(db.project.teams[0].name, 'Gäste A');
+  assert.notEqual(db.project.teams[0].id, t2[0].id);
 });

@@ -9,12 +9,12 @@ const PASSWORD = 'demo';
 const DEMO_TOKEN = 'demo-token';
 const STORAGE_KEY = 'quiz.prototype.state.v4';
 const DEMO_TEAMS = [
-  { name: 'Die Füchse', code: 'FUCHS12345' },
-  { name: 'Team Blitz', code: 'BLITZ12345' },
-  { name: 'Möwenschwarm', code: 'MOEWE12345' },
-  { name: 'Quizpiraten', code: 'PIRAT12345' },
-  { name: 'Die Schlauberger', code: 'SCHLAU1234' },
-  { name: 'Team Rakete', code: 'RAKETE1234' },
+  { name: 'Die Füchse', code: '1111' },
+  { name: 'Team Blitz', code: '2222' },
+  { name: 'Möwenschwarm', code: '3333' },
+  { name: 'Quizpiraten', code: '4444' },
+  { name: 'Die Schlauberger', code: '5555' },
+  { name: 'Team Rakete', code: '6666' },
 ];
 
 function seed() {
@@ -45,6 +45,12 @@ function load() {
           db.project.teams[db.project.teams.length - 1].code = t.code;
         }
         db.prototypeSix = true;
+      }
+      // Kurze Demo-Codes (1111 … 6666) statt der alten langen Codes.
+      if (!db.prototypeShortCodes) {
+        const old = ['FUCHS12345', 'BLITZ12345', 'MOEWE12345', 'PIRAT12345', 'SCHLAU1234', 'RAKETE1234'];
+        db.project.teams.forEach((t) => { const k = old.indexOf(t.code); if (k >= 0) t.code = DEMO_TEAMS[k].code; });
+        db.prototypeShortCodes = true;
       }
       return db;
     }

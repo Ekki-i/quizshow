@@ -71,6 +71,7 @@
       const ui = {
         conn,
         team: s.team,
+        teams: s.teams,
         teamName: (id) => teamOf(id)?.name || '?',
         teamColor: (id) => teamOf(id)?.color || '#888',
         setDraft: (k) => (draftKey = k),

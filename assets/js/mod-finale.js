@@ -23,13 +23,15 @@ export function buildFinaleLive(ui) {
   }
 
   const r = st.round;
+  // Verklickt? Letzten Schritt im Finale zurücknehmen.
+  const undoRow = F.undoLabel ? h('div', { class: 'row fin-undo' }, btn('small', `↶ Rückgängig: ${F.undoLabel}`, () => act('finale.undo'))) : null;
   const coins = h('span', { class: 'fin-coins' }, Array.from({ length: st.coinsTotal }, (_, i) => coinImg(`fin-coin${i < st.coins ? '' : ' lost'}`)));
   const head = h('div', { class: 'fin-head' },
     h('div', { class: 'fin-side', style: { '--team': st.team.color } }, h('b', {}, st.team.name), h('span', { class: 'fin-score' }, `${st.score.team}`), coins),
     h('div', { class: 'fin-vs' }, st.sudden ? badge('warn', 'SUDDEN DEATH') : `Ziel ${st.target}`),
     h('div', { class: 'fin-side mod' }, h('b', {}, st.host || 'Moderation'), h('span', { class: 'fin-score' }, `${st.score.mod}`)));
 
-  const out = [head];
+  const out = [head, undoRow];
 
   if (st.result) {
     out.push(h('div', { class: `state ${st.result === 'team' ? 'ok' : ''}`, role: 'status' }, h('span', { class: 'sym' }, st.result === 'team' ? '🎟' : '🎤'),

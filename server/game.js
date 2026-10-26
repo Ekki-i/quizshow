@@ -23,15 +23,18 @@ const PLAY = {
 };
 
 const STATE_VERSION = 2;
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'finale', 'blank'];
 const MAX_PROCESSED = 5000;
 
-// 10 Zeichen aus 32 Symbolen ≈ 50 Bit: nicht erratbar, aber noch abtippbar.
-function newTeamCode() {
-  let code = '';
-  for (let i = 0; i < 10; i++) code += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
-  return code;
+// Kurze Zugangscodes: vierstellige Zahl (1000–9999), in der Show eindeutig –
+// schnell abgetippt, z. B. am iPad über den Ziffernblock.
+function newTeamCode(taken = []) {
+  const used = new Set(taken);
+  for (let i = 0; i < 200; i++) {
+    const code = String(1000 + crypto.randomInt(9000));
+    if (!used.has(code)) return code;
+  }
+  return String(10000 + crypto.randomInt(90000));
 }
 
 function freshLive() {
@@ -62,7 +65,12 @@ function instanceFrom(entry) {
 
 const DEFAULT_TEAM_COUNT = 6;
 function defaultTeams() {
-  return Array.from({ length: DEFAULT_TEAM_COUNT }, (_, i) => ({ id: newId('team'), name: `Team ${i + 1}`, color: TEAM_COLORS[i % TEAM_COLORS.length], code: newTeamCode() }));
+  const codes = [];
+  return Array.from({ length: DEFAULT_TEAM_COUNT }, (_, i) => {
+    const code = newTeamCode(codes);
+    codes.push(code);
+    return { id: newId('team'), name: `Team ${i + 1}`, color: TEAM_COLORS[i % TEAM_COLORS.length], code };
+  });
 }
 
 // Eine neue Show mit der Standardreihenfolge, je Spieltyp der erste Eintrag der Datenbank.
@@ -137,6 +145,24 @@ function findGame(db, gameId) {
   const game = db.project.games.find((g) => g.id === gameId);
   if (!game) fail('Spiel nicht in der Show gefunden.');
   return game;
+}
+
+// Show für Team-Aktionen: ohne showId die geöffnete Show.
+function showFor(db, showId) {
+  if (!showId || showId === db.project.id) {
+    const sh = { project: db.project, ledger: db.ledger, current: true };
+    Object.defineProperty(sh, 'project', { get: () => db.project, set: (v) => { db.project = v; } });
+    return sh;
+  }
+  const s = db.shows.find((x) => x.project.id === showId);
+  if (!s) fail('Show nicht gefunden.');
+  return { get project() { return s.project; }, ledger: s.ledger, current: false };
+}
+
+function teamIn(sh, teamId) {
+  const team = sh.project.teams.find((t) => t.id === teamId);
+  if (!team) fail('Team nicht gefunden.');
+  return team;
 }
 
 function findEntry(db, libraryId) {
@@ -387,6 +413,16 @@ function introEnded(db, ctx, p) {
 const moderatorActions = {
   ...FINALE.mod,
 
+  // Finale: letzten Schritt zurücknehmen (z. B. falsch geklickte Bewertung nach einem Münzeinsatz).
+  'finale.undo'(db, ctx) {
+    const h = db.live.finaleHistory || [];
+    const last = h.pop();
+    if (!last || !db.live.finale) fail('Es gibt keinen Schritt zum Zurücknehmen.');
+    db.live.finale = last.state;
+    effect(db, 'undo');
+    log(db, ctx, 'finale', `Rückgängig: ${UNDO_LABEL[last.action] || last.action}`);
+  },
+
   'project.update'(db, ctx, p) {
     const pr = db.project;
     if ('name' in p) pr.name = cleanText(p.name, 80) || 'Wer stiehlt uns die Show';
@@ -441,18 +477,22 @@ const moderatorActions = {
     log(db, ctx, 'editor', `Intro-Lied „${game.intro.name}“ für „${game.title}“ gesetzt`);
   },
 
+  // Teams gehören zur jeweiligen Show. Mit showId lassen sich auch die Teams einer
+  // anderen (noch nicht geöffneten) Show vorbereiten.
   'team.add'(db, ctx, p) {
-    const teams = db.project.teams;
+    const sh = showFor(db, p.showId);
+    const teams = sh.project.teams;
     if (teams.length >= 12) fail('Maximal 12 Teams.');
     const name = cleanText(p.name || '', 40) || `Team ${teams.length + 1}`;
     const color = p.color ? cleanColor(p.color) : TEAM_COLORS[teams.length % TEAM_COLORS.length];
-    const team = { id: newId('team'), name, color, code: newTeamCode() };
+    const team = { id: newId('team'), name, color, code: newTeamCode(teams.map((t) => t.code)) };
     teams.push(team);
-    log(db, ctx, 'team', `Team „${name}“ angelegt`);
+    log(db, ctx, 'team', `Team „${name}“ angelegt${sh.current ? '' : ` (Show „${sh.project.name}“)`}`);
   },
 
   'team.update'(db, ctx, p) {
-    const team = findTeam(db, p.teamId);
+    const sh = showFor(db, p.showId);
+    const team = teamIn(sh, p.teamId);
     if ('name' in p) team.name = cleanText(p.name, 40) || team.name;
     if ('color' in p) team.color = cleanColor(p.color);
     // 3D-Avatar hinter dem Pult; null entfernt ihn (Pult bleibt dann leer).
@@ -461,20 +501,38 @@ const moderatorActions = {
   },
 
   'team.regenCode'(db, ctx, p) {
-    const team = findTeam(db, p.teamId);
-    team.code = newTeamCode();
+    const sh = showFor(db, p.showId);
+    const team = teamIn(sh, p.teamId);
+    team.code = newTeamCode(sh.project.teams.map((t) => t.code));
     log(db, ctx, 'team', `Neuer Zugangscode für „${team.name}“ (alter Code ungültig)`);
-    return { kick: team.id };
+    return sh.current ? { kick: team.id } : {};
   },
 
   'team.remove'(db, ctx, p) {
-    const team = findTeam(db, p.teamId);
-    if (db.ledger.some((e) => e.teamId === team.id)) {
+    const sh = showFor(db, p.showId);
+    const team = teamIn(sh, p.teamId);
+    if (sh.ledger.some((e) => e.teamId === team.id)) {
       fail('Team hat bereits Punktebuchungen und kann nicht gelöscht werden.');
     }
-    db.project.teams = db.project.teams.filter((t) => t.id !== team.id);
+    sh.project.teams = sh.project.teams.filter((t) => t.id !== team.id);
     log(db, ctx, 'team', `Team „${team.name}“ gelöscht`);
-    return { kick: team.id };
+    return sh.current ? { kick: team.id } : {};
+  },
+
+  // Teams einer anderen Show übernehmen (ersetzt die Teams der Zielshow, neue Codes).
+  'teams.copyFrom'(db, ctx, p) {
+    const target = showFor(db, p.showId);
+    const src = showFor(db, p.fromShowId);
+    if (target.project === src.project) fail('Bitte eine andere Show wählen.');
+    if (target.ledger.length) fail('Diese Show hat schon Punkte – Teams können nicht mehr ersetzt werden.');
+    const codes = [];
+    target.project.teams = src.project.teams.map((t) => {
+      const code = newTeamCode(codes);
+      codes.push(code);
+      return { ...clone(t), id: newId('team'), code };
+    });
+    log(db, ctx, 'team', `Teams aus „${src.project.name}“ in „${target.project.name}“ übernommen`);
+    return target.current ? { kickAll: true } : {};
   },
 
   // ----- Spiele-Datenbank -----
@@ -764,6 +822,8 @@ const moderatorActions = {
 function applyAction(db, ctx, name, payload, actionId) {
   if (actionId && db.processed.includes(actionId)) return { duplicate: true };
   let result;
+  // Für „Rückgängig“ im Finale: Zustand vor jeder Finale-Aktion merken.
+  const before = typeof name === 'string' && FINALE_UNDOABLE(name) && db.live.finale ? clone(db.live.finale) : null;
   if (ctx.role === 'beamer') {
     // Der Beamer darf nur melden, dass das Intro-Lied eines Spieltitels zu Ende ist.
     if (name !== 'beamer.introEnded') fail('Diese Aktion ist für diese Rolle nicht erlaubt.');
@@ -777,11 +837,25 @@ function applyAction(db, ctx, name, payload, actionId) {
     if (!fn) fail('Diese Aktion ist für diese Rolle nicht erlaubt.');
     result = fn(db, ctx, payload || {}) || {};
   }
+  rememberFinale(db, name, before);
   if (actionId) {
     db.processed.push(actionId);
     if (db.processed.length > MAX_PROCESSED) db.processed.splice(0, db.processed.length - MAX_PROCESSED);
   }
   return result;
+}
+
+const UNDO_LABEL = {
+  'finale.next': 'Finalfrage gestellt', 'finale.modAnswer': 'Antwort der Moderation', 'finale.answer': 'Antwort des Teams',
+  'finale.gradeTeam': 'Bewertung des Teams', 'finale.reveal': 'Auflösung', 'finale.challenge': 'Münzeinsatz', 'finale.pass': 'kein Münzeinsatz',
+  'finale.gradeMod': 'Bewertung der Moderation', 'finale.resolve': 'Weiter ohne Münze', 'finale.decide': 'Entscheidung',
+};
+const FINALE_UNDOABLE = (name) => name.startsWith('finale.') && !['finale.undo', 'finale.config', 'finale.start', 'finale.reset'].includes(name);
+function rememberFinale(db, name, before) {
+  if (!before) return;
+  if (!db.live.finaleHistory) db.live.finaleHistory = [];
+  db.live.finaleHistory.push({ state: before, action: name });
+  if (db.live.finaleHistory.length > 15) db.live.finaleHistory.shift();
 }
 
 // Alle Medien, auf die irgendeine Show noch verweist (für das Aufräumen).
@@ -893,7 +967,7 @@ function moderatorView(db, connections) {
     library: db.library,
     types: publicTypes(),
     showSize: SHOW_SIZE,
-    live: db.live,
+    live: { ...db.live, finaleHistory: undefined },
     totals: totals(db),
     ledger: db.ledger.slice(-100),
     log: db.log.slice(-60),
@@ -902,7 +976,10 @@ function moderatorView(db, connections) {
     rundownCustom: Array.isArray(db.project.rundown) && db.project.rundown.length > 0,
     connections: connections || {},
     beamerPreview: beamerView(db),
-    finale: FINALE.moderatorView(db),
+    // Teams aller anderen Shows (ohne große Avatar-Bilder) zum Vorbereiten im Editor.
+    showTeams: db.shows.map((x) => ({ id: x.project.id, name: x.project.name, date: x.project.date || '', hasPoints: x.ledger.length > 0,
+      teams: x.project.teams.map((t) => ({ id: t.id, name: t.name, color: t.color, code: t.code, hasAvatar: !!t.avatar })) })),
+    finale: { ...FINALE.moderatorView(db), undoLabel: (() => { const h = db.live.finaleHistory || []; const l = h[h.length - 1]; return l ? UNDO_LABEL[l.action] || l.action : null; })() },
   };
 }
 

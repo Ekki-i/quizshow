@@ -999,3 +999,26 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .game-intro { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; left: -10px; top: -10px; }
 .game-intro-box { margin: 12px 0; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-2); border-left: 4px solid var(--accent-2); }
 .game-intro-preview { width: 100%; max-height: 180px; margin: 6px 0; }
+.list.leader li { gap: 8px; }
+.list.leader .rank-n { width: 1.6em; color: var(--text-muted); }
+.list.leader .pts { min-width: 3.4em; text-align: center; font-variant-numeric: tabular-nums; }
+.list.leader .pt-btn { padding: 4px 9px; min-width: 2.4em; }
+/* Spiel 2: Tauschpartner über die Teampulte wählen */
+.swap-podiums { margin-top: 12px; }
+.swap-podiums .scene-teams { width: 100%; }
+.podium-slot .pick-hit { fill: transparent; stroke: transparent; stroke-width: 4; }
+.podium-slot.pick { cursor: pointer; }
+.podium-slot.pick:hover .pick-hit, .podium-slot.pick:focus-visible .pick-hit { stroke: #fff; fill: rgba(255, 255, 255, 0.08); }
+.podium-slot.pick:active .pick-hit { fill: rgba(255, 255, 255, 0.2); }
+.podium-slot.pick { animation: pickPulse 1.6s ease-in-out infinite; }
+@keyframes pickPulse { 50% { filter: drop-shadow(0 0 8px var(--team)); } }
+.podium-slot.pick-off { filter: grayscale(1) brightness(0.45); opacity: 0.6; }
+.podium-slot:focus { outline: none; }
+.podium-slot .pick-veil { fill: rgba(8, 9, 20, 0.72); }
+.podium-slot.pick-off { filter: none; opacity: 1; }
+.podium-slot.pick-off .podium-name { fill: #777; filter: none; }
+.list.leader li { flex-wrap: nowrap; gap: 5px; }
+.list.leader .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list.leader .badge { padding: 2px 6px; }
+.list.leader .pt-btn { padding: 3px 7px; min-width: 0; min-height: 0; font-size: 0.85rem; }
+.list.leader .pts { min-width: 2.8em; }

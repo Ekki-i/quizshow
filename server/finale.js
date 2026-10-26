@@ -92,6 +92,7 @@ function start(db, ctx, teamId) {
   const team = teamId ? db.project.teams.find((t) => t.id === teamId) : topTeam(db);
   if (!team) fail('Für das Finale gibt es kein Team.');
   config(db);
+  db.live.finaleHistory = [];
   db.live.finale = {
     teamId: team.id,
     coinsLost: 0,
@@ -229,6 +230,7 @@ const mod = {
 
   'finale.reset'(db, ctx) {
     db.live.finale = null;
+    db.live.finaleHistory = [];
     log(db, ctx, 'finale', 'Finale zurückgesetzt');
   },
 };
