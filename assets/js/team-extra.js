@@ -320,17 +320,19 @@ function brain(g, ui) {
   if (g.jokers.length) {
     out.push(h('div', { class: 'joker-stash' }, h('b', {}, 'Euer Joker-Vorrat'), g.jokers.map((j) => h('div', { class: 'joker-card' },
       h('span', { class: 'ji' }, j.icon), h('span', { class: 'grow' }, h('b', {}, j.name), h('small', {}, j.text)),
-      g.canUseJoker ? h('button', { class: 'btn small pink', onclick: async () => {
+      g.canUseJoker ? h('button', { class: 'btn small pink', disabled: !j.usable, title: j.usable ? '' : 'Kein anderes Team hat einen Joker zum Stehlen', onclick: async () => {
         let target = null;
         if (j.needsTarget) {
-          target = await pickTeam(ui, g.targets, `${j.name}: Welches Team?`);
+          target = await pickTeam(ui, j.targets || g.targets, `${j.name}: Welches Team?`);
           if (!target) return;
         }
         run(ui.conn, 'play.useJoker', { jokerId: j.id, target });
-      } }, 'Einsetzen') : null))));
+      } }, j.usable ? 'Einsetzen' : 'Gerade nicht möglich') : null))));
     if (g.jokerLock) out.push(stateBox('bad', '🔒', 'Joker-Sperre: bei diesem Kategoriewechsel kein Joker.'));
   }
   if (g.jokerUsed && !g.jokerUsed.other) out.push(stateBox('ok', '🃏', 'Euer Joker ist eingesetzt.'));
+  // Spielpunkte aller Teams in diesem Spiel
+  out.push(h('div', { class: 'brain-points ipad' }, (g.allPoints || []).map((p) => h('div', { class: 'bp', '--chip': ui.teamColor(p.teamId) }, h('span', {}, ui.teamName(p.teamId)), h('b', {}, String(p.points))))));
   if (g.phase === 'category') return [...out, ...wait('Gleich kommt die Frage …', g.canUseJoker ? 'Jetzt ist die Zeit für einen Joker – nach dem Vorlesen ist es zu spät.' : '')];
   out.push(question(g.question));
   if (g.phase === 'question') {

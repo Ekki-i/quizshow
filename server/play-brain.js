@@ -29,6 +29,9 @@ function teamState(st, id) {
   return st.t[id];
 }
 
+// Teams, denen man einen Joker stehlen kann (haben mindestens einen im Vorrat).
+const thievable = (db, st, teamId) => teamIds(db).filter((id) => id !== teamId && teamState(st, id).jokers.length > 0);
+
 function sub(t, n) {
   const taken = Math.min(t.points, n);
   t.points -= taken;
@@ -86,17 +89,12 @@ function applyJoker(db, ctx, game, st, teamId, joker, target) {
     }
     case 'dieb': {
       const victim = teamState(st, target);
-      if (!victim.jokers.length) {
-        r.joker.fallback = true;
-        note(st, `${teamName(db, teamId)} will einen Joker stehlen – ${teamName(db, target)} hat keinen. Keine Wirkung.`);
-      } else {
-        const k = randomInt(victim.jokers.length);
-        const [stolen] = victim.jokers.splice(k, 1);
-        t.jokers.push(stolen);
-        r.joker.stolen = stolen.key;
-        note(st, `${teamName(db, teamId)} stiehlt ${teamName(db, target)} einen Joker`);
-        log(db, ctx, 'joker', `Joker-Dieb: zufällig gezogen „${fieldByKey(stolen.key).name}“ (Nr. ${k + 1} von ${victim.jokers.length + 1})`);
-      }
+      const k = randomInt(victim.jokers.length);
+      const [stolen] = victim.jokers.splice(k, 1);
+      t.jokers.push(stolen);
+      r.joker.stolen = stolen.key;
+      note(st, `${teamName(db, teamId)} stiehlt ${teamName(db, target)} einen Joker`);
+      log(db, ctx, 'joker', `Joker-Dieb: zufällig gezogen „${fieldByKey(stolen.key).name}“ (Nr. ${k + 1} von ${victim.jokers.length + 1})`);
       break;
     }
     case 'blockade': {
@@ -179,8 +177,10 @@ module.exports = {
       if (k < 0) fail('Diesen Joker habt ihr nicht.');
       const joker = t.jokers[k];
       let target = null;
+      if (joker.key === 'dieb' && !thievable(db, st, ctx.teamId).length) fail('Kein anderes Team hat einen Joker – der Joker-Dieb bleibt im Vorrat.');
       if (NEEDS_TARGET.includes(joker.key)) {
         if (!teamIds(db).includes(p.target) || p.target === ctx.teamId) fail('Bitte ein anderes Team wählen.');
+        if (joker.key === 'dieb' && !teamState(st, p.target).jokers.length) fail('Dieses Team hat keinen Joker.');
         target = p.target;
       }
       t.jokers.splice(k, 1);
@@ -362,7 +362,14 @@ module.exports = {
       gained: r.gains ? r.gains[teamId] || 0 : null,
       points: t.points,
       // Eigener Joker-Vorrat (privat).
-      jokers: t.jokers.map((j) => ({ id: j.id, ...fieldByKey(j.key), needsTarget: NEEDS_TARGET.includes(j.key) })),
+      jokers: t.jokers.map((j) => ({
+        id: j.id, ...fieldByKey(j.key), needsTarget: NEEDS_TARGET.includes(j.key),
+        // Joker-Dieb ist nur einsetzbar, wenn ein anderes Team Joker hat.
+        usable: j.key !== 'dieb' || thievable(db, st, teamId).length > 0,
+        targets: j.key === 'dieb' ? thievable(db, st, teamId) : null,
+      })),
+      // Spielpunkte aller Teams (nur dieses Spiel).
+      allPoints: teamIds(db).map((id) => ({ teamId: id, points: teamState(st, id).points })),
       canUseJoker: r.phase === 'category' && !r.joker && !t.lockNow && t.jokers.length > 0,
       jokerLock: t.lockNow,
       jokerUsed: r.joker ? (r.joker.teamId === teamId ? { key: r.joker.key, target: r.joker.target } : { other: true }) : null,
@@ -382,7 +389,7 @@ module.exports = {
     const r = st.r;
     const q = game.content.rounds[st.round];
     const publicJoker = r.joker && !SECRET.includes(r.joker.key) && r.joker.key !== 'fifty'
-      ? { teamId: r.joker.teamId, field: fieldByKey(r.joker.key), target: r.joker.target, fallback: !!r.joker.fallback }
+      ? { teamId: r.joker.teamId, field: fieldByKey(r.joker.key), target: r.joker.target }
       : r.joker ? { teamId: r.joker.teamId, secret: true } : null;
     return {
       round: st.round,
@@ -398,7 +405,8 @@ module.exports = {
       results: ['evaluated', 'wheel'].includes(r.phase) ? teamIds(db).map((id) => ({ teamId: id, ok: r.correct.includes(id), answered: effective(r, id) !== null })) : [],
       joker: publicJoker,
       wheel: { fields: WHEEL.map((f) => ({ n: f.n, icon: f.icon, good: f.good })), buzz: r.phase === 'wheel' ? r.buzz : null, spin: r.spin ? { index: r.spin.index, field: field(r.spin.n), teamId: r.spin.teamId, text: r.spin.res ? negText(db, r.spin.teamId, field(r.spin.n), r.spin.res) : null } : null, open: r.phase === 'wheel' },
-      // Spielpunkte stehen nicht auf dem Beamer (Punkte gibt es dort nur bei der Münzvergabe).
+      // Spielpunkte dieses Spiels (nicht der Show-Gesamtstand) dauerhaft auf dem Beamer.
+      points: teamIds(db).map((id) => ({ teamId: id, points: teamState(st, id).points })),
       events: st.events.filter((e) => e.pub).slice(-4),
       finished: st.finished,
     };

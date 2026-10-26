@@ -304,7 +304,7 @@ function brain(ui, g, st) {
   out.push(h('p', {}, h('b', {}, `Runde ${st.round + 1} von ${g.content.rounds.length}: ${q.category}`), ` · ${names[r.phase]}`));
   if (r.phase !== 'category') out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, q.question), optionsList(q));
   if (r.joker) {
-    const extra = r.joker.key === 'dieb' && r.joker.fallback ? ' – kein Joker beim Gegner, keine Wirkung' : r.joker.stolen ? ` – gezogen: ${jn(r.joker.stolen)}` : '';
+    const extra = r.joker.stolen ? ` – gezogen: ${jn(r.joker.stolen)}` : '';
     out.push(h('p', { class: 'notice' }, `🃏 ${ui.teamName(r.joker.teamId)}: ${jn(r.joker.key)}${r.joker.target ? ` → ${ui.teamName(r.joker.target)}` : ''}${extra}`));
   }
   if (r.swapped) out.push(h('p', { class: 'notice' }, `🔁 Antworttausch: ${ui.teamName(r.swapped.teamId)} wertet ${r.swapped.used} statt ${r.swapped.original} (Antwort von ${ui.teamName(r.swapped.with)} bleibt ${r.swapped.used})`));

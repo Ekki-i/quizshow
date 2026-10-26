@@ -95,6 +95,8 @@ test('Film ab: erster Buzzer antwortet, falsch sperrt, alle falsch beendet den F
   assert.equal(pv(db).playback.state, 'paused');
   act(db, mod(), 'judge', { correct: false });
   assert.ok(tv(db, ids[1]).locked);
+  assert.equal(pv(db).playback.state, 'playing'); // Clip läuft noch einmal von vorn
+  assert.equal(pv(db).playback.restart, true);
   act(db, team(ids[0]), 'buzz');
   act(db, mod(), 'judge', { correct: false });
   act(db, team(ids[2]), 'buzz');
@@ -297,6 +299,8 @@ test('Habt ihr noch Fragen?: nur Frage öffentlich, 20 Sekunden, Wertung +1/−1
   act(db, mod(), 'grade', { teamId: ids[1], correct: true });
   assert.throws(() => game.applyAction(db, { ...mod(), now: t0 + 1000 }, 'play.evaluate', {}), /läuft noch/);
   game.applyAction(db, { ...mod(), now: t0 + 21000 }, 'play.evaluate', {});
+  assert.equal(pv(db).answers.length, 1);
+  assert.ok(pv(db).solution.includes('QUFB')); // bei der Auflösung: Antwort des fragenden Teams
   assert.equal(totals(db)[ids[1]], 1);
   assert.equal(totals(db)[ids[0]], -1);
 });
@@ -364,7 +368,7 @@ test('Brain or Dreh\'n: Joker, Glücksrad, Sperren, Reset nur Spielpunkte, Gehei
   act(db, team(C), 'answer', { choice: wrong0 });
   act(db, mod(), 'evaluate');
   assert.equal(tv(db, A).points, 1);
-  assert.ok(!('points' in pv(db)) || pv(db).points === undefined);
+  assert.equal(pv(db).points.find((x) => x.teamId === A).points, 1); // Spielpunkte aller Teams dauerhaft sichtbar
   act(db, mod(), 'openWheel');
   assert.throws(() => act(db, team(C), 'wheelBuzz'), /richtiger Antwort/);
   act(db, team(B), 'wheelBuzz');
@@ -436,4 +440,49 @@ test('Brain or Dreh\'n: Antworttausch wertet die getauschte Antwort, Original de
   assert.equal(tv(db, A).points, 1);
   assert.equal(tv(db, B).points, 1);
   assert.equal(db.live.games[g.id].r.answers[B].choice, right);
+});
+
+test('Brain or Dreh\'n: Joker-Dieb nur einsetzbar, wenn ein anderes Team Joker hat', () => {
+  const { db, ids } = setup(3);
+  const [A, B, C] = ids;
+  const g = use(db, 'brain');
+  act(db, mod(), 'start');
+  const st = db.live.games[g.id];
+  st.t[A].jokers = [{ id: 'jd', key: 'dieb' }];
+  assert.equal(tv(db, A).jokers[0].usable, false);
+  assert.throws(() => act(db, team(A), 'useJoker', { jokerId: 'jd', target: B }), /Kein anderes Team/);
+  st.t[C].jokers = [{ id: 'jx', key: 'fifty' }];
+  assert.equal(tv(db, A).jokers[0].usable, true);
+  assert.deepEqual(tv(db, A).jokers[0].targets, [C]);
+  assert.throws(() => act(db, team(A), 'useJoker', { jokerId: 'jd', target: B }), /keinen Joker/);
+  act(db, team(A), 'useJoker', { jokerId: 'jd', target: C });
+  assert.equal(st.t[A].jokers[0].key, 'fifty');
+});
+
+test('Danke, gleichfalsch!: alter Name wird korrigiert, eigene Namen bleiben', () => {
+  const db = game.createState();
+  const e = db.library.find((x) => x.type === 'dgf');
+  assert.equal(e.title, 'Danke, gleichfalsch!');
+  e.title = 'DankeGleichFalsch';
+  const other = structuredClone(e); other.id = 'lib_x'; other.title = 'Mein DGF';
+  db.library.push(other);
+  game.migrate(db);
+  assert.equal(e.title, 'Danke, gleichfalsch!');
+  assert.equal(other.title, 'Mein DGF');
+});
+
+test('Erst ich, dann du: Beamer zeigt, wie viele Punkte gerade auf dem Spiel stehen', () => {
+  const { db, ids } = setup(2);
+  use(db, 'zocken');
+  act(db, mod(), 'open', { q: 0 });
+  act(db, team(ids[0]), 'buzz');
+  act(db, mod(), 'judge', { correct: true });
+  assert.deepEqual(pv(db).series, { teamId: ids[0], v: 1, phase: 'decide' });
+  act(db, team(ids[0]), 'decide', { choice: 'zock' });
+  act(db, team(ids[0]), 'choose', { q: 1 });
+  assert.equal(pv(db).series.phase, 'zock');
+  act(db, mod(), 'judge', { correct: true });
+  assert.equal(pv(db).series.v, 2);
+  act(db, team(ids[0]), 'decide', { choice: 'secure' });
+  assert.deepEqual(pv(db).last, { teamId: ids[0], kind: 'secured', v: 2 });
 });

@@ -3,7 +3,7 @@
 // Spiel „Film ab – Buzzer an!“: Die Moderation startet den Filmausschnitt auf
 // dem Beamer, alle Teams dürfen buzzern. Der erste Buzzer antwortet mündlich:
 // richtig = 1 Punkt und der Film endet, falsch = dieses Team ist für diesen Film
-// gesperrt, die übrigen dürfen erneut buzzern.
+// gesperrt, der Clip läuft noch einmal von vorn und die übrigen dürfen erneut buzzern.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, buzzIn, currentBuzz, buzzTeamView } = require('./core');
 
@@ -86,6 +86,10 @@ module.exports = {
           r.resolved = true;
           setPlayback(r, 'stopped');
           log(db, ctx, 'ablauf', `Film ${st.index + 1}: alle Teams falsch, keine Punkte`);
+        } else {
+          // Clip läuft noch einmal von vorn; alle nicht gesperrten Teams dürfen wieder buzzern.
+          setPlayback(r, 'playing', true);
+          log(db, ctx, 'ablauf', `Film ${st.index + 1} läuft noch einmal von vorn`);
         }
       }
     },

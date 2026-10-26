@@ -215,7 +215,7 @@ function songsong(v, teamOf) {
 // ---------- DankeGleichFalsch ----------
 let dgfFlashSeq = null;
 function dgf(v, teamOf) {
-  if (v.waiting) return waitTitle('DankeGleichFalsch', '25 Begriffe – 3 passen nicht. Wer aussteigt, sichert seine Punkte.');
+  if (v.waiting) return waitTitle('Danke, gleichfalsch!', '25 Begriffe – 3 passen nicht. Wer aussteigt, sichert seine Punkte.');
   const turn = v.turn ? teamOf(v.turn) : null;
   const head = h('div', { class: 'dgf-head' },
     banner(v.name, 'compact slim'),
@@ -235,7 +235,10 @@ function dgf(v, teamOf) {
     dgfFlashSeq = v.flash.seq;
     out.push(h('div', { class: `dgf-flash ${v.flash.kind}` }, h('b', {}, { wrong: 'FALSCH!', timeout: 'ZEIT UM!', secured: 'GESICHERT' }[v.flash.kind] || ''), h('span', {}, teamOf(v.flash.teamId).name)));
   } else if (v.flash) dgfFlashSeq = v.flash.seq;
-  if (v.done) out.push(h('div', { class: 'solution' }, `${v.found} von 22 gefunden – die falschen sind rot markiert`));
+  if (v.done) {
+    const wrong = v.board.filter((b) => b.wrong === true).map((b) => b.text);
+    out.push(h('div', { class: 'dgf-reveal' }, h('span', {}, `${v.found} von 22 gefunden · Die drei falschen Begriffe:`), h('b', {}, wrong.join('  ·  '))));
+  }
   return out;
 }
 
@@ -246,18 +249,34 @@ function zocken(v, teamOf) {
   if (!c || (c.resolved && !v.decide && !v.choose)) {
     const out = [board];
     if (c && c.resolved) out.unshift(h('div', { class: 'solution', style: { margin: '0 auto 2vh' } }, `Feld ${c.q + 1}: ${c.answer}`));
+    out.unshift(seriesBar(v, teamOf));
     if (v.done) out.push(h('div', { class: 'solution' }, 'Alle 24 Felder gespielt!'));
     return out;
   }
-  if (v.decide) return [board, h('div', { class: 'row zock-foot' }, chip(teamOf(v.decide), 'answering', ' ✓ richtig – sichern oder zocken?'))];
-  if (v.choose) return [board, h('div', { class: 'row zock-foot' }, chip(teamOf(v.choose), 'answering', ' 🎲 wählt das nächste Feld …'))];
-  const out = [h('div', { class: 'zock-num' }, `Feld ${c.q + 1}`), banner(c.question)];
+  if (v.decide) return [seriesBar(v, teamOf), board, h('div', { class: 'row zock-foot' }, chip(teamOf(v.decide), 'answering', ' ✓ richtig – sichern oder zocken?'))];
+  if (v.choose) return [seriesBar(v, teamOf), board, h('div', { class: 'row zock-foot' }, chip(teamOf(v.choose), 'answering', ' 🎲 wählt das nächste Feld …'))];
+  const out = [seriesBar(v, teamOf), h('div', { class: 'zock-num' }, `Feld ${c.q + 1}`), banner(c.question)];
   if (c.answering) out.push(h('div', { class: 'row', style: { justifyContent: 'center' } }, chip(teamOf(c.answering), 'answering', c.mode === 'zock' ? ' 🎲 zockt' : ' 🔔 antwortet')));
   else out.push(sub('Buzzer frei!', { marginTop: '1vh' }));
   const wrong = c.buzzOrder.filter((b) => b.status === 'wrong');
   if (wrong.length) out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1vh' } }, wrong.map((b) => chip(teamOf(b.teamId), 'wrong', ' ✗'))));
   if (v.streaks.length) out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '2vh' } }, v.streaks.map((s) => chip(teamOf(s.teamId), '', h('b', {}, ` ungesichert ${s.v}`)))));
   return out;
+}
+
+// Laufende Zock-Serie bzw. letztes Ergebnis: wie viele Punkte gerade erspielt sind / auf dem Spiel stehen.
+function seriesBar(v, teamOf) {
+  if (v.series) {
+    const t = teamOf(v.series.teamId);
+    const txt = v.series.phase === 'zock' ? `${pts(v.series.v)} stehen auf dem Spiel` : `${pts(v.series.v)} erspielt (ungesichert)`;
+    return h('div', { class: 'zock-series', '--chip': t.color }, h('b', {}, t.name), h('span', {}, txt), h('em', {}, String(v.series.v)));
+  }
+  if (v.last) {
+    const t = teamOf(v.last.teamId);
+    const txt = { secured: `sichert ${pts(v.last.v)}`, lost: v.last.v ? `verliert ${pts(v.last.v)}` : 'falsch', won: `${pts(v.last.v)} erspielt` }[v.last.kind];
+    return h('div', { class: `zock-series ${v.last.kind}`, '--chip': t.color }, h('b', {}, t.name), h('span', {}, txt));
+  }
+  return null;
 }
 
 // ---------- Habt ihr noch Fragen? ----------
@@ -268,14 +287,17 @@ function fragen(v, teamOf) {
     out.push(sub(v.proposals ? `${v.proposals} ${v.proposals === 1 ? 'Vorschlag' : 'Vorschläge'} eingegangen` : 'Teams schreiben ihre Fragen …', { marginTop: '2vh' }));
     return out;
   }
-  out.push(h('div', { class: 'fragen-q' }, h('img', { class: 'ink-board', src: v.question, alt: 'Frage' }), h('div', { class: 'ans-name' }, `Frage von ${teamOf(v.asker).name}`)));
+  // Sobald Antworten eingeblendet sind, rückt die Frage zusammen, damit alles auf eine Folie passt.
+  if (v.answers.length || v.solution) out.splice(0, out.length, banner(`${v.name}`, 'compact slim'));
+  out.push(h('div', { class: `fragen-q${v.answers.length || v.solution ? ' small' : ''}` }, h('img', { class: 'ink-board', src: v.question, alt: 'Frage' }), h('div', { class: 'ans-name' }, `Frage von ${teamOf(v.asker).name}`)));
   if (!v.evaluated && v.deadline) out.push(h('div', { class: 'big-count center' }, countdown(v.deadline)));
   if (v.answers.length) out.push(h('div', { class: 'answers small' }, v.answers.map((a) => {
     const t = teamOf(a.teamId);
     return h('div', { class: 'answer fx-card has-ink', '--team': t.color }, h('div', { class: 'ans-body' }, h('img', { class: 'ink-answer beamer', src: a.ink, alt: '' }),
       a.correct === null ? null : h('span', { class: `mark ${a.correct ? 'ok' : 'bad'}` }, a.correct ? '✓' : '✗')), h('div', { class: 'ans-name' }, t.name));
   })));
-  if (v.solution) out.push(h('div', { class: 'fragen-sol' }, h('span', {}, 'Lösung'), h('img', { class: 'ink-board small', src: v.solution, alt: 'Lösung' })));
+  // Erst die Antworten der anderen Teams, danach die Antwort des fragenden Teams.
+  if (v.solution) out.push(h('div', { class: 'fragen-sol', style: { animationDelay: `${0.4 + v.answers.length * 0.35}s` } }, h('span', {}, `Antwort von ${teamOf(v.asker).name}`), h('img', { class: 'ink-board small', src: v.solution, alt: 'Lösung' })));
   if (v.evaluated && v.result) out.push(h('div', { class: 'solution' }, v.result.right.length ? `${v.result.right.map((id) => teamOf(id).name).join(', ')} +1 · ${teamOf(v.asker).name} −1` : `Niemand wusste es: ${teamOf(v.asker).name} +2`));
   return out;
 }
@@ -331,6 +353,16 @@ function wheel(v, teamOf) {
 
 function brain(v, teamOf) {
   if (v.waiting) return waitTitle('Brain or Dreh’n', 'Wissen bringt Punkte – das Glücksrad bringt Joker … oder Pech.');
+  return [...brainBody(v, teamOf), brainPoints(v, teamOf)].filter(Boolean);
+}
+// Spielpunkte dieser Runde (nicht der Show-Gesamtstand) für alle Teams, dauerhaft unten.
+function brainPoints(v, teamOf) {
+  return h('div', { class: 'brain-points' }, (v.points || []).map((p) => {
+    const t = teamOf(p.teamId);
+    return h('div', { class: 'bp', '--chip': t.color }, h('span', {}, t.name), h('b', {}, String(p.points)));
+  }));
+}
+function brainBody(v, teamOf) {
   const events = v.events.length ? h('div', { class: 'brain-events' }, v.events.map((e) => h('span', {}, e.text))) : null;
   if (v.phase === 'category') {
     return [h('div', { class: 'level-tag' }, `Kategorie ${v.round + 1} von ${v.count}`), h('div', { class: 'brain-cat' }, v.category),

@@ -68,7 +68,7 @@ freimachen und „In Show einsetzen“ bzw. „⇄ Ersetzen“ wählen.
 | … 2.0 | alle schreiben, schnellster Buzzer schätzt ein (alles oder nichts) | Bild je Runde |
 | Keine Kon-Sequenz | Lied in Stufen 0,1/1/3/5/10 s, Punkte je Stufe (Vorschlag 5–1, bestätigen) | Lied je Runde |
 | Song Song Song | Mash-up, beide Titel schreiben, Buzzer sperrt niemanden | Mash-up je Rätsel |
-| DankeGleichFalsch | 25 Begriffe, 3 falsch, reihum mit 60 s, Aussteigen sichert | – |
+| Danke, gleichfalsch! | 25 Begriffe, 3 falsch, reihum mit 60 s, Aussteigen sichert | – |
 | Erst ich, dann du, dann du, dann du | 24 Felder, sichern oder zocken | – |
 | Habt ihr noch Fragen? | Teams stellen Fragen, 20 s, +1/−1 bzw. +2 | – |
 | Das geht mir zu weit | zwei Einträge aus einer Datenbank, Differenz entscheidet | – |
