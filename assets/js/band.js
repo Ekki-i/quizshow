@@ -165,7 +165,11 @@ export function audioReady(ctx) {
 let player = null;
 
 function createSongPlayer(ctx, songs) {
-  const el = new Audio();
+  // Das erste Lied ist meist schon vorgeladen (preloadSongs) → sofortiger Start.
+  const pre = songs[0] && preloaded.get(songs[0].id);
+  if (pre) preloaded.delete(songs[0].id);
+  const el = pre || new Audio();
+  el.muted = false;
   el.preload = 'auto';
   const source = ctx.createMediaElementSource(el);
   const gain = ctx.createGain();
@@ -174,7 +178,8 @@ function createSongPlayer(ctx, songs) {
   analyser.fftSize = 2048;
   analyser.smoothingTimeConstant = 0.55;
   source.connect(gain).connect(analyser).connect(ctx.destination);
-  gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.5);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.5);
   const bins = new Uint8Array(analyser.frequencyBinCount);
   const hz = ctx.sampleRate / analyser.fftSize;
   const band = (lo, hi) => {
@@ -196,8 +201,8 @@ function createSongPlayer(ctx, songs) {
     const url = await mediaUrl(song.id);
     if (stopped) return;
     if (!url) return playAt(index + 1);
-    el.src = url;
-    document.querySelectorAll('.band-scene .bd-pause-sub').forEach((n) => (n.textContent = `♪ ${song.name.replace(/\.[a-z0-9]{2,4}$/i, '')}`));
+    if (el.src !== url && el.getAttribute('src') !== url) el.src = url;
+    else el.currentTime = 0;
     el.play().catch(() => {});
   }
   el.addEventListener('ended', () => playAt(index + 1));
@@ -244,6 +249,23 @@ function createSongPlayer(ctx, songs) {
       setTimeout(() => { el.pause(); el.removeAttribute('src'); el.load(); source.disconnect(); }, 900);
     },
   };
+}
+
+// Lieder der Pausen schon vorher laden, damit die Musik in der Pause sofort einsetzt.
+const preloaded = new Map();
+export async function preloadSongs(songs = []) {
+  for (const m of songs) {
+    if (!m || preloaded.has(m.id)) continue;
+    preloaded.set(m.id, null);
+    const url = await mediaUrl(m.id);
+    if (!url) continue;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.muted = true;
+    a.src = url;
+    a.load();
+    preloaded.set(m.id, a);
+  }
 }
 
 // ctx: AudioContext oder null (stumm). songs: eigene Lieder der Pause (oder leer

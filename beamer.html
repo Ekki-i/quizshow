@@ -26,7 +26,7 @@
     import { answerContent } from './assets/js/ink.js';
     import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
     import { studioRoom } from './assets/js/studio-room.js';
-    import { startPause, stopPause, bandScene, audioReady } from './assets/js/band.js';
+    import { startPause, stopPause, bandScene, audioReady, preloadSongs } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
     const embedded = new URLSearchParams(location.search).has('preview');
@@ -175,6 +175,7 @@
     function render(s) {
       document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
       document.title = `${s.show.name} – Beamer`;
+      if (!embedded && s.settings.sound) preloadSongs(s.preloadSongs || []);
       const fresh = lastEffect !== null && s.effect.seq !== lastEffect;
       if (fresh && s.settings.sound && !embedded) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
