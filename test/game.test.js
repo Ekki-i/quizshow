@@ -896,3 +896,24 @@ test('Spiel 8: zweites Team übernimmt die richtigen Antworten des ersten und f�
   for (const v of valid.slice(2, 5)) game.applyAction(db, mod(), 'play.mark', { answer: v });
   assert.equal(game.beamerView(db).gameView.attempt.done, 'success');
 });
+
+test('Show neu starten: Punkte, Münzen und Spielstände weg, Editor-Inhalte bleiben', () => {
+  const { db, ids } = setup();
+  const title = db.project.games[0].title;
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
+  game.applyAction(db, mod(), 'play.open', { qIndex: 0 });
+  game.applyAction(db, team(ids[0]), 'play.submit', { text: '1440' });
+  game.applyAction(db, mod(), 'play.grade', { teamId: ids[0], correct: true });
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[1], points: 3, reason: 'Bonus' });
+  game.applyAction(db, mod(), 'coin.determine', { position: 4 });
+  assert.ok(Object.keys(db.live.games).length);
+  game.applyAction(db, mod(), 'live.reset', { confirm: 'NEUSTART' });
+  assert.deepEqual(Object.values(game.totals(db)).filter((v) => v !== 0), []);
+  assert.deepEqual(db.live.coins, []);
+  assert.deepEqual(db.live.games, {});
+  assert.equal(db.live.run, -1);
+  assert.equal(db.live.activeGame, null);
+  assert.equal(db.live.beamer.view, 'start');
+  assert.equal(db.project.teams.length, 3);
+  assert.equal(db.project.games[0].title, title);
+});
