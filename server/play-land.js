@@ -46,6 +46,7 @@ function publicView(db, game, st) {
     taskIndex: st.taskIndex,
     count: game.content.tasks.length,
     question: task.question,
+    image: task.image ? { id: task.image.id, type: task.image.type } : null,
     open: r.open,
     submittedCount: Object.keys(r.guesses).length,
     teamCount: db.project.teams.length,

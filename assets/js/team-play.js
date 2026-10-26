@@ -1,7 +1,7 @@
 // Team-iPad: Darstellung und Eingaben für alle acht Spiele. Die Sicht kommt
 // bereits gefiltert vom Server; hier wird nichts Geheimes ausgeblendet.
 
-import { h, run, ask, toast, coinImg } from './client.js';
+import { h, run, ask, toast, coinImg, mediaUrl } from './client.js';
 import { inkPad, answerContent } from './ink.js';
 import { mapView } from './map.js';
 import { podiumRow } from './studio.js';
@@ -137,6 +137,12 @@ let landPending = null;
 function land(g, ui) {
   if (g.taskIndex < 0) return wait('Gleich geht’s los!', `Karte: ${g.map}`);
   const out = [h('p', { class: 'muted' }, `Aufgabe ${g.taskIndex + 1} von ${g.count} · Karte: ${g.map}`), h('p', { class: 'question' }, g.question)];
+  if (g.image) {
+    // Bild auch auf dem iPad, damit jedes Team es aus der Nähe sieht.
+    const img = h('img', { class: 'land-image ipad', alt: 'Bild zur Aufgabe' });
+    mediaUrl(g.image.id).then((url) => { if (url) img.src = url; });
+    out.push(img);
+  }
   const key = `${g.taskIndex}`;
   if (landPending?.key !== key || g.own) landPending = null;
   const markers = [];
