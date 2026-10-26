@@ -158,6 +158,13 @@ const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorst
 const runIcon = (kind) => (kind === 'coin' ? coinImg('run-coin') : RUN_ICON[kind]);
 
 function runNext() { return act('run.next'); }
+
+// Neustart: Punkte, Münzen, Antworten und Finale weg, zurück zur ersten Folie.
+// Teams, Editor, Spieledatenbank, Ablauf und Medien bleiben erhalten.
+async function restartShow() {
+  const ok = await ask('Show wirklich neu starten? Alle Punkte und Münzen gehen auf 0, alle Fragen sind wieder unbeantwortet, der Beamer springt zurück auf die erste Folie. Deine Inhalte im Editor bleiben erhalten.', { requireText: 'NEUSTART', confirmLabel: 'Show neu starten', danger: true });
+  if (ok) act('live.reset', { confirm: 'NEUSTART' });
+}
 function runPrev() { return act('run.prev'); }
 
 function buildRun() {
@@ -183,7 +190,9 @@ function buildRun() {
       onclick: () => act('run.goto', { index: i }),
     }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
   const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
-    h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'));
+    h('div', { class: 'row run-foot' },
+      h('p', { class: 'muted run-hint grow' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'),
+      h('button', { class: 'btn small ghost bad-text', onclick: restartShow, title: 'Punkte und Münzen auf 0, alle Fragen unbeantwortet, zurück zur ersten Folie. Editor-Inhalte bleiben.' }, '⟲ Show neu starten …')));
   // Aktuellen Schritt in der Leiste sichtbar halten.
   requestAnimationFrame(() => panel.querySelector('.run-step.current')?.scrollIntoView({ block: 'nearest', inline: 'center' }));
   return panel;
@@ -1184,14 +1193,9 @@ function buildPoints() {
         h('label', {}, 'Punkte (z. B. 1 oder -1)'), h('input', { name: 'points', type: 'number', step: '1', required: true }),
         h('label', {}, 'Begründung (Pflicht, wird protokolliert)'), h('input', { name: 'reason', maxlength: '160', required: true }),
         h('p', {}, h('button', { class: 'btn', type: 'submit' }, 'Buchen')))),
-      card('Kontrollierter Neustart',
-        h('p', { class: 'muted' }, 'Setzt Spielzustand, Münzen und alle Punkte zurück. Teams, Inhalte und Protokoll bleiben erhalten.'),
-        h('button', {
-          class: 'btn bad', onclick: async () => {
-            const ok = await ask('Spielstand, Münzen und alle Punkte wirklich zurücksetzen?', { requireText: 'NEUSTART', confirmLabel: 'Zurücksetzen', danger: true });
-            if (ok) act('live.reset', { confirm: 'NEUSTART' });
-          },
-        }, 'Neustart …'))),
+      card('Show neu starten',
+        h('p', { class: 'muted' }, 'Alle Punkte und Münzen auf 0, alle Fragen wieder unbeantwortet und ohne Auflösung, zurück zur ersten Folie. Teams, Editor, Spieledatenbank, Ablauf und Medien bleiben erhalten.'),
+        h('button', { class: 'btn bad', onclick: restartShow }, 'Show neu starten …'))),
     card('Punktebuchungen',
       h('p', { class: 'muted' }, '„Rückgängig“ löscht nichts, sondern erzeugt eine Gegenbuchung.'),
       ledger.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Zeit'), h('th', {}, 'Team'), h('th', {}, 'Punkte'), h('th', {}, 'Grund'), h('th', {}, ''))),
