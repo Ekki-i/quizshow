@@ -15,7 +15,7 @@
       <h1 id="show-name" class="show-title">Wer stiehlt <span class="hot">uns</span> die Show</h1>
       <div class="welcome-row small">
         <div class="fb-ticket welcome-ticket" aria-hidden="true">
-          <div class="fb-ticket-l"><small>TICKET</small><b>Die große Finalshow</b><span>Wer stiehlt uns die Show</span></div>
+          <div class="fb-ticket-l"><small>TICKET</small><b id="ticket-date"></b><span>Wer stiehlt uns die Show</span></div>
           <div class="fb-ticket-r"><img class="fb-ticket-coin" src="assets/img/muenze.webp" alt=""><small>ADMIT ONE</small></div>
         </div>
         <p class="welcome-text">Herzlich Willkommen zu Deiner Show!</p>
@@ -64,6 +64,8 @@
 
   <script type="module">
     import { h, store } from './assets/js/client.js';
+    // Ticket auf der Startseite: immer das heutige Datum
+    document.getElementById('ticket-date').textContent = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const teamList = document.getElementById('team-list');
     const codeInput = document.getElementById('code');
