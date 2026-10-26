@@ -432,9 +432,9 @@
     function ranking(s) {
       const list = s.ranking || [];
       return [
-        h('div', { class: 'mega', style: { fontSize: 'clamp(1rem,min(6vw,12vh),6rem)', marginBottom: '4vh' } }, 'Zwischenstand'),
-        h('ol', { class: 'rank' }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
-          h('span', {}, `${i + 1}.`), h('span', {}, r.name), h('span', { class: 'pts' }, r.points)))),
+        h('div', { class: 'q rank-title' }, 'Zwischenstand'),
+        h('ol', { class: `rank rank-board n${list.length}` }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
+          h('span', { class: 'pos' }, String(i + 1)), h('span', { class: 'nm' }, r.name), h('span', { class: 'pts' }, r.points)))),
       ];
     }
 

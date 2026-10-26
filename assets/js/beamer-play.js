@@ -7,7 +7,7 @@ import { mapView } from './map.js';
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 const sub = (text, style = {}) => h('div', { class: 'sub', style: { marginTop: 0, ...style } }, text);
-const chip = (t, extra = '', ...rest) => h('span', { class: `chip ${extra}` }, h('span', { class: 'dot', style: { background: t.color } }), t.name, ...rest);
+const chip = (t, extra = '', ...rest) => h('span', { class: `chip team-chip ${extra}`, '--chip': t.color }, t.name, ...rest);
 
 export function renderGame(v, s, teamOf) {
   const fn = { leichte5, dummes, land, kassenschlager, trumpf5, musik, jauch, nerd }[v.type];
@@ -38,7 +38,10 @@ function leichte5(v, teamOf) {
   out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
     const t = teamOf(a.teamId);
     const mark = a.grade === true ? h('span', { class: 'mark ok', 'aria-label': 'richtig' }, '✓') : a.grade === false ? h('span', { class: 'mark bad', 'aria-label': 'falsch' }, '✗') : null;
-    return h('div', { class: `answer${a.ink ? ' has-ink' : ''}`, '--team': t.color }, h('span', {}, h('span', { class: 'who' }, t.name), answerContent(a, 'beamer')), mark);
+    // Wie im Finale: schwarze Antwortfläche, darunter die graue Namensleiste, Teamfarbe als seitliche Balken.
+    return h('div', { class: `answer fx-card${a.ink ? ' has-ink' : ''}`, '--team': t.color },
+      h('div', { class: 'ans-body' }, answerContent(a, 'beamer'), mark),
+      h('div', { class: 'ans-name' }, t.name));
   })));
   if (v.solution) out.push(h('div', { class: 'solution' }, `Lösung: ${v.solution}`));
   return out;
@@ -77,7 +80,7 @@ function kassenschlager(v, teamOf) {
         h('span', {}, '💰'), h('span', {}, teamOf(id).name), h('span', { class: 'pts' }, `${c.money} $ → ${c.points}`))))];
   }
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, 'Das ist ein echter Kassenschlager'), sub('Jedes Team startet mit 20 $', { marginTop: '3vh' })];
-  const out = [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, '🎬 Welcher Film ist gesucht?')];
+  const out = [h('div', { class: 'q' }, '🎬 Welcher Film ist gesucht?')];
   if (v.finished) out.push(h('div', { class: 'solution' }, v.title));
   if (v.turn) {
     const phase = { buy: 'kauft einen Hinweis …', answer: 'schreibt …', grading: 'hat geantwortet' }[v.turn.phase];
