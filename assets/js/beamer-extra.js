@@ -32,29 +32,50 @@ function filmEl() {
   }
   return media.film;
 }
-// Hält die Tonausgabe wach (unhörbar leises Rauschen). Lautsprecher über HDMI oder
-// Bluetooth schalten sonst bei Stille ab und verschlucken die ersten Sekundenbruchteile –
-// bei „Hits me baby“ wäre die 0,5-s-Stufe dann stumm.
-let keep = null;
-function keepAudioAwake(on) {
-  const ctx = on && env.audioCtx ? env.audioCtx() : null;
-  if (!ctx) {
-    if (keep) { try { keep.src.stop(); } catch { /* schon gestoppt */ } keep = null; }
-    return;
+// „Hits me baby“: Häppchen sample-genau über Web Audio abspielen. Das Lied wird beim
+// Auswählen einmal komplett geladen und dekodiert; jede Stufe startet dann ohne
+// Lade- oder Anlaufzeit des Audio-Elements (wichtig für die 0,5-s-Stufe).
+const konBufs = new Map();
+let konSrc = null;
+function konBuffer(ctx, id) {
+  if (!konBufs.has(id)) {
+    konBufs.set(id, (async () => {
+      const url = await mediaUrl(id);
+      if (!url) return null;
+      const data = await (await fetch(url)).arrayBuffer();
+      return await new Promise((res, rej) => ctx.decodeAudioData(data, res, rej));
+    })().catch(() => null));
   }
-  if (keep && keep.ctx === ctx) return;
+  return konBufs.get(id);
+}
+function konStop() {
+  if (!konSrc) return;
+  const { src, gain, ctx } = konSrc;
+  konSrc = null;
+  try {
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.03);
+    src.stop(ctx.currentTime + 0.05);
+  } catch { /* schon beendet */ }
+}
+function konPlay(ctx, buf, from, len) {
+  konStop();
   if (ctx.state === 'suspended') ctx.resume();
-  const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
   const src = ctx.createBufferSource();
   src.buffer = buf;
-  src.loop = true;
-  const g = ctx.createGain();
-  g.gain.value = 0.0004; // etwa −68 dB: nicht hörbar, aber kein „digitales Schweigen“
-  src.connect(g).connect(ctx.destination);
-  src.start();
-  keep = { ctx, src };
+  const gain = ctx.createGain();
+  const t = ctx.currentTime + 0.03;
+  const end = t + len;
+  // 10 ms ein- und ausblenden gegen Knackser
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(1, t + 0.01);
+  gain.gain.setValueAtTime(1, Math.max(t + 0.01, end - 0.01));
+  gain.gain.linearRampToValueAtTime(0, end);
+  src.connect(gain).connect(ctx.destination);
+  src.start(t, Math.min(from, Math.max(0, buf.duration - 0.05)), len + 0.02);
+  konSrc = { src, gain, ctx };
+  src.onended = () => { if (konSrc && konSrc.src === src) konSrc = null; };
 }
 
 function audioEl() {
@@ -79,6 +100,7 @@ export function soundEnabled() {
 
 // Bei jedem Neuzeichnen: Medien passend zum Spielzustand steuern.
 export function syncMedia(s) {
+  last.s = s;
   const v = s.view === 'game' ? s.gameView : null;
   const film = v && v.type === 'filmab' && !v.waiting ? v : null;
   const fl = media.film || (film ? filmEl() : null);
@@ -98,30 +120,39 @@ export function syncMedia(s) {
   }
   const song = v && v.type === 'songsong' && !v.waiting ? v : null;
   const kon = v && v.type === 'konsequenz' && !v.waiting ? v : null;
-  keepAudioAwake(!!kon && env.soundOn());
   const au = media.audio || (song || kon ? audioEl() : null);
   if (!au) return;
   au.muted = !env.soundOn();
+  if (!kon) konStop();
   if (song && song.audio) {
     setSrc(au, song.audio.id, 'audioId').then(() => {
       if (last.audioSeq === `s${song.playback.seq}`) return;
       last.audioSeq = `s${song.playback.seq}`;
       if (song.playback.state === 'playing') { au.currentTime = 0; au.play().catch(() => {}); } else au.pause();
     });
+  } else if (kon && kon.audio && last.konFallback !== kon.audio.id && env.soundOn() && env.audioCtx && env.audioCtx()) {
+    // Web-Audio-Weg (echter Beamer mit Ton)
+    const ctx = env.audioCtx();
+    if (!au.paused) au.pause();
+    const id = kon.audio.id;
+    const bufP = konBuffer(ctx, id); // schon beim Auswählen laden
+    if (kon.stage >= 0 && last.audioSeq !== `k${kon.seq}`) {
+      last.audioSeq = `k${kon.seq}`;
+      const seq = kon.seq;
+      const from = kon.start || 0, len = kon.stages[kon.stage];
+      bufP.then((buf) => {
+        if (last.audioSeq !== `k${seq}`) return;
+        if (buf) return konPlay(ctx, buf, from, len);
+        // Dekodieren fehlgeschlagen: über das Audio-Element abspielen
+        last.audioSeq = null;
+        last.konFallback = id;
+        syncMedia(last.s);
+      });
+    }
   } else if (kon && kon.audio) {
+    konStop();
     setSrc(au, kon.audio.id, 'audioId').then(() => {
-      // Lied gewählt, aber noch nicht angespielt: schon an den Startpunkt springen und puffern,
-      // damit die erste Stufe sofort und vollständig zu hören ist.
-      if (kon.stage < 0) {
-        if (last.konPrepared !== kon.audio.id) {
-          last.konPrepared = kon.audio.id;
-          au.pause();
-          au.currentTime = kon.start || 0;
-        }
-        return;
-      }
-      last.konPrepared = null;
-      if (last.audioSeq === `k${kon.seq}`) return;
+      if (last.audioSeq === `k${kon.seq}` || kon.stage < 0) return;
       last.audioSeq = `k${kon.seq}`;
       // Genau die Länge der Stufe ab dem Startpunkt spielen.
       clearTimeout(last.stageTimer);
@@ -147,6 +178,7 @@ export function syncMedia(s) {
       au.play().catch(() => {});
     });
   } else if (!au.paused) {
+    konStop();
     clearTimeout(last.stageTimer);
     cancelAnimationFrame(last.stageRaf);
     au.pause();
