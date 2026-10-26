@@ -244,6 +244,51 @@ function buildIntroVideo() {
     h('p', { class: 'muted', style: { fontSize: '0.85rem' } }, 'Formate: MP4 (empfohlen), WebM oder MOV. Ton läuft auf dem Beamer, sobald dort „Ton aktivieren“ geklickt wurde.'));
 }
 
+// Intro-Lied je Spiel (Kategorie): läuft auf der Spieltitel-Folie dieses Spiels.
+let gameIntroUpload = null; // { gameId, name, progress }
+function buildGameIntro(g, pos) {
+  const m = g.intro;
+  const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+  const input = h('input', {
+    type: 'file', accept: 'audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v,.mp3,.m4a,.mp4', class: 'visually-hidden', 'aria-label': `Intro-Lied für Spiel ${pos} wählen`,
+    onchange: async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      gameIntroUpload = { gameId: g.id, name: file.name, progress: 0 };
+      renderAll(true);
+      try {
+        const up = await uploadMedia(file, token, (p) => {
+          gameIntroUpload.progress = p;
+          const bar = document.getElementById('game-intro-progress');
+          if (bar) bar.value = p;
+        });
+        await act('game.setIntro', { gameId: g.id, media: { id: up.id, type: up.type, size: up.size, name: file.name } });
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        gameIntroUpload = null;
+        renderAll(true);
+      }
+    },
+  });
+  const busy = gameIntroUpload && gameIntroUpload.gameId === g.id;
+  const player = m ? h(m.type.startsWith('video') ? 'video' : 'audio', { controls: true, preload: 'metadata', class: 'game-intro-preview' }) : null;
+  if (m) mediaUrl(m.id).then((url) => {
+    if (url) player.src = url;
+    else player.replaceWith(h('p', { class: 'notice warn' }, 'Die Datei ist auf diesem Gerät nicht mehr vorhanden – bitte neu hochladen.'));
+  });
+  return h('div', { class: 'game-intro-box' },
+    h('b', {}, '♪ Intro-Lied für die Spieltitel-Folie'),
+    busy
+      ? h('div', {}, h('p', {}, `„${gameIntroUpload.name}“ wird hochgeladen …`), h('progress', { id: 'game-intro-progress', max: '1', value: String(gameIntroUpload.progress), style: { width: '100%' } }))
+      : m ? h('div', {}, h('p', { style: { margin: '6px 0' } }, m.name, m.size ? h('span', { class: 'muted' }, ` · ${fmtSize(m.size)}`) : null), player)
+        : h('p', { class: 'muted', style: { margin: '6px 0' } }, 'Noch kein Intro-Lied. MP3 oder MP4 hochladen – es läuft, solange der Spieltitel auf dem Beamer steht.'),
+    busy ? null : h('div', { class: 'row' },
+      h('label', { class: 'btn small' }, input, m ? 'Austauschen' : '+ MP3/MP4 hochladen'),
+      m ? h('button', { class: 'btn small ghost', onclick: () => act('game.setIntro', { gameId: g.id, media: null }) }, 'Entfernen') : null));
+}
+
 // Eigene Lieder je Pause: Playlist hochladen, sortieren, entfernen.
 let openPause = null;
 let songUpload = null; // { done, total, name }
@@ -776,6 +821,7 @@ function buildGameEditor(kind, item) {
       ? 'Änderungen gelten nur für diese Show. Der Eintrag in der Datenbank bleibt unverändert.'
       : 'Änderungen gelten für künftige Shows. Spiele, die schon in einer Show sind, bleiben unverändert.'),
     running ? h('p', { class: 'notice warn' }, 'Dieses Spiel läuft gerade. Inhalte erst nach dem Beenden ändern.') : null,
+    kind === 'game' ? buildGameIntro(item, pos) : null,
     h('fieldset', { disabled: running, class: 'plain' },
       h('label', { for: `${key}-title` }, 'Name in der Show (erscheint im Spieltitel auf dem Beamer)'),
       h('input', { id: `${key}-title`, value: d.title, maxlength: '80', oninput: (ev) => { d.title = ev.target.value; save(); } }),

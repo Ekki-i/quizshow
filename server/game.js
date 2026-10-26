@@ -287,7 +287,7 @@ function stepLabel(db, st) {
     video: `Intro-Video${db.project.introVideo ? ` (${db.project.introVideo.name})` : ' – noch keins hinterlegt'}`,
     intro: 'Vorstellung der Teams',
     pyramid: st.pos ? `Übersicht Kategorien → ${game}` : 'Übersicht Kategorien',
-    title: `${game} – Spieltitel`,
+    title: `${game} – Spieltitel${g && g.intro ? ' ♪' : ''}`,
     game: `${game} – spielen`,
     coin: `Münzvergabe nach Spiel ${st.pos}${STAGE_LABEL[st.pos] ? ` (Gewinnstufe ${STAGE_LABEL[st.pos]})` : ''}`,
     pause: `Pause${st.songs && st.songs.length ? ` · ${st.songs.length} ${st.songs.length === 1 ? 'eigenes Lied' : 'eigene Lieder'}` : ''}`,
@@ -405,6 +405,21 @@ const moderatorActions = {
     db.project.introVideo = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro-Video'), 80) || 'Intro-Video', size: Number(m.size) || 0 };
     log(db, ctx, 'editor', `Intro-Video „${db.project.introVideo.name}“ gesetzt`);
     return { releasedMedia: old && old.id !== m.id ? old.id : null };
+  },
+
+  // Intro-Lied je Spiel (Kategorie): MP3/Audio oder MP4/Video, läuft auf der Spieltitel-Folie.
+  'game.setIntro'(db, ctx, p) {
+    const game = findGame(db, p.gameId);
+    if (p.media === null) {
+      delete game.intro;
+      log(db, ctx, 'editor', `Intro-Lied von „${game.title}“ entfernt`);
+      return;
+    }
+    const m = p.media || {};
+    if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültige Datei.');
+    if (typeof m.type !== 'string' || !/^(audio|video)\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine MP3- oder MP4-Datei wählen.');
+    game.intro = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro'), 100) || 'Intro', size: Number(m.size) || 0 };
+    log(db, ctx, 'editor', `Intro-Lied „${game.intro.name}“ für „${game.title}“ gesetzt`);
   },
 
   'team.add'(db, ctx, p) {
@@ -751,6 +766,7 @@ function referencedMedia(db) {
   const ids = new Set();
   for (const pr of [db.project, ...db.shows.map((x) => x.project)]) {
     if (pr.introVideo) ids.add(pr.introVideo.id);
+    for (const g of pr.games) if (g.intro) ids.add(g.intro.id);
     for (const st of pr.rundown || []) for (const m of st.songs || []) ids.add(m.id);
   }
   return ids;
@@ -766,7 +782,7 @@ function findTeamByCode(db, code) {
 
 function gameHeader(db) {
   const g = activeGame(db);
-  return g ? { type: g.type, title: g.title, position: position(db, g) } : null;
+  return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null } : null;
 }
 
 function teamView(db, teamId, now = Date.now()) {

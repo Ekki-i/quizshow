@@ -118,6 +118,8 @@ Umgesetzt:
 - Spiellogik je Spiel in `server/play-*.js`, gemeinsame Bausteine in `server/core.js`.
   Kartenumrisse: Natural Earth (gemeinfrei), erzeugt mit `scripts/build-maps.mjs`.
 
+- **Intro-Lied je Kategorie**: Im Show-Editor beim Spiel MP3 oder MP4 hochladen; es läuft auf dem Beamer,
+  solange die Spieltitel-Folie dieses Spiels steht, und blendet beim Weiterschalten aus.
 - **Finale gegen die Moderation** (Showablauf: nach der Rangliste): Das Team mit den meisten Punkten
   spielt gegen die Moderation. Beide schreiben jede Frage gleichzeitig ohne Zeitdruck auf. Das Team
   bekommt pro richtiger Antwort einen Punkt, die Moderation bei jeder Frage, ohne ihre Antwort zu zeigen.

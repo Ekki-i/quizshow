@@ -51,6 +51,7 @@
       // Ein laufendes Intro-Video bekommt jetzt Ton.
       const v = document.querySelector('video.intro-video');
       if (v) v.muted = false;
+      if (gameIntro) { gameIntro.muted = false; gameIntro.play().catch(() => {}); }
     }
     document.getElementById('sound-on').onclick = enableSound;
 
@@ -182,6 +183,7 @@
       lastState = s;
       // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
       if (s.view !== 'pause') stopPause();
+      if (s.view !== 'title') stopGameIntro();
       const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, finale, blank: () => [] };
       if (s.view !== 'finale') prevFin = null;
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
@@ -355,7 +357,38 @@
           h('div', { class: 'tv-plate' }, h('span', { class: 'tv-num' }, label), title)));
     }
 
+    // Intro-Lied der Kategorie (MP3 oder MP4) läuft, solange die Spieltitel-Folie steht.
+    // Ton nur auf dem echten Beamer nach „Ton aktivieren“; die Vorschau bleibt stumm.
+    let gameIntro = null;
+    function stopGameIntro() {
+      const el = gameIntro;
+      gameIntro = null;
+      if (!el) return;
+      const start = el.volume;
+      let k = 0;
+      const t = setInterval(() => {
+        k += 1;
+        el.volume = Math.max(0, start * (1 - k / 10));
+        if (k >= 10) { clearInterval(t); el.pause(); el.remove(); }
+      }, 80);
+    }
+    function playGameIntro(s) {
+      stopGameIntro();
+      const m = s.game && s.game.intro;
+      if (!m || embedded || !s.settings.sound) return;
+      const el = h('video', { class: 'game-intro', playsinline: true, preload: 'auto', 'aria-hidden': 'true' });
+      el.muted = !audio;
+      document.body.append(el);
+      gameIntro = el;
+      mediaUrl(m.id).then((url) => {
+        if (!url || gameIntro !== el) return;
+        el.src = url;
+        el.play().catch(() => {});
+      });
+    }
+
     function title(s) {
+      playGameIntro(s);
       return [titleCard(s)];
     }
 

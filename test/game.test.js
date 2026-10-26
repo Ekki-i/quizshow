@@ -716,3 +716,17 @@ test('Finale: Team erreicht das Ziel allein und gewinnt das Ticket', () => {
   assert.equal(db.live.finale.result, 'team');
   assert.equal(game.teamView(db, ids[0]).finale.result, 'team');
 });
+
+test('Intro-Lied je Spiel: setzen, an Beamer im Spieltitel, entfernen', () => {
+  const { db } = setup(1);
+  const g = db.project.games[1];
+  game.applyAction(db, mod(), 'game.setIntro', { gameId: g.id, media: { id: 'media_aaaaaaaaaaaa11', type: 'audio/mpeg', name: 'Intro.mp3', size: 10 } });
+  assert.throws(() => game.applyAction(db, mod(), 'game.setIntro', { gameId: g.id, media: { id: 'media_aaaaaaaaaaaa11', type: 'image/png' } }), /MP3/);
+  assert.ok(game.referencedMedia(db).has('media_aaaaaaaaaaaa11'));
+  const idx = game.moderatorView(db).rundown.findIndex((s) => s.kind === 'title' && s.pos === 2);
+  game.applyAction(db, mod(), 'run.goto', { index: idx });
+  assert.deepEqual(game.beamerView(db).game.intro, { id: 'media_aaaaaaaaaaaa11', type: 'audio/mpeg' });
+  game.applyAction(db, mod(), 'game.setIntro', { gameId: g.id, media: null });
+  assert.equal(game.beamerView(db).game.intro, null);
+  assert.ok(!game.referencedMedia(db).has('media_aaaaaaaaaaaa11'));
+});
