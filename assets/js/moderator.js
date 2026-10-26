@@ -1,5 +1,6 @@
 import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
+import { mapView } from './map.js';
 import { buildFinaleLive, buildFinaleEditor } from './mod-finale.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
@@ -910,6 +911,7 @@ function buildGameEditor(kind, item) {
     drafts.set(key, d);
   }
   const type = S.types[item.type];
+  editorContent = d.content;
   const save = () => autosave(key, () => (kind === 'game'
     ? act('game.update', { gameId: item.id, title: d.title, content: d.content })
     : act('library.update', { libraryId: item.id, title: d.title, content: d.content })));
@@ -937,7 +939,48 @@ function buildGameEditor(kind, item) {
 }
 
 function formFields(fields, obj, save, rerender, idBase) {
-  return fields.map((f) => formField(f, obj, f.key, save, rerender, `${idBase}-${f.key}`));
+  const out = fields.map((f) => formField(f, obj, f.key, save, rerender, `${idBase}-${f.key}`));
+  // Orte mit Breiten- und Längengrad: zusätzlich auf der Karte antippen.
+  if (fields.some((f) => f.key === 'lat') && fields.some((f) => f.key === 'lng')) out.push(geoPicker(obj, save, idBase));
+  return out;
+}
+
+// Karte im Editor: Antippen setzt Breiten- und Längengrad des gesuchten Orts.
+let editorContent = null; // Inhalt des gerade bearbeiteten Spiels (für die Standard-Karte)
+const MAP_BOUNDS = { Europa: [34, 71.5, -25, 45], Deutschland: [46.8, 55.4, 4.5, 16.5] };
+function geoPicker(item, save, idBase) {
+  const box = h('div', { class: 'map-box geo-pick' });
+  const note = h('p', { class: 'muted', style: { margin: '6px 0 0' } });
+  const mapName = () => (['Welt', 'Europa', 'Deutschland'].includes(item.map) ? item.map : (editorContent && editorContent.map) || 'Welt');
+  const draw = () => {
+    const name = mapName();
+    const has = Number.isFinite(item.lat) && Number.isFinite(item.lng);
+    box.replaceChildren(mapView(name, {
+      markers: has ? [{ lat: item.lat, lng: item.lng, kind: 'target', label: item.target || 'Ziel' }] : [],
+      label: `Karte ${name} – Ort antippen`,
+      onPick: ({ lat, lng }) => {
+        item.lat = lat;
+        item.lng = lng;
+        for (const [k, v] of [['lat', lat], ['lng', lng]]) { const inp = document.getElementById(`${idBase}-${k}`); if (inp) inp.value = v; }
+        save();
+        draw();
+      },
+    }));
+    const b = MAP_BOUNDS[name];
+    const outside = has && b && (item.lat < b[0] || item.lat > b[1] || item.lng < b[2] || item.lng > b[3]);
+    note.textContent = outside
+      ? `⚠ Der Ort liegt außerhalb der Karte „${name}“ – bitte andere Karte wählen oder neu antippen.`
+      : `Karte „${name}“: Ort antippen, um Breiten- und Längengrad zu setzen. Feinkorrektur in den Feldern oben.`;
+    note.style.color = outside ? 'var(--bad)' : '';
+  };
+  draw();
+  // Bei Änderung der Karte oder der Zahlen die Vorschau nachziehen.
+  setTimeout(() => {
+    const sel = document.getElementById(`${idBase}-map`);
+    if (sel) sel.addEventListener('change', draw);
+    for (const k of ['lat', 'lng']) document.getElementById(`${idBase}-${k}`)?.addEventListener('change', draw);
+  }, 0);
+  return h('div', { class: 'field geo-field' }, h('label', {}, 'Ort auf der Karte'), box, note);
 }
 
 function formField(f, holder, k, save, rerender, id) {

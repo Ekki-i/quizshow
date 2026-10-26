@@ -490,3 +490,22 @@ test('Erst ich, dann du: Beamer zeigt, wie viele Punkte gerade auf dem Spiel ste
   act(db, team(ids[0]), 'decide', { choice: 'secure' });
   assert.deepEqual(pv(db).last, { teamId: ids[0], kind: 'secured', v: 2 });
 });
+
+test('Ich sehe ein Land: Karte je Aufgabe, sonst Standard-Karte des Spiels', () => {
+  const { db, ids } = setup(2);
+  const g = db.project.games.find((x) => x.type === 'land');
+  const content = structuredClone(g.content);
+  content.map = 'Welt';
+  content.tasks = [
+    { question: 'Wo liegt Kassel?', map: 'Deutschland', target: 'Kassel', lat: 51.316, lng: 9.498 },
+    { question: 'Wo liegt Paris?', map: 'Standard-Karte des Spiels', target: 'Paris', lat: 48.857, lng: 2.352 },
+  ];
+  game.applyAction(db, mod(), 'game.update', { gameId: g.id, content });
+  game.applyAction(db, mod(), 'show.activate', { gameId: g.id });
+  db.live.beamer = { view: 'game', data: {} };
+  act(db, mod(), 'open', { taskIndex: 0 });
+  assert.equal(pv(db).map, 'Deutschland');
+  assert.equal(tv(db, ids[0]).map, 'Deutschland');
+  act(db, mod(), 'open', { taskIndex: 1 });
+  assert.equal(pv(db).map, 'Welt');
+});

@@ -128,15 +128,16 @@ function land(ui, g, st) {
   const r = rounds[t];
   const out = [
     tabs(g.content.tasks.map((_, i) => `Aufgabe ${i + 1}`), t, (i) => ui.act('play.open', { taskIndex: i }), (i) => rounds[i]?.showTarget),
-    h('p', { class: 'muted' }, `Karte: ${g.content.map}`),
+    h('p', { class: 'muted' }, `Standard-Karte: ${g.content.map}`),
   ];
   if (t < 0 || !r) return [...out, h('p', { class: 'muted' }, 'Aufgabe freigeben: Teams setzen einen Punkt auf ihrer Karte.')];
   const task = g.content.tasks[t];
-  out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, task.question));
+  const mapName = ['Welt', 'Europa', 'Deutschland'].includes(task.map) ? task.map : g.content.map;
+  out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, task.question), h('p', { class: 'muted' }, `Karte dieser Aufgabe: ${mapName}`));
   out.push(h('p', {}, h('span', { class: 'muted' }, 'Ziel (nur für dich): '), h('b', {}, task.target || '–'), h('span', { class: 'muted' }, ` · ${task.lat}, ${task.lng}`)));
   const dist = (gs) => Math.round(haversine(gs, task));
   const list = Object.entries(r.guesses).map(([id, gs]) => ({ id, km: dist(gs), ...gs })).sort((a, b) => a.km - b.km);
-  out.push(h('div', { class: 'map-box' }, mapView(g.content.map, {
+  out.push(h('div', { class: 'map-box' }, mapView(mapName, {
     markers: [...list.map((x) => ({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.id), label: ui.teamName(x.id), showLabel: true })), { lat: task.lat, lng: task.lng, kind: 'target', label: task.target }],
   })));
   out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((tm) => {

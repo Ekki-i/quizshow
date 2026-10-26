@@ -33,11 +33,16 @@ function bookWinners(db, ctx, game, st, r, winners, why) {
   }
 }
 
+// Karte je Aufgabe: eigene Wahl oder die Standard-Karte des Spiels.
+function mapOf(game, task) {
+  return task && ['Welt', 'Europa', 'Deutschland'].includes(task.map) ? task.map : game.content.map;
+}
+
 function publicView(db, game, st) {
   const r = round(st, st.taskIndex);
   const task = game.content.tasks[st.taskIndex];
   return {
-    map: game.content.map,
+    map: mapOf(game, task),
     taskIndex: st.taskIndex,
     count: game.content.tasks.length,
     question: task.question,

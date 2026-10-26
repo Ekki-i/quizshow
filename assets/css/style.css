@@ -1307,3 +1307,5 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .beamer .fragen-q.small + .answers, .beamer .fragen-q.small ~ .answers { margin-top: 1.4vh; }
 .beamer .fragen-sol .ink-board.small { max-height: 11vh; }
 .beamer .dgf-tile { min-height: 8vh; }
+.geo-field .geo-pick { max-width: 560px; margin: 4px 0 0; }
+.geo-field .map.pickable { cursor: crosshair; }
