@@ -3,6 +3,7 @@
 // Video und Musik laufen in dauerhaften Elementen außerhalb der Folie, damit
 // ein Neuzeichnen die Wiedergabe nicht unterbricht.
 
+import { pooled } from './media-pool.js';
 import { h, mediaUrl } from './client.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -27,7 +28,8 @@ const last = { filmSeq: null, filmId: null, audioSeq: null, audioId: null, stage
 
 function filmEl() {
   if (!media.film) {
-    media.film = h('video', { class: 'film-layer', playsinline: true, preload: 'auto' });
+    media.film = pooled('film');
+    media.film.className = 'film-layer';
     document.body.append(media.film);
   }
   return media.film;
@@ -80,7 +82,8 @@ function konPlay(ctx, buf, from, len) {
 
 function audioEl() {
   if (!media.audio) {
-    media.audio = h('audio', { preload: 'auto', 'aria-hidden': 'true' });
+    media.audio = pooled('audio');
+    media.audio.setAttribute('aria-hidden', 'true');
     document.body.append(media.audio);
   }
   return media.audio;

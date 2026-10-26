@@ -917,3 +917,21 @@ test('Show neu starten: Punkte, Münzen und Spielstände weg, Editor-Inhalte ble
   assert.equal(db.project.teams.length, 3);
   assert.equal(db.project.games[0].title, title);
 });
+
+test('Pause: iPads warten, Münzen auf dem Pult wie vor der nächsten Münzvergabe', () => {
+  const { db, ids } = setup();
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
+  game.applyAction(db, mod(), 'play.open', { qIndex: 0 });
+  assert.ok(game.teamView(db, ids[0]).play);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[0], points: 3, reason: 'T' });
+  game.applyAction(db, mod(), 'coin.determine', { position: 4 }); // Gewinner schon ermittelt
+  const steps = game.moderatorView(db, []).rundown;
+  const pi = steps.findIndex((x) => x.kind === 'pause');
+  game.applyAction(db, mod(), 'run.goto', { index: pi });
+  const tv = game.teamView(db, ids[0]);
+  assert.equal(tv.play, undefined);
+  assert.equal(tv.waitKind, 'pause');
+  const bv = game.beamerView(db);
+  assert.equal(bv.pauseCoinPos, 4);
+  assert.equal(bv.coins.filter((c) => c.position < bv.pauseCoinPos).length, 0); // alle 3 Münzen noch auf dem Pult
+});

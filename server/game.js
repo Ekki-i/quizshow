@@ -1027,6 +1027,8 @@ function gameHeader(db) {
   return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null, color: g.color || null } : null;
 }
 
+const TEAM_WAIT_VIEWS = ['pause', 'coin', 'stageTitle', 'finaleTitle'];
+
 function teamView(db, teamId, now = Date.now()) {
   const team = findTeam(db, teamId);
   const view = {
@@ -1038,6 +1040,14 @@ function teamView(db, teamId, now = Date.now()) {
     settings: { reducedMotion: db.project.settings.reducedMotion },
   };
   if (db.project.settings.publicScores) view.ranking = rankingSnapshot(db).map(({ name, color, points }) => ({ name, color, points }));
+  // Pause, Münzvergabe, Zwischenstand und Titelfolien: die iPads warten, statt den
+  // letzten Stand des vorigen Spiels zu zeigen.
+  const away = TEAM_WAIT_VIEWS.includes(db.live.beamer && db.live.beamer.view);
+  if (away) {
+    view.game = null;
+    view.waitKind = db.live.beamer.view === 'pause' ? 'pause' : 'wait';
+    return view;
+  }
   const g = activeGame(db);
   if (g) {
     const play = PLAY[g.type].teamView(db, g, gameState(db, g), teamId, now);
@@ -1094,6 +1104,12 @@ function beamerView(db) {
   if (b.view === 'pause') {
     const st = b.data && b.data.stepId ? rundown(db).find((x) => x.id === b.data.stepId) : null;
     view.pauseSongs = st && st.songs ? st.songs.map((m) => ({ id: m.id, type: m.type, name: m.name })) : [];
+    // Münzen auf dem Pult zählen wie vor der nächsten Münzvergabe – auch wenn deren
+    // Gewinner schon ermittelt ist, liegt die Münze in der Pause noch auf dem Pult.
+    const steps = rundown(db);
+    const at = st ? steps.findIndex((x) => x.id === st.id) : -1;
+    const nextCoin = at >= 0 ? steps.slice(at + 1).find((x) => x.kind === 'coin') : null;
+    view.pauseCoinPos = nextCoin ? nextCoin.pos : null;
   }
   if (b.view === 'video') view.introVideo = pr.introVideo ? { id: pr.introVideo.id, type: pr.introVideo.type } : null;
   if (b.view === 'game') view.gameView = beamerGameView(db);

@@ -80,6 +80,9 @@
       draftKey = null;
       if (s.play) parts.push(...renderPlay(s.play, ui).filter(Boolean));
       else if (s.finale) parts.push(...renderFinale(s.finale, ui).filter(Boolean));
+      else if (s.waitKind === 'pause') parts.push(h('div', { class: 'wait' },
+        h('p', { class: 'big' }, 'Pause – gleich geht’s weiter!'),
+        h('p', { class: 'muted' }, 'Dieses Gerät bleibt mit eurem Team verbunden.')));
       else parts.push(h('div', { class: 'wait' },
         h('p', { class: 'big' }, 'Gleich geht’s los!'),
         h('p', { class: 'muted' }, 'Wartet auf die Moderation. Dieses Gerät bleibt mit eurem Team verbunden.')));
@@ -89,7 +92,7 @@
       }
 
       // Ein offenes Eingabefeld nicht bei jedem Update neu aufbauen (Fokus/Tastatur bleiben).
-      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.finale || null, s.ranking || null]);
+      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.finale || null, s.ranking || null, s.waitKind || null]);
       if (key === lastRenderKey) return;
       lastRenderKey = key;
       main.replaceChildren(...parts);

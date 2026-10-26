@@ -301,24 +301,10 @@
   select(initial);
   window.addEventListener('hashchange', () => { const id = location.hash.slice(1); if (views.some((v) => v.id === id)) select(id); });
 
-  // Der Reiter „iPad Moderation“ erscheint erst ab der Münzvergabe für Gewinnstufe 3 (nach Spiel 8).
+  // Der Reiter „iPad Moderation (Finale)“ steht immer oben neben Moderation und Editor.
   const hostTab = [...tabs.children].find((b) => b.dataset.id === 'host');
   hostTab.textContent = 'iPad Moderation (Finale)';
-  (function watchFinale() {
-    const c = server.connect();
-    c.onmessage = (e) => {
-      const m = JSON.parse(e.data);
-      if (m.type !== 'state') return;
-      const st = m.state;
-      const steps = st.rundown || [];
-      const coin3 = steps.findIndex((x) => x.kind === 'coin' && x.pos === 8);
-      const on = !!st.live.finale || (st.live.coins || []).some((x) => x.position === 8)
-        || (coin3 >= 0 && (st.live.run ?? -1) >= coin3);
-      hostTab.hidden = !on;
-      if (!on && stage.dataset.focus === 'host') select('moderation');
-    };
-    setTimeout(() => c.send(JSON.stringify({ type: 'hello', role: 'moderator', token: server.demoToken })), 30);
-  })();
+  hostTab.hidden = false;
 
   document.getElementById('reset').onclick = () => {
     server.reset();
