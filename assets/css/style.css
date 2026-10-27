@@ -1347,3 +1347,5 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 /* „Ich sehe ein Land“: gesuchtes Land hervorheben */
 .map .target-area { fill: rgba(255, 194, 61, 0.55); stroke: #ffc23d; stroke-width: 1.6; vector-effect: non-scaling-stroke; animation: areaPulse calc(1.6s * var(--speed, 1)) ease-in-out 2; }
 @keyframes areaPulse { 50% { fill: rgba(255, 194, 61, 0.85); } }
+/* Beamer: Browser hat Ton blockiert → ein Klick setzt ihn fort */
+.sound-resume { position: fixed; left: 50%; bottom: 6vh; translate: -50% 0; z-index: 50; padding: 1.6vh 3vh; font: 800 2.4vh/1 var(--font-display, sans-serif); color: #fff; background: #ff2d8a; border: 0; border-radius: 1vh; box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.5); cursor: pointer; animation: pulse 1.4s ease-in-out infinite; }

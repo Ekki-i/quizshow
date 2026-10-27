@@ -1,10 +1,10 @@
 // Feste Audio-/Video-Elemente für den Beamer, die beim Klick auf „Ton aktivieren“
-// freigeschaltet werden.
+// freigeschaltet werden, plus eine Notbremse, falls der Browser Ton trotzdem blockiert.
 //
 // Safari erlaubt Ton nur für Medien-Elemente, die einmal während eines Klicks
-// gestartet wurden. Neu erzeugte Elemente (z. B. für jedes Intro-Lied) bleiben dort
-// stumm – deshalb lief der Ton nur beim ersten Mal. Wir schalten beim Klick einen
-// festen Satz Elemente frei und verwenden immer wieder dieselben.
+// gestartet bzw. geladen wurden. Deshalb verwenden wir immer wieder dieselben
+// Elemente. Blockiert der Browser dennoch, erscheint „🔊 Ton fortsetzen“ – ein
+// Klick darauf startet alles Wartende mit Ton.
 
 const pool = new Map();
 const KINDS = { intro: 'video', video: 'video', film: 'video', audio: 'audio', pause: 'audio' };
@@ -38,27 +38,58 @@ export function pooled(key) {
   return el;
 }
 
-// Muss direkt im Klick-Handler aufgerufen werden (ohne vorheriges await).
+// Direkt im Klick-Handler aufrufen. Elemente, die gerade etwas geladen haben oder
+// spielen, bleiben unangetastet (sonst würde z. B. das Intro-Video anhalten).
 export function unlockMedia() {
-  SILENT = SILENT || silentWav();
+  try { SILENT = SILENT || silentWav(); } catch { SILENT = null; }
   for (const key of Object.keys(KINDS)) {
-    const el = pooled(key);
-    if (el.getAttribute('src') && !el.paused) continue; // läuft schon (z. B. Intro gerade gestartet)
-    const hadSrc = el.getAttribute('src');
-    el.muted = false;
-    if (hadSrc) {
-      // Schon geladen, aber angehalten: im Klick kurz starten und sofort wieder anhalten.
-      const t = el.currentTime;
-      el.play().catch(() => {});
-      el.pause();
-      el.currentTime = t;
-      continue;
-    }
-    el.src = SILENT;
-    const p = el.play();
-    const done = () => {
-      if (el.getAttribute('src') === SILENT) { el.pause(); el.removeAttribute('src'); el.load(); }
-    };
-    if (p && p.then) p.then(done, done); else done();
+    try {
+      const el = pooled(key);
+      if (el.getAttribute('src')) continue;
+      el.muted = false;
+      if (!SILENT) continue;
+      el.src = SILENT;
+      const done = () => {
+        if (el.getAttribute('src') === SILENT) { el.pause(); el.removeAttribute('src'); }
+      };
+      const p = el.play();
+      if (p && p.then) p.then(done, done); else done();
+    } catch { /* Freischalten ist nur ein Versuch */ }
   }
+  resumePending();
+}
+
+// ---------- Notbremse: Ton blockiert → Knopf „Ton fortsetzen“ ----------
+const pending = new Set();
+let resumeBtn = null;
+
+function showResume() {
+  if (resumeBtn) return;
+  resumeBtn = document.createElement('button');
+  resumeBtn.className = 'sound-resume';
+  resumeBtn.type = 'button';
+  resumeBtn.textContent = '🔊 Ton fortsetzen';
+  resumeBtn.onclick = () => { unlockMedia(); resumePending(); };
+  document.body.append(resumeBtn);
+}
+function resumePending() {
+  for (const el of pending) {
+    el.muted = false;
+    el.play().catch(() => {});
+  }
+  pending.clear();
+  if (resumeBtn) { resumeBtn.remove(); resumeBtn = null; }
+}
+
+// Mit Ton abspielen. Lehnt der Browser ab, läuft es stumm weiter (bei Videos) und
+// der Knopf „Ton fortsetzen“ erscheint.
+export function playWithSound(el, { mutedFallback = false } = {}) {
+  const p = el.play();
+  if (!p || !p.catch) return Promise.resolve();
+  return p.catch((err) => {
+    if (!err || err.name !== 'NotAllowedError') return;
+    pending.add(el);
+    showResume();
+    if (mutedFallback) { el.muted = true; el.play().catch(() => {}); }
+  });
 }

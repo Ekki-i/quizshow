@@ -5,7 +5,7 @@
 // Ohne Ton (Vorschau, Ton nicht aktiviert) läuft die Band im selben Takt stumm.
 
 import { h, mediaUrl } from './client.js';
-import { pooled } from './media-pool.js';
+import { pooled, playWithSound } from './media-pool.js';
 import { bandSceneSvg, poseBand } from './band-scene.js';
 
 const BPM = 104;
@@ -208,7 +208,7 @@ function createSongPlayer(ctx, songs) {
     if (!url) return playAt(index + 1);
     if (el.src !== url && el.getAttribute('src') !== url) el.src = url;
     else el.currentTime = 0;
-    el.play().catch(() => {});
+    playWithSound(el);
   }
   // Als Eigenschaft (nicht addEventListener): das Element wird von Pause zu Pause weiterverwendet.
   el.onended = () => { if (el.__owner === owner) playAt(index + 1); };

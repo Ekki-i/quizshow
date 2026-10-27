@@ -27,7 +27,7 @@
     import { podiumRow, INTRO_START, INTRO_STEP, pultLayers, singlePodium, PULT } from './assets/js/studio.js';
     import { studioRoom } from './assets/js/studio-room.js';
     import { qrcode } from './assets/js/vendor/qrcode.js';
-    import { pooled, unlockMedia } from './assets/js/media-pool.js';
+    import { pooled, unlockMedia, playWithSound } from './assets/js/media-pool.js';
     import { startPause, stopPause, bandScene, audioReady, preloadSongs } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
@@ -48,16 +48,16 @@
     // Eigene, synthetisch erzeugte Effekte – keine fremde Musik.
     function enableSound() {
       if (audio) return;
-      // Feste Medien-Elemente im Klick freischalten (Safari: sonst nur beim ersten Mal Ton).
-      if (!embedded) unlockMedia();
       audio = new AudioContext();
       document.getElementById('sound-on')?.remove();
+      // Feste Medien-Elemente im Klick freischalten (Safari: sonst nur beim ersten Mal Ton).
+      if (!embedded) { try { unlockMedia(); } catch { /* nur ein Versuch */ } }
       // Läuft gerade die Pause, setzt die Musik jetzt ein.
       if (lastState && lastState.view === 'pause' && lastState.settings.sound) startPause(audio, lastState.pauseSongs || []);
       // Ein laufendes Intro-Video bekommt jetzt Ton.
       const v = document.querySelector('video.intro-video');
-      if (v) v.muted = false;
-      if (gameIntro) { gameIntro.muted = false; gameIntro.play().catch(() => {}); }
+      if (v) { v.muted = false; if (!v.ended) playWithSound(v); }
+      if (gameIntro) { gameIntro.muted = false; playWithSound(gameIntro); }
       soundEnabled();
     }
     // Filmclips und Musik der Datenbank-Spiele: Ton nur auf dem echten Beamer nach „Ton aktivieren“.
@@ -443,7 +443,7 @@
         if (!url || gameIntro !== el || token !== introToken) return;
         if (el.getAttribute('src') !== url) el.src = url;
         el.currentTime = 0;
-        el.play().catch(() => {});
+        playWithSound(el);
       });
     }
 
@@ -511,7 +511,8 @@
         if (!url) return logo();
         if (v.getAttribute('src') !== url) v.src = url;
         v.currentTime = 0;
-        v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+        if (v.muted) v.play().catch(() => {});
+        else playWithSound(v, { mutedFallback: true });
       });
       return [box];
     }

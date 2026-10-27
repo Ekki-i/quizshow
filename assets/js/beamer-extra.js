@@ -3,7 +3,7 @@
 // Video und Musik laufen in dauerhaften Elementen außerhalb der Folie, damit
 // ein Neuzeichnen die Wiedergabe nicht unterbricht.
 
-import { pooled } from './media-pool.js';
+import { pooled, playWithSound } from './media-pool.js';
 import { h, mediaUrl } from './client.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -116,7 +116,7 @@ export function syncMedia(s) {
         if (!ok && last.filmId !== film.clip.id) return;
         if (last.filmSeq === pb.seq) return;
         last.filmSeq = pb.seq;
-        if (pb.state === 'playing') { if (pb.restart) fl.currentTime = 0; fl.play().catch(() => { fl.muted = true; fl.play().catch(() => {}); }); }
+        if (pb.state === 'playing') { if (pb.restart) fl.currentTime = 0; (fl.muted ? fl.play().catch(() => {}) : playWithSound(fl, { mutedFallback: true })); }
         else { fl.pause(); if (pb.state === 'stopped') fl.currentTime = 0; }
       });
     }
@@ -131,7 +131,7 @@ export function syncMedia(s) {
     setSrc(au, song.audio.id, 'audioId').then(() => {
       if (last.audioSeq === `s${song.playback.seq}`) return;
       last.audioSeq = `s${song.playback.seq}`;
-      if (song.playback.state === 'playing') { au.currentTime = 0; au.play().catch(() => {}); } else au.pause();
+      if (song.playback.state === 'playing') { au.currentTime = 0; (au.muted ? au.play().catch(() => {}) : playWithSound(au)); } else au.pause();
     });
   } else if (kon && kon.audio && last.konFallback !== kon.audio.id && env.soundOn() && env.audioCtx && env.audioCtx()) {
     // Web-Audio-Weg (echter Beamer mit Ton)
@@ -178,7 +178,7 @@ export function syncMedia(s) {
       }, { once: true });
       // Falls „playing“ ausbleibt: spätestens nach Ladezeit + Stufenlänge anhalten.
       last.stageTimer = setTimeout(() => au.pause(), len * 1000 + 4000);
-      au.play().catch(() => {});
+      (au.muted ? au.play().catch(() => {}) : playWithSound(au));
     });
   } else if (!au.paused) {
     konStop();
