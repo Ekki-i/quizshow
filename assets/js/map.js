@@ -27,12 +27,17 @@ export function unproject(m, x, y) {
 }
 
 // markers: [{ lat, lng, color, label, kind: 'team' | 'target' | 'pending' }]
-export function mapView(name, { markers = [], onPick = null, label = 'Karte' } = {}) {
+// area: Umriss eines gesuchten Landes, Ringe aus [lng, lat] – wird hervorgehoben.
+export function mapView(name, { markers = [], onPick = null, label = 'Karte', area = null } = {}) {
   const m = MAPS[name] || MAPS.Welt;
   const r = m.width / 90;
   const svg = el('svg', { viewBox: `0 0 ${m.width} ${m.height}`, class: `map${onPick ? ' pickable' : ''}`, role: 'img', 'aria-label': label });
   svg.append(el('rect', { x: 0, y: 0, width: m.width, height: m.height, class: 'sea' }));
   svg.append(el('g', { class: `land${m.highlight !== undefined ? ' has-hl' : ''}` }, ...m.paths.map((d, i) => el('path', { d, class: i === m.highlight ? 'hl' : null }))));
+  if (area && area.length) {
+    const d = area.map((ring) => ring.map(([lng, lat], i) => { const [x, y] = project(m, lat, lng); return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`; }).join('') + 'Z').join('');
+    svg.append(el('path', { d, class: 'target-area' }));
+  }
   for (const mk of markers) {
     const [x, y] = project(m, mk.lat, mk.lng);
     const title = mk.label ? el('title') : null;

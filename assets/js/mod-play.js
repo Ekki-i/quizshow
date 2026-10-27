@@ -139,22 +139,29 @@ function land(ui, g, st) {
     mediaUrl(task.image.id).then((url) => { if (url) img.src = url; });
     out.push(img);
   }
-  out.push(h('p', {}, h('span', { class: 'muted' }, 'Ziel (nur für dich): '), h('b', {}, task.target || '–'), h('span', { class: 'muted' }, ` · ${task.lat}, ${task.lng}`)));
-  const dist = (gs) => Math.round(haversine(gs, task));
-  const list = Object.entries(r.guesses).map(([id, gs]) => ({ id, km: dist(gs), ...gs })).sort((a, b) => a.km - b.km);
+  const country = task.mode === 'Ganzes Land (nur Welt- und Europakarte)' && mapName !== 'Deutschland';
+  out.push(country
+    ? h('p', {}, h('span', { class: 'muted' }, 'Gesucht (nur für dich): '), h('b', {}, `ganzes Land – ${task.country || '–'}`), h('span', { class: 'muted' }, ' · jedes Team im Land bekommt 1 Punkt'))
+    : h('p', {}, h('span', { class: 'muted' }, 'Ziel (nur für dich): '), h('b', {}, task.target || '–'), h('span', { class: 'muted' }, ` · ${task.lat}, ${task.lng}`)));
+  const dist = (gs) => (country ? gs.km ?? 0 : Math.round(haversine(gs, task)));
+  const list = Object.entries(r.guesses).map(([id, gs]) => ({ id, ...gs, km: dist(gs) })).sort((a, b) => a.km - b.km);
   out.push(h('div', { class: 'map-box' }, mapView(mapName, {
-    markers: [...list.map((x) => ({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.id), label: ui.teamName(x.id), showLabel: true })), { lat: task.lat, lng: task.lng, kind: 'target', label: task.target }],
+    markers: [...list.map((x) => ({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.id), label: ui.teamName(x.id), showLabel: true })), ...(country ? [] : [{ lat: task.lat, lng: task.lng, kind: 'target', label: task.target }])],
   })));
   out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((tm) => {
     const x = list.find((y) => y.id === tm.id);
     const win = r.winners.includes(tm.id);
-    return h('li', {}, ui.dot(tm.color), h('span', { class: 'grow' }, h('b', {}, tm.name), x ? ` · ${x.km.toLocaleString('de-DE')} km` : h('span', { class: 'muted' }, ' – noch kein Punkt')),
+    const info = !x ? h('span', { class: 'muted' }, ' – noch kein Punkt')
+      : country ? (x.hit ? ' · im Land ✓' : ` · nicht im Land (${x.km.toLocaleString('de-DE')} km daneben)`)
+        : ` · ${x.km.toLocaleString('de-DE')} km`;
+    return h('li', {}, ui.dot(tm.color), h('span', { class: 'grow' }, h('b', {}, tm.name), info),
       win ? badge('ok', '✓ 1 Punkt') : null,
-      r.showTarget && !win ? btn('small ghost', 'Punkt geben', () => ui.confirmAct(`Korrektur: Den Punkt dieser Aufgabe an ${tm.name} geben (statt bisher)?`, 'play.setWinner', { teamId: tm.id })) : null);
+      r.showTarget && country ? btn('small ghost', win ? 'Punkt wegnehmen' : 'Punkt geben', () => ui.act('play.toggleWinner', { teamId: tm.id })) : null,
+      r.showTarget && !country && !win ? btn('small ghost', 'Punkt geben', () => ui.confirmAct(`Korrektur: Den Punkt dieser Aufgabe an ${tm.name} geben (statt bisher)?`, 'play.setWinner', { teamId: tm.id })) : null);
   })));
   out.push(row(
     btn('', '1. Tipps der Teams zeigen', () => ui.confirmAct('Abgabe schließen und alle Teampunkte gleichzeitig zeigen?', 'play.revealGuesses'), r.showGuesses),
-    btn('pink', '2. Zielort enthüllen', () => ui.act('play.revealTarget'), !r.showGuesses || r.showTarget),
+    btn('pink', country ? '2. Land enthüllen' : '2. Zielort enthüllen', () => ui.act('play.revealTarget'), !r.showGuesses || r.showTarget),
     r.open ? badge('ok', '● Abgabe offen') : null));
   return out;
 }

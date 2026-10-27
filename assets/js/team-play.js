@@ -136,7 +136,7 @@ let landPending = null;
 
 function land(g, ui) {
   if (g.taskIndex < 0) return wait('Gleich geht’s los!', `Karte: ${g.map}`);
-  const out = [h('p', { class: 'muted' }, `Aufgabe ${g.taskIndex + 1} von ${g.count} · Karte: ${g.map}`), h('p', { class: 'question' }, g.question)];
+  const out = [h('p', { class: 'muted' }, `Aufgabe ${g.taskIndex + 1} von ${g.count} · Karte: ${g.map}${g.mode === 'country' ? ' · gesucht: ein ganzes Land' : ''}`), h('p', { class: 'question' }, g.question)];
   if (g.image) {
     // Bild auch auf dem iPad, damit jedes Team es aus der Nähe sieht.
     const img = h('img', { class: 'land-image ipad', alt: 'Bild zur Aufgabe' });
@@ -151,10 +151,11 @@ function land(g, ui) {
   } else if (g.own) {
     markers.push({ lat: g.own.lat, lng: g.own.lng, color: ui.team.color, label: 'Euer Punkt' });
   }
-  if (g.target) markers.push({ lat: g.target.lat, lng: g.target.lng, kind: 'target', label: g.target.name });
+  if (g.target && !g.target.country) markers.push({ lat: g.target.lat, lng: g.target.lng, kind: 'target', label: g.target.name });
   const canPick = g.open && !g.own;
   const box = h('div', { class: 'map-box' });
   const draw = () => box.replaceChildren(mapView(g.map, {
+    area: g.target && g.target.country ? g.target.shape : null,
     markers: [...markers, ...(landPending ? [{ ...landPending, color: ui.team.color, kind: 'pending', label: 'Euer Tipp' }] : [])],
     onPick: canPick ? (pt) => {
       landPending = { ...pt, key };
@@ -175,8 +176,13 @@ function land(g, ui) {
   if (canPick) out.push(h('p', { class: 'muted' }, 'Tippt auf die Karte, um euren Punkt zu setzen. Ihr könnt ihn verschieben, bis ihr sperrt.'), send);
   else if (g.target) {
     const own = g.guesses?.find((x) => x.teamId === ui.team.id);
-    out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Am nächsten dran! +1 Punkt${own ? ` (${own.km.toLocaleString('de-DE')} km)` : ''}`)
-      : stateBox('', '📍', `${g.target.name}${own ? ` – ihr wart ${own.km.toLocaleString('de-DE')} km entfernt` : ''}`));
+    if (g.target.country) {
+      out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Im richtigen Land – ${g.target.name}! +1 Punkt`)
+        : stateBox('', '🗺', `${g.target.name}${own ? ` – ihr lagt ${own.km.toLocaleString('de-DE')} km daneben` : ''}`));
+    } else {
+      out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Am nächsten dran! +1 Punkt${own ? ` (${own.km.toLocaleString('de-DE')} km)` : ''}`)
+        : stateBox('', '📍', `${g.target.name}${own ? ` – ihr wart ${own.km.toLocaleString('de-DE')} km entfernt` : ''}`));
+    }
   } else if (g.own) out.push(stateBox('', '🔒', 'Punkt gesperrt – wartet auf die Auflösung'));
   else out.push(stateBox('', '🔒', 'Abgabe geschlossen'));
   return out;

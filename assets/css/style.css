@@ -1344,3 +1344,6 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .welcome-row.small .fb-ticket-r small { font-size: 8px; }
 .welcome-row.small .fb-ticket-coin { width: 44px; }
 .welcome-row.small .welcome-text { font-size: 22px; max-width: 260px; }
+/* „Ich sehe ein Land“: gesuchtes Land hervorheben */
+.map .target-area { fill: rgba(255, 194, 61, 0.55); stroke: #ffc23d; stroke-width: 1.6; vector-effect: non-scaling-stroke; animation: areaPulse calc(1.6s * var(--speed, 1)) ease-in-out 2; }
+@keyframes areaPulse { 50% { fill: rgba(255, 194, 61, 0.85); } }

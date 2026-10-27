@@ -63,7 +63,7 @@ const TYPES = {
   land: {
     title: 'Ich sehe ein Land, das du nicht siehst',
     playable: true,
-    summary: 'Teams setzen einen Punkt auf der Karte, der nächste gewinnt 1 Punkt.',
+    summary: 'Teams setzen einen Punkt auf der Karte: beim gesuchten Ort gewinnt der nächste, beim gesuchten Land jedes Team im Land 1 Punkt.',
     schema: [
       { key: 'map', label: 'Standard-Karte (gilt für alle Aufgaben ohne eigene Karte)', type: 'select', options: ['Welt', 'Europa', 'Deutschland'] },
       { key: 'tasks', label: 'Aufgaben', type: 'list', min: 1, max: 15, itemLabel: (i) => `Aufgabe ${i + 1}`, addLabel: 'Aufgabe hinzufügen',
@@ -71,9 +71,12 @@ const TYPES = {
           area('question', 'Aufgabe / Frage', 300),
           { key: 'image', label: 'Bild zur Aufgabe (optional, z. B. Foto eines Wahrzeichens)', type: 'media', accept: 'image' },
           { key: 'map', label: 'Karte für diese Aufgabe', type: 'select', options: ['Standard-Karte des Spiels', 'Welt', 'Europa', 'Deutschland'] },
-          text('target', 'Gesuchter Ort'),
-          { key: 'lat', label: 'Breitengrad (z. B. 48.137)', type: 'number', min: -90, max: 90, step: 0.001 },
-          { key: 'lng', label: 'Längengrad (z. B. 11.575)', type: 'number', min: -180, max: 180, step: 0.001 },
+          // Ganzes Land: jedes Team, das im Land tippt, bekommt den Punkt (nur Welt-/Europakarte).
+          { key: 'mode', label: 'Gesucht wird', type: 'select', options: ['Punkt (Koordinaten)', 'Ganzes Land (nur Welt- und Europakarte)'] },
+          { key: 'country', label: 'Gesuchtes Land (nur bei „Ganzes Land“)', type: 'select', options: ['– bitte wählen –', ...require('./countries').map((c) => c.name)] },
+          text('target', 'Gesuchter Ort (bei „Ganzes Land“ optional, sonst wird der Landesname gezeigt)'),
+          { key: 'lat', label: 'Breitengrad (z. B. 48.137) – nur bei „Punkt“', type: 'number', min: -90, max: 90, step: 0.001 },
+          { key: 'lng', label: 'Längengrad (z. B. 11.575) – nur bei „Punkt“', type: 'number', min: -180, max: 180, step: 0.001 },
         ] },
     ],
     example: {
