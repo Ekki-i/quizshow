@@ -935,3 +935,41 @@ test('Pause: iPads warten, Münzen auf dem Pult wie vor der nächsten Münzverga
   assert.equal(bv.pauseCoinPos, 4);
   assert.equal(bv.coins.filter((c) => c.position < bv.pauseCoinPos).length, 0); // alle 3 Münzen noch auf dem Pult
 });
+
+test('Land: ganzes Land gesucht – jedes Team im Land bekommt einen Punkt', () => {
+  const { db, ids } = setup(4);
+  const [a, b, c, d] = ids;
+  const g = db.project.games.find((x) => x.type === 'land');
+  const content = JSON.parse(JSON.stringify(g.content));
+  content.tasks[0] = { question: 'Wo liegt Italien?', map: 'Europa', mode: 'Ganzes Land (nur Welt- und Europakarte)', country: 'Italien', target: '', lat: null, lng: null };
+  game.applyAction(db, mod(), 'game.update', { gameId: g.id, content });
+  activate(db, 'land');
+  game.applyAction(db, mod(), 'beamer.show', { view: 'game' });
+  game.applyAction(db, mod(), 'play.open', { taskIndex: 0 });
+  game.applyAction(db, team(a), 'play.guess', { lat: 41.9, lng: 12.5 }); // Rom
+  game.applyAction(db, team(b), 'play.guess', { lat: 45.46, lng: 9.19 }); // Mailand
+  game.applyAction(db, team(c), 'play.guess', { lat: 48.86, lng: 2.35 }); // Paris
+  game.applyAction(db, team(d), 'play.guess', { lat: 47.37, lng: 8.54 }); // Zürich, nah an Italien, aber in der Schweiz
+  game.applyAction(db, mod(), 'play.revealGuesses');
+  game.applyAction(db, mod(), 'play.revealTarget');
+  const v = game.beamerView(db).gameView;
+  assert.equal(v.mode, 'country');
+  assert.equal(v.target.country, true);
+  assert.equal(v.target.name, 'Italien');
+  assert.ok(v.target.shape.length > 0);
+  assert.deepEqual(v.winners.slice().sort(), [a, b].sort());
+  assert.deepEqual([a, b, c, d].map((t) => game.totals(db)[t]), [1, 1, 0, 0]);
+  // Korrektur: Zürich doch zählen, Mailand nicht
+  game.applyAction(db, mod(), 'play.toggleWinner', { teamId: d });
+  game.applyAction(db, mod(), 'play.toggleWinner', { teamId: b });
+  assert.deepEqual([a, b, c, d].map((t) => game.totals(db)[t]), [1, 0, 0, 1]);
+});
+
+test('Land: Küste und Kleinstaat zählen mit Toleranz', () => {
+  const land = require('../server/play-land');
+  const M = land.MODE_COUNTRY;
+  assert.ok(M);
+  assert.equal(land.judgeCountry('Italien', 'Europa', { lat: 40.6, lng: 14.0 }).hit, true); // im Golf von Neapel, knapp vor der Küste
+  assert.equal(land.judgeCountry('Monaco', 'Europa', { lat: 43.75, lng: 7.3 }).hit, true); // Kleinstaat, knapp daneben in Frankreich
+  assert.equal(land.judgeCountry('Italien', 'Europa', { lat: 46.0, lng: 8.95 }).hit, false); // Lugano: Schweiz
+});

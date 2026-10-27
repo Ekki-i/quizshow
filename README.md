@@ -140,7 +140,10 @@ Umgesetzt:
     (serverseitig), Nachabgabe durch die Moderation, fünf Fragen, bei jeder Frage ein Antworttausch
     für das schnellste Team.
   - *Ich sehe ein Land, das du nicht siehst*: Karte (Welt, Europa, Deutschland) zum Antippen,
-    erst Tipps, dann Zielort enthüllen, Entfernung in km, manuelle Korrektur.
+    erst Tipps, dann Zielort enthüllen, Entfernung in km, manuelle Korrektur. Je Aufgabe wählbar:
+    gesuchter *Punkt* (nächstes Team gewinnt) oder *ganzes Land* (Welt-/Europakarte; jedes Team,
+    das im Land tippt, bekommt 1 Punkt – mit kleiner Toleranz an Küsten und bei Kleinstaaten).
+    Ländergrenzen: Natural Earth 1:50 Mio., erzeugt mit `node scripts/build-countries.mjs`.
   - *Das ist ein echter Kassenschlager*: private Paywall mit zehn Hinweisen, 20 $ Start,
     höchstens vier Käufe pro Film, Züge in bis zu vier Zyklen, +5 $ bei richtig, Ausscheiden
     mit 0 $, einmalige Umrechnung ⌈Guthaben ÷ 2⌉.
