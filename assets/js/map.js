@@ -80,7 +80,7 @@ function placeLabels(items, pinR, bounds) {
 export function mapView(name, { markers = [], onPick = null, label = 'Karte', area = null, zoom = null, fit = false } = {}) {
   const m = MAPS[name] || MAPS.Welt;
   const R = m.width / 160; // Grundgröße der Markierungen (klein, für präzises Tippen)
-  const svg = el('svg', { viewBox: `0 0 ${m.width} ${m.height}`, class: `map${onPick ? ' pickable' : ''}`, role: 'img', 'aria-label': label });
+  const svg = el('svg', { viewBox: `0 0 ${m.width} ${m.height}`, width: String(m.width), height: String(m.height), class: `map${onPick ? ' pickable' : ''}`, role: 'img', 'aria-label': label });
   const world = el('g', { class: 'map-world' });
   world.append(el('rect', { x: 0, y: 0, width: m.width, height: m.height, class: 'sea' }));
   world.append(el('g', { class: `land${m.highlight !== undefined ? ' has-hl' : ''}` }, ...m.paths.map((d, i) => el('path', { d, class: i === m.highlight ? 'hl' : null }))));

@@ -35,7 +35,13 @@ const dot = (t) => h('span', { class: 'dot', title: t.name, style: { background:
 
 // ---------- 1 ----------
 function leichte5(v, teamOf) {
-  const out = [h('div', { class: 'q' }, v.question || '…')];
+  // Mit Bild: Frage schmaler oben, Bild groß darunter; sobald Antworten gezeigt werden, kleiner daneben.
+  const out = [h('div', { class: `q${v.image ? ' compact slim' : ''}` }, v.question || '…')];
+  if (v.image) {
+    const img = h('img', { class: 'l5-image', alt: '' });
+    mediaUrl(v.image.id).then((url) => { if (url) img.src = url; });
+    out.push(h('div', { class: `l5-image-box${v.answers.length || v.solution ? ' small' : ''}` }, img));
+  }
   if (!v.answers.length && v.question && !v.solution) out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '2vh' }));
   out.push(h('div', { class: 'answers' }, v.answers.map((a) => {
     const t = teamOf(a.teamId);
