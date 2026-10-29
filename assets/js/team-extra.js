@@ -2,7 +2,7 @@
 // Die Sicht kommt bereits gefiltert vom Server (keine fremden Antworten, keine
 // geheimen Joker); hier wird nur dargestellt und eingegeben.
 
-import { h, run, ask, toast } from './client.js';
+import { h, run, ask, toast, shield } from './client.js';
 import { inkPad, clearInkDraft } from './ink.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -56,8 +56,8 @@ function dumm3(g, ui) {
     return out;
   }
   if (g.entry) {
-    out.push(abcd(g.options, { selected: g.entry.choice, disabled: true }));
-    out.push(stateBox('', '🔒', `Verbindlich abgegeben: ${g.entry.choice} mit Einsatz ${g.entry.stake}`));
+    out.push(abcd(g.options, { disabled: true }));
+    out.push(shield(stateBox('', '🔒', `Verbindlich abgegeben: ${g.entry.choice} mit Einsatz ${g.entry.stake}`)));
     return out;
   }
   if (!g.open) return [...out, stateBox('', '🔒', 'Abgabe geschlossen')];
@@ -297,7 +297,7 @@ function zuweit(g, ui) {
       `${r.a} & ${r.b}: ${r.valid ? `${String(r.diff).replace('.', ',')} ${g.unit}` : 'ungültig (außerhalb der Grenzen)'}${r.best ? ' – bestes Ergebnis, +2' : r.worst ? ' – schlechtestes Ergebnis, −1' : ''}`));
     return out;
   }
-  if (g.pick) return [...out, stateBox('', '🔒', `Abgegeben: ${g.pick.a} & ${g.pick.b}`)];
+  if (g.pick) return [...out, shield(stateBox('', '🔒', `Abgegeben: ${g.pick.a} & ${g.pick.b}`))];
   if (!g.open || !g.options) return [...out, stateBox('', '🔒', 'Abgabe geschlossen')];
   const d = (zuDraft[g.index] ||= { a: '', b: '' });
   const listId = `zu-list-${g.index}`;
@@ -345,8 +345,8 @@ function brain(g, ui) {
         h('div', { class: 'row' }, h('button', { class: 'btn pink', onclick: () => run(ui.conn, 'play.swap', { swap: true }) }, `Ja, ${g.swap.theirs} nehmen`), h('button', { class: 'btn ghost', onclick: () => run(ui.conn, 'play.swap', { swap: false }) }, 'Eigene behalten')));
     }
     const canAnswer = !g.answer && !(g.detective && g.detective.waiting);
-    out.push(abcd(g.options, { selected: g.answer, removed: g.removed, disabled: !canAnswer, onPick: canAnswer ? (l) => run(ui.conn, 'play.answer', { choice: l }) : null }));
-    if (g.answer) out.push(stateBox('', '🔒', `Eingeloggt: ${g.answer}`));
+    out.push(abcd(g.options, { selected: null, removed: g.removed, disabled: !canAnswer, onPick: canAnswer ? (l) => run(ui.conn, 'play.answer', { choice: l }) : null }));
+    if (g.answer) out.push(shield(stateBox('', '🔒', `Eingeloggt: ${g.answer}`)));
     return out;
   }
   out.push(abcd(g.options, { selected: g.answer, correct: g.correct, removed: g.removed }));

@@ -3,7 +3,8 @@
 
 import { h, mediaUrl } from './client.js';
 import { answerContent } from './ink.js';
-import { mapView } from './map.js';
+import { mapView, zoomState } from './map.js';
+const modLandZoom = {};
 import { MOD_EXTRA } from './mod-extra.js';
 
 const MOVIE_HINTS = [
@@ -145,8 +146,11 @@ function land(ui, g, st) {
     : h('p', {}, h('span', { class: 'muted' }, 'Ziel (nur für dich): '), h('b', {}, task.target || '–'), h('span', { class: 'muted' }, ` · ${task.lat}, ${task.lng}`)));
   const dist = (gs) => (country ? gs.km ?? 0 : Math.round(haversine(gs, task)));
   const list = Object.entries(r.guesses).map(([id, gs]) => ({ id, ...gs, km: dist(gs) })).sort((a, b) => a.km - b.km);
+  const zk = `${g.id}:${t}:${mapName}`;
+  modLandZoom[zk] = modLandZoom[zk] || zoomState();
   out.push(h('div', { class: 'map-box' }, mapView(mapName, {
-    markers: [...list.map((x) => ({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.id), label: ui.teamName(x.id), showLabel: true })), ...(country ? [] : [{ lat: task.lat, lng: task.lng, kind: 'target', label: task.target }])],
+    zoom: modLandZoom[zk],
+    markers: [...list.map((x) => ({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.id), label: `${ui.teamName(x.id)} · ${country ? (x.hit ? '✓' : `${x.km.toLocaleString('de-DE')} km daneben`) : `${x.km.toLocaleString('de-DE')} km`}`, showLabel: true })), ...(country ? [] : [{ lat: task.lat, lng: task.lng, kind: 'target', label: task.target }])],
   })));
   out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((tm) => {
     const x = list.find((y) => y.id === tm.id);
@@ -290,11 +294,15 @@ function jauch(ui, g, st) {
   if (!r) return [...out, row(btn('pink', 'Frage 1 freigeben', () => ui.act('play.next'), !canNext))];
   const question = g.content.questions[q];
   out.push(h('p', { class: 'question', style: { fontSize: '1.3rem' } }, `Frage ${q + 1} · ${pts(JAUCH_LADDER[q])}: ${question.question}`), optionsList(question));
-  if (r.joker) out.push(h('p', {}, '🃏 ', h('b', {}, ui.teamName(r.joker.teamId)), r.joker.kind === 'fifty' ? ` nutzt 50:50 (weg: ${r.joker.removed.join(', ')})` : ' nutzt den Telefonjoker – erst wenn alle anderen gesperrt haben, telefonieren lassen.'));
+  const jlog = r.jokerLog || (r.joker ? [r.joker] : []);
+  for (const j of jlog) {
+    const removed = (r.fifty && r.fifty[j.teamId]) || j.removed || [];
+    out.push(h('p', {}, '🃏 ', h('b', {}, ui.teamName(j.teamId)), j.kind === 'fifty' ? ` nutzt 50:50 (weg: ${removed.join(', ')})` : ' nutzt den Telefonjoker – erst wenn alle anderen gesperrt haben, telefonieren lassen.'));
+  }
   out.push(h('ul', { class: 'list' }, teams.map((t) => {
     const ts = st.teams[t.id] || { status: 'active', secured: 0 };
     const a = r.answers[t.id];
-    const status = { active: null, quit: badge('', `ausgestiegen nach ${ts.outAt}`), out: badge('bad', `raus bei Frage ${ts.outAt}`), done: badge('ok', 'alle 8 geschafft') }[ts.status];
+    const status = { active: null, quit: badge('', ts.outAt ? `ausgestiegen nach Frage ${ts.outAt}` : 'ausgestiegen vor Frage 1'), out: badge('bad', `raus bei Frage ${ts.outAt}`), done: badge('ok', 'alle 8 geschafft') }[ts.status];
     const jokers = [ts.jokers?.fifty ? null : '50:50', ts.jokers?.phone ? null : 'Telefon'].filter(Boolean).join(', ');
     return h('li', {}, ui.dot(t.color), h('span', { class: 'grow' }, h('b', {}, t.name), a ? `: ${a.choice}` : ts.status === 'active' && !r.revealed ? h('span', { class: 'muted' }, ' – wählt noch') : '', h('span', { class: 'muted' }, ` · Joker übrig: ${jokers || 'keine'}`)),
       status, r.revealed && a ? (a.choice === question.correct ? badge('ok', '✓') : badge('bad', '✗')) : null, h('b', {}, pts(ts.secured)));

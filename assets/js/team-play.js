@@ -1,9 +1,9 @@
 // Team-iPad: Darstellung und Eingaben für alle acht Spiele. Die Sicht kommt
 // bereits gefiltert vom Server; hier wird nichts Geheimes ausgeblendet.
 
-import { h, run, ask, toast, coinImg, mediaUrl } from './client.js';
+import { h, run, ask, toast, coinImg, mediaUrl, shield } from './client.js';
 import { inkPad, answerContent } from './ink.js';
-import { mapView } from './map.js';
+import { mapView, zoomState } from './map.js';
 import { podiumRow } from './studio.js';
 import { TEAM_EXTRA } from './team-extra.js';
 
@@ -73,10 +73,10 @@ function leichte5(g, ui) {
   if (!g.question) return wait(`Frage ${g.qIndex + 1} kommt gleich …`);
   const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von ${g.count}`), h('p', { class: 'question' }, g.question)];
   if (g.answer) {
-    out.push(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('div', { style: { fontSize: '1.6rem', margin: 0 } }, answerContent(g.answer))));
-    if (g.answer.grade === true) out.push(stateBox('ok', '✓', 'Richtig! +1 Punkt'));
-    else if (g.answer.grade === false) out.push(stateBox('bad', '✗', 'Leider falsch'));
-    else out.push(stateBox('', '🔒', 'Abgegeben und gesperrt – wartet auf die Bewertung'));
+    const card = h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('div', { style: { fontSize: '1.6rem', margin: 0 } }, answerContent(g.answer)));
+    if (g.answer.grade === true) out.push(card, stateBox('ok', '✓', 'Richtig! +1 Punkt'));
+    else if (g.answer.grade === false) out.push(card, stateBox('bad', '✗', 'Leider falsch'));
+    else out.push(shield(card), stateBox('', '🔒', 'Abgegeben und gesperrt – wartet auf die Bewertung'));
     return out;
   }
   if (!g.open) return [...out, stateBox('', '🔒', 'Gesperrt – keine Abgabe mehr möglich')];
@@ -99,7 +99,7 @@ function dummes(g, ui) {
   }
   const canAnswer = g.open && !g.choice && !g.tooLate;
   out.push(choiceButtons(g.options, {
-    selected: g.choice,
+    selected: null, // Blickschutz: die gesperrte Antwort steht verdeckt darunter
     disabled: !canAnswer,
     onPick: canAnswer ? async (l) => {
       run(ui.conn, 'play.answer', { choice: l }); // sofort absenden, ohne Rückfrage
@@ -124,7 +124,7 @@ function dummes(g, ui) {
   }
   if (g.swapDone) return [...out, stateBox('ok', '🔁', 'Tausch erledigt – gleich wird aufgelöst.')];
   if (g.swapWaiting) return [...out, stateBox('ok', '🔔', h('span', {}, 'Ihr wart am schnellsten! Gleich dürft ihr tauschen … ', g.windowEnds ? countdown(g.windowEnds) : null))];
-  out.push(stateBox('', '🔒', `Antwort ${g.choice} gesperrt`));
+  out.push(shield(stateBox('', '🔒', `Antwort ${g.choice} gesperrt`)));
   if (!g.buzzTaken) out.push(h('p', { class: 'muted', style: { textAlign: 'center' } }, 'Wer zuerst buzzert, darf seine Antwort mit einem anderen Team tauschen.'), buzzer(ui, g.canBuzz));
   else if (g.buzzTaken && !g.isBuzzer) out.push(h('p', { class: 'muted' }, 'Ein anderes Team war schneller am Buzzer.'));
   return out;
@@ -133,6 +133,14 @@ function dummes(g, ui) {
 // ---------- 3 · Ich sehe ein Land, das du nicht siehst ----------
 
 let landPending = null;
+let landZoom = { key: null, z: zoomState() };
+// Abstand für die Beschriftung bei der Auflösung
+export function landLabel(name, x) {
+  if (x.km === null || x.km === undefined) return name;
+  if (x.hit === true) return `${name} · ✓ im Land`;
+  if (x.hit === false) return `${name} · ${x.km.toLocaleString('de-DE')} km daneben`;
+  return `${name} · ${x.km.toLocaleString('de-DE')} km`;
+}
 
 function land(g, ui) {
   if (g.taskIndex < 0) return wait('Gleich geht’s los!', `Karte: ${g.map}`);
@@ -147,14 +155,16 @@ function land(g, ui) {
   if (landPending?.key !== key || g.own) landPending = null;
   const markers = [];
   if (g.guesses) {
-    for (const x of g.guesses) markers.push({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.teamId), label: ui.teamName(x.teamId), showLabel: true });
+    for (const x of g.guesses) markers.push({ lat: x.lat, lng: x.lng, color: ui.teamColor(x.teamId), label: landLabel(ui.teamName(x.teamId), x), showLabel: true });
   } else if (g.own) {
     markers.push({ lat: g.own.lat, lng: g.own.lng, color: ui.team.color, label: 'Euer Punkt' });
   }
   if (g.target && !g.target.country) markers.push({ lat: g.target.lat, lng: g.target.lng, kind: 'target', label: g.target.name });
   const canPick = g.open && !g.own;
   const box = h('div', { class: 'map-box' });
+  if (landZoom.key !== `${key}:${g.map}`) landZoom = { key: `${key}:${g.map}`, z: zoomState() };
   const draw = () => box.replaceChildren(mapView(g.map, {
+    zoom: landZoom.z,
     area: g.target && g.target.country ? g.target.shape : null,
     markers: [...markers, ...(landPending ? [{ ...landPending, color: ui.team.color, kind: 'pending', label: 'Euer Tipp' }] : [])],
     onPick: canPick ? (pt) => {
@@ -172,8 +182,9 @@ function land(g, ui) {
     },
   }, 'Punkt sperren');
   draw();
-  out.push(box);
-  if (canPick) out.push(h('p', { class: 'muted' }, 'Tippt auf die Karte, um euren Punkt zu setzen. Ihr könnt ihn verschieben, bis ihr sperrt.'), send);
+  // Blickschutz: gesperrter Punkt bleibt bis zum Aufdecken verdeckt.
+  out.push(g.own && !g.guesses ? shield(box) : box);
+  if (canPick) out.push(h('p', { class: 'muted' }, 'Tippt auf die Karte, um euren Punkt zu setzen. Zum genauen Treffen mit zwei Fingern oder mit + / − zoomen und mit einem Finger verschieben. Ihr könnt den Punkt verschieben, bis ihr sperrt.'), send);
   else if (g.target) {
     const own = g.guesses?.find((x) => x.teamId === ui.team.id);
     if (g.target.country) {
@@ -277,14 +288,16 @@ function ladder(g) {
 function jauch(g, ui) {
   const status = `Gesichert: ${pts(g.secured)}`;
   if (g.status === 'out') return [ladder(g), stateBox('bad', '✗', `Ausgeschieden bei Frage ${g.outAt}. Ihr behaltet ${pts(g.secured)}.`)];
-  if (g.status === 'quit') return [ladder(g), stateBox('ok', '🏁', `Ausgestiegen nach Frage ${g.outAt}. ${status}.`)];
+  if (g.status === 'quit') return [ladder(g), stateBox('ok', '🏁', `${g.outAt ? `Ausgestiegen nach Frage ${g.outAt}` : 'Ausgestiegen'}. ${status}.`)];
   if (g.status === 'done') return [ladder(g), stateBox('ok', '🏆', `Alle acht Fragen geschafft! ${pts(g.secured)}.`)];
   if (g.qIndex < 0) return [ladder(g), ...wait('Gleich geht’s los!', 'Ihr habt einen 50:50-Joker und einen Telefonjoker.')];
   const out = [ladder(g), h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} · ${pts(g.value)} · ${status}`), h('p', { class: 'question' }, g.question)];
   const phoneWait = g.phone?.waiting;
   const canAnswer = g.open && !g.choice && !phoneWait;
+  // Blickschutz: nach dem Sperren bleibt die gewählte Antwort bis zur Auflösung verdeckt.
+  const hideChoice = g.choice && !g.revealed;
   out.push(choiceButtons(g.options, {
-    selected: g.choice, correct: g.correct, removed: g.removed, disabled: !canAnswer,
+    selected: hideChoice ? null : g.choice, correct: g.correct, removed: g.removed, disabled: !canAnswer,
     onPick: canAnswer ? async (l) => {
       run(ui.conn, 'play.answer', { choice: l }); // sofort absenden, ohne Rückfrage
     } : null,
@@ -303,16 +316,23 @@ function jauch(g, ui) {
   }
   if (phoneWait) out.push(stateBox('', '📞', 'Telefonjoker: Wartet, bis alle anderen Teams gesperrt haben. Dann telefoniert ihr und gebt eure Antwort ab.'));
   else if (g.phone) out.push(stateBox('ok', '📞', 'Alle anderen haben gesperrt – jetzt telefonieren und dann antworten!'));
-  else if (g.choice) out.push(stateBox('', '🔒', `Antwort ${g.choice} gesperrt – wartet auf die Auflösung.`));
-  if (g.open && !g.choice && !g.phone) {
+  else if (g.choice) out.push(shield(stateBox('', '🔒', `Antwort ${g.choice} gesperrt – wartet auf die Auflösung.`)));
+  if (g.open && !g.choice) {
+    // 50:50 jederzeit (einmal pro Team), Telefonjoker einmal pro Frage.
     const jokerBtn = (kind, label) => h('button', {
-      class: 'btn', disabled: !g.jokers[kind] || g.jokerBlocked || g.removed.length > 0,
+      class: 'btn', disabled: !g.jokers[kind] || (kind === 'phone' && (g.phoneTaken || !!g.phone)),
       onclick: async () => {
         run(ui.conn, 'play.joker', { kind }); // sofort, ohne Rückfrage
       },
     }, label);
     out.push(h('div', { class: 'row', style: { marginTop: '12px' } }, jokerBtn('fifty', '50:50-Joker'), jokerBtn('phone', '📞 Telefonjoker'),
-      g.jokerBlocked ? h('span', { class: 'muted' }, 'In dieser Frage hat schon ein Team einen Joker genommen.') : null));
+      g.phoneTaken && g.jokers.phone ? h('span', { class: 'muted' }, 'In dieser Frage telefoniert schon ein anderes Team.') : null));
+    if (g.canQuit) {
+      out.push(h('button', {
+        class: 'btn ghost huge', style: { width: '100%', marginTop: '12px' },
+        onclick: () => run(ui.conn, 'play.quit'), // sofort, ohne Rückfrage
+      }, `Nicht antworten – aussteigen und ${pts(g.secured)} sichern`));
+    }
   }
   return out;
 }
@@ -322,7 +342,7 @@ function jauch(g, ui) {
 function nerd(g, ui) {
   const out = [h('p', { class: 'muted' }, `${g.finale ? '★ Große Finalkategorie' : `Kategorie ${g.catIndex + 1} von ${g.count}`}`), h('p', { class: 'question' }, g.category), g.possible ? h('p', { class: 'muted' }, `Maximal ${g.possible} richtige Antworten möglich`) : null];
   if (g.phase === 'bidding') {
-    if (!g.canBid) return [...out, stateBox('', '🔒', `Euer Gebot: ${g.ownBid} – wartet, bis alle Gebote aufgedeckt werden.`)];
+    if (!g.canBid) return [...out, shield(stateBox('', '🔒', `Euer Gebot: ${g.ownBid} – wartet, bis alle Gebote aufgedeckt werden.`))];
     const input = h('input', { id: 'bid', type: 'number', min: '1', max: String(g.maxBid), inputmode: 'numeric', class: 'bid-input', 'aria-label': 'Gebot' });
     out.push(h('p', {}, 'Wie viele richtige Antworten traut ihr euch zu? Das Gebot bleibt geheim, bis alle aufgedeckt werden.'));
     out.push(h('form', {

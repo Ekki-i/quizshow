@@ -1,6 +1,6 @@
 import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
-import { mapView } from './map.js';
+import { mapView, zoomState } from './map.js';
 import { buildFinaleLive, buildFinaleEditor } from './mod-finale.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
@@ -1067,6 +1067,7 @@ let editorContent = null; // Inhalt des gerade bearbeiteten Spiels (für die Sta
 const MAP_BOUNDS = { Europa: [34, 71.5, -25, 45], Deutschland: [46.8, 55.4, 4.5, 16.5] };
 function geoPicker(item, save, idBase) {
   const box = h('div', { class: 'map-box geo-pick' });
+  const zoom = zoomState(); // zum genauen Antippen zoomen (+/−, Mausrad)
   const note = h('p', { class: 'muted', style: { margin: '6px 0 0' } });
   const mapName = () => (['Welt', 'Europa', 'Deutschland'].includes(item.map) ? item.map : (editorContent && editorContent.map) || 'Welt');
   const draw = () => {
@@ -1075,6 +1076,7 @@ function geoPicker(item, save, idBase) {
     box.replaceChildren(mapView(name, {
       markers: has ? [{ lat: item.lat, lng: item.lng, kind: 'target', label: item.target || 'Ziel' }] : [],
       label: `Karte ${name} – Ort antippen`,
+      zoom,
       onPick: ({ lat, lng }) => {
         item.lat = lat;
         item.lng = lng;
