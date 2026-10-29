@@ -31,6 +31,16 @@ function saveDraft(key) {
   }
 }
 
+// Alle Entwürfe verwerfen (nach „Show jetzt starten“: Testgekritzel nicht übernehmen).
+export function clearAllInkDrafts() {
+  drafts.clear();
+  try {
+    for (const k of Object.keys(sessionStorage)) if (k.startsWith('quiz.ink.')) sessionStorage.removeItem(k);
+  } catch {
+    // ignorieren
+  }
+}
+
 export function clearInkDraft(key) {
   drafts.delete(key);
   try {

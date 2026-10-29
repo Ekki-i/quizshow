@@ -18,6 +18,7 @@
   <script type="module">
     import { h, connect, store, localServer, setShowTitle } from './assets/js/client.js';
     import { syncTimer } from './assets/js/timer-ui.js';
+    import { clearAllInkDrafts } from './assets/js/ink.js';
     import { renderPlay, renderFinale } from './assets/js/team-play.js';
 
     const params = new URLSearchParams(location.search);
@@ -58,7 +59,21 @@
     // Bedienelemente, an denen man erkennt, dass ein Team noch antworten kann.
     const ANSWER_CONTROLS = 'canvas.ink-canvas, svg.map.pickable, input:not(:disabled), select:not(:disabled), textarea:not(:disabled), .buzzer:not(:disabled), .abcd-opt:not(:disabled), .btn.huge:not(:disabled), .zu-opt, .guess-row, .team-pick button:not(:disabled)';
 
+    // Neue Show-Sitzung („Show jetzt starten“): alte Entwürfe aus Proben verwerfen und neu laden.
+    function checkSession(s) {
+      const skey = `quiz.session.${s.team.id}`;
+      const seen = store(skey);
+      const now = String(s.session || 0);
+      if (seen === now) return false;
+      store(skey, now);
+      if (seen === null) return false; // erstes Mal auf diesem Gerät: nichts zu verwerfen
+      clearAllInkDrafts();
+      location.reload();
+      return true;
+    }
+
     function render(s) {
+      if (checkSession(s)) return;
       document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
       document.title = `${s.team.name} – ${s.show.name}`;
       document.getElementById('team-name').textContent = s.team.name;

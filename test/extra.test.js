@@ -595,3 +595,19 @@ test('10-Sekunden-Timer: neue Runde oder Schritt setzt ihn zurück', () => {
   assert.equal(game.beamerView(db).timer, null);
   act(db, team(ids[0]), 'submit', { ink });
 });
+
+test('Show jetzt starten: Proben verwerfen, Punkte 0, Schritt 1, neue Sitzung', () => {
+  const { db, ids } = setup(2);
+  use(db, 'weissnicht2');
+  act(db, mod(), 'open', { index: 0 });
+  act(db, team(ids[0]), 'submit', { ink });
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[0], points: 3, reason: 'Test' });
+  assert.equal(totals(db)[ids[0]], 3);
+  const before = game.teamView(db, ids[0]).session;
+  game.applyAction(db, mod(), 'live.startShow', {});
+  assert.equal(totals(db)[ids[0]] || 0, 0);
+  assert.equal(db.live.run, 0);
+  assert.deepEqual(db.live.games, {});
+  assert.notEqual(game.teamView(db, ids[0]).session, before);
+  assert.equal(game.moderatorView(db).undo, null);
+});
