@@ -366,7 +366,20 @@ function suggestField(index, d, k, label, onChange) {
   const list = h('div', { class: 'zu-suggest' });
   const chosen = h('div', { class: 'zu-chosen' });
   const input = h('input', { id: `zu-${k}`, value: d[k], autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: 'Tippen – Vorschläge erscheinen darunter …' });
-  const showChosen = () => chosen.replaceChildren(d[k] && index.some((it) => it.n === d[k]) ? h('span', {}, '✓ ', h('b', {}, d[k])) : '');
+  // Grüne Bestätigung, sobald die Eingabe eindeutig einem Eintrag der Datenbank entspricht
+  // (wie bei der Prüfung auf dem Server: Groß/klein, Akzente, ein Tippfehler egal).
+  const resolveName = (q) => {
+    const n = zuNorm(q);
+    if (!n) return null;
+    const exact = index.find((it) => it.k === n);
+    if (exact) return exact.n;
+    const close = index.map((it) => ({ n: it.n, dd: zuLev(it.k, n, 1) })).filter((x) => x.dd <= 1);
+    return close.length === 1 ? close[0].n : null;
+  };
+  const showChosen = () => {
+    const hit = resolveName(d[k]);
+    chosen.replaceChildren(hit ? h('span', {}, '✓ in der Datenbank: ', h('b', {}, hit)) : d[k] && d[k].trim() ? h('span', { class: 'zu-miss' }, 'Noch kein passender Eintrag – Vorschlag antippen') : '');
+  };
   const update = () => {
     const sug = zuSuggest(index, input.value);
     list.replaceChildren(...sug.map((name) => h('button', { type: 'button', class: `zu-opt${name === d[k] ? ' on' : ''}`,
