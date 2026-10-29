@@ -108,8 +108,14 @@ test('Spiel 5: Punktwert hängt vom Hinweis beim Buzzern ab, falsches Team bleib
   game.applyAction(db, mod(), 'play.judge', { correct: true });
   assert.equal(game.totals(db)[ids[1]], 4); // gebuzzert bei Hinweis 2 → 4 Punkte
   assert.equal(game.totals(db)[ids[0]], 0);
+  // Nach der richtigen Antwort: alle fünf Hinweise aufgedeckt, Lösung sichtbar.
+  const tv5 = game.teamView(db, ids[2]).play;
+  assert.equal(tv5.hints.length, 5);
+  assert.equal(tv5.shown, 2);
+  assert.ok(tv5.term);
 
   game.applyAction(db, mod(), 'play.start', { termIndex: 1 });
+  assert.equal(game.teamView(db, ids[2]).play.hints.length, 0);
   game.applyAction(db, mod(), 'play.nextHint');
   assert.equal(game.teamView(db, ids[0]).play.canBuzz, true);
 });

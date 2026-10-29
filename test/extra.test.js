@@ -138,7 +138,7 @@ test('Ich weiß nicht 1.0: erster Buzzer sperrt alle, wählt Team, 10 Sekunden, 
   assert.throws(() => act(db, team(ids[1]), 'buzz'), /nicht offen/);
 });
 
-test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung erst nach allen, alles oder nichts', () => {
+test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung schon während andere schreiben, alles oder nichts', () => {
   const { db, ids } = setup(4);
   use(db, 'weissnicht2');
   act(db, mod(), 'open', { index: 0 });
@@ -147,14 +147,16 @@ test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung erst nach 
   act(db, team(ids[0]), 'buzz');
   act(db, team(ids[1]), 'submit', { ink }); // nach dem Buzzer weiter abgeben
   assert.throws(() => act(db, team(ids[1]), 'buzz'), /schneller/);
-  assert.equal(tv(db, ids[0]).guessTeams, null);
-  assert.throws(() => act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true } }), /alle Teams/);
+  // Sofort einschätzen: nur Teams, die schon abgegeben haben; die anderen schreiben weiter.
+  assert.deepEqual(tv(db, ids[0]).guessTeams, [ids[1]]);
+  assert.equal(tv(db, ids[0]).stillWriting, 2);
   act(db, team(ids[2]), 'submit', { ink });
-  act(db, team(ids[3]), 'submit', { ink });
-  assert.deepEqual(tv(db, ids[0]).guessTeams.sort(), [ids[1], ids[2], ids[3]].sort());
+  assert.deepEqual(tv(db, ids[0]).guessTeams.sort(), [ids[1], ids[2]].sort());
   assert.equal(pv(db).answers.length, 0); // nichts öffentlich vor der Auswertung
   assert.throws(() => act(db, team(ids[0]), 'guess', { guesses: {} }), /mindestens ein Team/);
-  act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true, [ids[2]]: false } });
+  act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true, [ids[2]]: false, [ids[3]]: true } });
+  assert.throws(() => act(db, mod(), 'evaluate'), /nicht alle/);
+  act(db, team(ids[3]), 'submit', { ink }); // schreibt nach der Einschätzung noch fertig → ausgelassen
   for (const [i, ok] of [[0, true], [1, true], [2, false], [3, true]]) act(db, mod(), 'grade', { teamId: ids[i], correct: ok });
   act(db, mod(), 'evaluate');
   assert.equal(totals(db)[ids[0]], 3); // 2 richtige Einschätzungen + eigene Antwort

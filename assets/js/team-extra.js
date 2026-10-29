@@ -141,7 +141,9 @@ function weissnicht2(g, ui) {
   }
   if (g.guessTeams) {
     const d = (guessDraft[g.index] ||= {});
-    out.push(stateBox('ok', '🔔', 'Alle haben abgegeben. Schätzt ein: Wer hat richtig, wer falsch geantwortet? Mindestens ein Team, beliebig viele. Eine falsche Einschätzung = 0 Punkte für alle Einschätzungen!'));
+    out.push(stateBox('ok', '🔔', 'Ihr wart am schnellsten! Schätzt ein: Wer hat richtig, wer falsch geantwortet? Mindestens ein Team, beliebig viele. Eine falsche Einschätzung = 0 Punkte für alle Einschätzungen!'));
+    if (g.stillWriting) out.push(muted(`${g.stillWriting === 1 ? '1 Team schreibt' : `${g.stillWriting} Teams schreiben`} noch – sobald es abgibt, erscheint es hier. Ihr könnt aber auch jetzt schon abschicken; wer dann noch fehlt, wird ausgelassen.`));
+    if (!g.guessTeams.length) out.push(stateBox('', '⏳', 'Noch hat kein anderes Team abgegeben.'));
     const rows = h('div', { class: 'guess-list' });
     const send = h('button', { class: 'btn pink huge', style: { width: '100%' } }, 'Einschätzung abschicken');
     const draw = () => {
@@ -151,6 +153,7 @@ function weissnicht2(g, ui) {
           const val = lab === 'richtig' ? true : lab === 'falsch' ? false : undefined;
           return h('button', { class: `btn small ${d[id] === val ? 'pink' : 'ghost'}`, onclick: () => { if (val === undefined) delete d[id]; else d[id] = val; draw(); } }, lab);
         }))));
+      for (const id of Object.keys(d)) if (!g.guessTeams.includes(id)) delete d[id];
       send.disabled = !Object.keys(d).length;
     };
     send.onclick = async () => { send.disabled = true; if (await run(ui.conn, 'play.guess', { guesses: d })) delete guessDraft[g.index]; else send.disabled = false; };
@@ -159,9 +162,8 @@ function weissnicht2(g, ui) {
     return out;
   }
   if (g.guessed) return [...out, stateBox('', '⏳', 'Einschätzung abgegeben – die Moderation bewertet.')];
-  if (g.waitingForAll) return [...out, stateBox('ok', '🔔', 'Ihr wart am schnellsten! Sobald alle abgegeben haben, schätzt ihr ein.')];
   out.push(stateBox('', '🔒', 'Abgegeben.'));
-  if (!g.buzzTaken) out.push(muted('Wer zuerst buzzert, darf danach einschätzen, welche Teams richtig liegen.'), buzzButton('Buzzer', g.canBuzz, () => run(ui.conn, 'play.buzz')));
+  if (!g.buzzTaken) out.push(muted('Wer zuerst buzzert, darf sofort einschätzen, welche Teams richtig liegen.'), buzzButton('Buzzer', g.canBuzz, () => run(ui.conn, 'play.buzz')));
   else if (!g.isBuzzer) out.push(muted('Ein anderes Team war schneller am Buzzer.'));
   return out;
 }

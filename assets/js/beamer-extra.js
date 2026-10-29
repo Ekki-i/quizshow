@@ -253,20 +253,38 @@ function weissnicht2(v, teamOf) {
   if (v.waiting) return waitTitle('Ich weiß nicht, dass du weißt es doch 2.0', 'Alle schreiben – der schnellste Buzzer schätzt danach ein, wer richtig liegt.');
   if (v.evaluated) {
     const s = v.score;
+    const buzzer = s && s.buzzer;
+    // Eine Karte je Team: Antwort, richtig/falsch, Tipp des Buzzer-Teams und die Punkte des Teams.
+    const card = (a, tag, points) => {
+      const t = teamOf(a.teamId);
+      return h('div', { class: 'answer fx-card has-ink', '--team': t.color },
+        h('div', { class: 'ans-body' }, h('img', { class: 'ink-answer beamer', src: a.ink, alt: '' }),
+          a.correct === null ? null : h('span', { class: `mark ${a.correct ? 'ok' : 'bad'}` }, a.correct ? '✓' : '✗'), tag,
+          h('span', { class: `pts-tag${points > 0 ? ' plus' : ''}` }, points > 0 ? `+${points}` : '0')),
+        h('div', { class: 'ans-name' }, t.name));
+    };
+    const group = (kind, title, note, cards) => (cards.length ? h('section', { class: `wn2-group ${kind}`, style: { flexGrow: cards.length }, '--cols': Math.min(cards.length, 3) },
+      h('header', {}, h('b', {}, title), note ? h('span', {}, note) : null),
+      h('div', { class: 'answers small' }, cards)) : null);
+    const own = (a) => (a.correct ? 1 : 0);
+    let groups;
+    if (!buzzer) {
+      groups = [group('rest', 'Alle Antworten', 'kein Buzzer – jede richtige Antwort +1', v.answers.map((a) => card(a, null, own(a))))];
+    } else {
+      const b = v.answers.find((a) => a.teamId === buzzer);
+      const rated = v.answers.filter((a) => a.teamId !== buzzer && a.guess !== null);
+      const skipped = v.answers.filter((a) => a.teamId !== buzzer && a.guess === null);
+      const bPts = s.guessPoints + s.ownPoint;
+      groups = [
+        group('buzz', '🔔 Gebuzzert', s.allRight ? `Einschätzung +${s.guessPoints} · eigene Antwort +${s.ownPoint}` : 'Eine Einschätzung falsch – 0 Punkte', b ? [card(b, null, bPts)] : []),
+        group('rated', 'Eingeschätzt', 'Tipp vom Buzzer-Team · richtige Antwort +1', rated.map((a) => card(a,
+          h('span', { class: `guess-tag ${a.guess === a.correct ? 'ok' : 'bad'}` }, `Tipp: ${a.guess ? 'richtig' : 'falsch'} ${a.guess === a.correct ? '✓' : '✗'}`), own(a)))),
+        group('skip', 'Ausgelassen', 'nicht eingeschätzt · richtige Antwort +1', skipped.map((a) => card(a, null, own(a)))),
+      ];
+    }
     return [v.question ? banner(v.question, 'compact slim') : null,
       v.solution ? h('div', { class: 'solution', style: { marginTop: 0 } }, `Lösung: ${v.solution}`) : null,
-      h('div', { class: 'answers' }, v.answers.map((a) => {
-        const t = teamOf(a.teamId);
-        const g = a.guess === null ? null : h('span', { class: `guess-tag ${a.guess === a.correct ? 'ok' : 'bad'}` }, `Tipp: ${a.guess ? 'richtig' : 'falsch'}`);
-        return h('div', { class: 'answer fx-card has-ink', '--team': t.color },
-          h('div', { class: 'ans-body' }, h('img', { class: 'ink-answer beamer', src: a.ink, alt: '' }),
-            a.correct === null ? null : h('span', { class: `mark ${a.correct ? 'ok' : 'bad'}` }, a.correct ? '✓' : '✗'), g),
-          h('div', { class: 'ans-name' }, t.name));
-      })),
-      s && s.buzzer ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1.5vh' } }, chip(teamOf(s.buzzer), s.allRight ? '' : 'wrong-soft', h('b', {}, s.allRight ? ` Einschätzung +${s.guessPoints} · eigene Antwort +${s.ownPoint}` : ' Einschätzung falsch – 0 Punkte'))) : null,
-      // Alle anderen richtigen Teams: je +1
-      v.answers.some((a) => a.correct && a.teamId !== (s && s.buzzer)) ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1vh', gap: '1vw' } },
-        v.answers.filter((a) => a.correct && a.teamId !== (s && s.buzzer)).map((a) => chip(teamOf(a.teamId), '', h('b', {}, ' +1')))) : null];
+      h('div', { class: 'wn2-groups' }, groups)];
   }
   const out = [v.question ? banner(v.question, 'compact slim') : null, bigImage(v.image)];
   out.push(h('div', { class: 'row img-foot' }, sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`),

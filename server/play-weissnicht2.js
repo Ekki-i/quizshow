@@ -2,9 +2,9 @@
 
 // Spiel „Ich weiß nicht, dass du weißt es doch 2.0“: Alle Teams schreiben ihre
 // Antwort. Wer abgegeben hat, darf buzzern – nur der erste Buzzer zählt und
-// sperrt nur die Buzzer der anderen, nicht deren Abgabe. Erst wenn alle
-// abgegeben haben, schätzt das Buzzer-Team ein, welche Teams richtig liegen
-// (mindestens ein Team). Jede richtige Einschätzung +1, aber eine falsche macht
+// sperrt nur die Buzzer der anderen, nicht deren Abgabe. Das Buzzer-Team kann
+// sofort einschätzen, welche Teams richtig liegen (mindestens ein Team) – jeweils
+// sobald ein Team abgegeben hat, während die anderen noch schreiben. Jede richtige Einschätzung +1, aber eine falsche macht
 // alle Punkte des Buzzer-Teams zunichte – auch den für die eigene richtige
 // Antwort. Alle anderen Teams bekommen für ihre richtige Antwort +1.
 
@@ -74,7 +74,6 @@ module.exports = {
     guess(db, ctx, game, st, p) {
       const r = current(st);
       if (!r.buzz || r.buzz.teamId !== ctx.teamId) fail('Nur das schnellste Team schätzt ein.');
-      if (!allIn(db, r)) fail('Erst wenn alle Teams abgegeben haben, wird eingeschätzt.');
       if (r.guesses) fail('Eure Einschätzung ist schon abgegeben.');
       const src = p.guesses && typeof p.guesses === 'object' ? p.guesses : {};
       const out = {};
@@ -150,9 +149,10 @@ module.exports = {
       canBuzz: r.open && !!r.answers[teamId] && !r.buzz,
       buzzTaken: !!r.buzz,
       isBuzzer,
-      // Einschätzen: erst nach allen Abgaben, nur fürs Buzzer-Team. Antworten der anderen bleiben geheim.
-      guessTeams: isBuzzer && ready && !r.guesses ? Object.keys(r.answers).filter((id) => id !== teamId) : null,
-      waitingForAll: isBuzzer && !ready,
+      // Einschätzen: sofort nach dem Buzzer, für jedes Team, das schon abgegeben hat.
+      // Antworten der anderen bleiben geheim.
+      guessTeams: isBuzzer && !r.guesses ? Object.keys(r.answers).filter((id) => id !== teamId) : null,
+      stillWriting: isBuzzer && !ready ? teamIds(db).filter((id) => !r.answers[id]).length : 0,
       guessed: isBuzzer && !!r.guesses,
       evaluated: r.evaluated,
       ownCorrect: r.evaluated ? r.grades[teamId] ?? null : null,
@@ -174,7 +174,7 @@ module.exports = {
       submittedCount: Object.keys(r.answers).length,
       teamCount: db.project.teams.length,
       buzzer: r.buzz ? r.buzz.teamId : null,
-      guessing: !!r.buzz && allIn(db, r) && !r.guesses,
+      guessing: !!r.buzz && !r.guesses,
       evaluated: r.evaluated,
       // Erst nach der Auswertung: Antworten, Bewertungen und Einschätzungen.
       answers: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, ink: a.ink, correct: r.grades[teamId] ?? null, guess: r.guesses ? r.guesses[teamId] ?? null : null })) : [],
