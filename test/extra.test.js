@@ -147,16 +147,15 @@ test('Ich weiß nicht 2.0: Abgabe trotz fremdem Buzzer, Einschätzung schon wäh
   act(db, team(ids[0]), 'buzz');
   act(db, team(ids[1]), 'submit', { ink }); // nach dem Buzzer weiter abgeben
   assert.throws(() => act(db, team(ids[1]), 'buzz'), /schneller/);
-  // Sofort einschätzen: nur Teams, die schon abgegeben haben; die anderen schreiben weiter.
-  assert.deepEqual(tv(db, ids[0]).guessTeams, [ids[1]]);
-  assert.equal(tv(db, ids[0]).stillWriting, 2);
-  act(db, team(ids[2]), 'submit', { ink });
-  assert.deepEqual(tv(db, ids[0]).guessTeams.sort(), [ids[1], ids[2]].sort());
+  // Sofort einschätzen: alle anderen Teams, auch die, die noch schreiben.
+  assert.deepEqual(tv(db, ids[0]).guessTeams.sort(), [ids[1], ids[2], ids[3]].sort());
+  assert.deepEqual(tv(db, ids[0]).pendingTeams.sort(), [ids[2], ids[3]].sort());
   assert.equal(pv(db).answers.length, 0); // nichts öffentlich vor der Auswertung
   assert.throws(() => act(db, team(ids[0]), 'guess', { guesses: {} }), /mindestens ein Team/);
-  act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true, [ids[2]]: false, [ids[3]]: true } });
+  act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true, [ids[2]]: false } }); // ids[2] schreibt noch, ids[3] ausgelassen
+  act(db, team(ids[2]), 'submit', { ink }); // Antwort folgt nach der Einschätzung
   assert.throws(() => act(db, mod(), 'evaluate'), /nicht alle/);
-  act(db, team(ids[3]), 'submit', { ink }); // schreibt nach der Einschätzung noch fertig → ausgelassen
+  act(db, team(ids[3]), 'submit', { ink }); // schreibt nach der Einschätzung noch fertig
   for (const [i, ok] of [[0, true], [1, true], [2, false], [3, true]]) act(db, mod(), 'grade', { teamId: ids[i], correct: ok });
   act(db, mod(), 'evaluate');
   assert.equal(totals(db)[ids[0]], 3); // 2 richtige Einschätzungen + eigene Antwort
@@ -554,4 +553,19 @@ test('Das geht mir zu weit: Liste nur auf Anfrage, Eingabe tolerant (Groß/klein
   const typo = (s) => s.toUpperCase().replace(/E/, '3'); // GROSS geschrieben und ein Tippfehler
   act(db, team(ids[0]), 'submit', { a: typo(x), b: y.toLowerCase() });
   assert.throws(() => act(db, team(ids[1]), 'submit', { a: 'völlig unbekannt xyz', b: y }), /nicht in der Liste/);
+});
+
+test('Ich weiß nicht 2.0: Einschätzung eines Teams ohne Abgabe zählt nicht', () => {
+  const { db, ids } = setup(3);
+  use(db, 'weissnicht2');
+  act(db, mod(), 'open', { index: 0 });
+  act(db, team(ids[0]), 'submit', { ink });
+  act(db, team(ids[0]), 'buzz');
+  act(db, team(ids[0]), 'guess', { guesses: { [ids[1]]: true, [ids[2]]: true } });
+  act(db, team(ids[1]), 'submit', { ink });
+  act(db, mod(), 'closeSubmissions'); // ids[2] gibt nie ab
+  act(db, mod(), 'grade', { teamId: ids[0], correct: true });
+  act(db, mod(), 'grade', { teamId: ids[1], correct: true });
+  act(db, mod(), 'evaluate');
+  assert.equal(totals(db)[ids[0]], 2); // 1 Einschätzung + eigene Antwort
 });

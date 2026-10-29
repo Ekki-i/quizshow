@@ -142,13 +142,12 @@ function weissnicht2(g, ui) {
   if (g.guessTeams) {
     const d = (guessDraft[g.index] ||= {});
     out.push(stateBox('ok', '🔔', 'Ihr wart am schnellsten! Schätzt ein: Wer hat richtig, wer falsch geantwortet? Mindestens ein Team, beliebig viele. Eine falsche Einschätzung = 0 Punkte für alle Einschätzungen!'));
-    if (g.stillWriting) out.push(muted(`${g.stillWriting === 1 ? '1 Team schreibt' : `${g.stillWriting} Teams schreiben`} noch – sobald es abgibt, erscheint es hier. Ihr könnt aber auch jetzt schon abschicken; wer dann noch fehlt, wird ausgelassen.`));
-    if (!g.guessTeams.length) out.push(stateBox('', '⏳', 'Noch hat kein anderes Team abgegeben.'));
+    if (g.pendingTeams && g.pendingTeams.length) out.push(muted('Ihr könnt auch Teams einschätzen, die noch schreiben – ihre Antwort folgt. Teams, die ihr auslasst, zählen nicht.'));
     const rows = h('div', { class: 'guess-list' });
     const send = h('button', { class: 'btn pink huge', style: { width: '100%' } }, 'Einschätzung abschicken');
     const draw = () => {
       rows.replaceChildren(...g.guessTeams.map((id) => h('div', { class: 'guess-row', style: { '--team': ui.teamColor(id) } },
-        h('b', {}, ui.teamName(id)),
+        h('b', {}, ui.teamName(id), (g.pendingTeams || []).includes(id) ? h('small', { class: 'muted', style: { fontWeight: 400, marginLeft: '8px' } }, '✎ schreibt noch') : null),
         ['richtig', 'falsch', 'auslassen'].map((lab) => {
           const val = lab === 'richtig' ? true : lab === 'falsch' ? false : undefined;
           return h('button', { class: `btn small ${d[id] === val ? 'pink' : 'ghost'}`, onclick: () => { if (val === undefined) delete d[id]; else d[id] = val; draw(); } }, lab);

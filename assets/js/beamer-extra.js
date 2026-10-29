@@ -255,9 +255,9 @@ function weissnicht2(v, teamOf) {
     const s = v.score;
     const buzzer = s && s.buzzer;
     // Eine Karte je Team: Antwort, richtig/falsch, Tipp des Buzzer-Teams und die Punkte des Teams.
-    const card = (a, tag, points) => {
+    const card = (a, tag, points, extra = '') => {
       const t = teamOf(a.teamId);
-      return h('div', { class: 'answer fx-card has-ink', '--team': t.color },
+      return h('div', { class: `answer fx-card has-ink ${extra}`.trim(), '--team': t.color },
         h('div', { class: 'ans-body' }, h('img', { class: 'ink-answer beamer', src: a.ink, alt: '' }),
           a.correct === null ? null : h('span', { class: `mark ${a.correct ? 'ok' : 'bad'}` }, a.correct ? '✓' : '✗'), tag,
           h('span', { class: `pts-tag${points > 0 ? ' plus' : ''}` }, points > 0 ? `+${points}` : '0')),
@@ -275,11 +275,21 @@ function weissnicht2(v, teamOf) {
       const rated = v.answers.filter((a) => a.teamId !== buzzer && a.guess !== null);
       const skipped = v.answers.filter((a) => a.teamId !== buzzer && a.guess === null);
       const bPts = s.guessPoints + s.ownPoint;
+      // Das Ergebnis des Buzzer-Teams groß und eindeutig: grün mit Punkten oder rot mit 0.
+      const verdict = h('div', { class: `wn2-verdict ${s.allRight ? 'win' : 'lose'}` },
+        h('div', { class: 'big' }, s.allRight ? `+${bPts}` : '0'),
+        h('div', { class: 'what' }, s.allRight ? (bPts === 1 ? 'PUNKT' : 'PUNKTE') : 'PUNKTE'),
+        h('div', { class: 'why' }, s.allRight
+          ? `✓ Alle ${s.guessPoints} Einschätzung${s.guessPoints === 1 ? '' : 'en'} richtig${s.ownPoint ? ' + eigene Antwort' : ''}`
+          : '✗ Eine Einschätzung falsch – alles verloren'));
+      const bGroup = b ? h('section', { class: `wn2-group buzz ${s.allRight ? 'win' : 'lose'}`, style: { flexGrow: 1 }, '--cols': 1 },
+        h('header', {}, h('b', {}, '🔔 Gebuzzert')), verdict, h('div', { class: 'answers small' }, card(b, null, bPts))) : null;
       groups = [
-        group('buzz', '🔔 Gebuzzert', s.allRight ? `Einschätzung +${s.guessPoints} · eigene Antwort +${s.ownPoint}` : 'Eine Einschätzung falsch – 0 Punkte', b ? [card(b, null, bPts)] : []),
-        group('rated', 'Eingeschätzt', 'Tipp vom Buzzer-Team · richtige Antwort +1', rated.map((a) => card(a,
-          h('span', { class: `guess-tag ${a.guess === a.correct ? 'ok' : 'bad'}` }, `Tipp: ${a.guess ? 'richtig' : 'falsch'} ${a.guess === a.correct ? '✓' : '✗'}`), own(a)))),
-        group('skip', 'Ausgelassen', 'nicht eingeschätzt · richtige Antwort +1', skipped.map((a) => card(a, null, own(a)))),
+        bGroup,
+        group('rated', 'Eingeschätzt', 'Tipp vom Buzzer-Team', rated.map((a) => card(a,
+          h('span', { class: `guess-tag ${a.guess === a.correct ? 'ok' : 'bad'}` }, `Tipp: ${a.guess ? 'richtig' : 'falsch'} ${a.guess === a.correct ? '✓' : '✗'}`), own(a),
+          a.guess === a.correct ? 'tip-ok' : 'tip-bad'))),
+        group('skip', 'Ausgelassen', 'nicht eingeschätzt', skipped.map((a) => card(a, null, own(a)))),
       ];
     }
     return [v.question ? banner(v.question, 'compact slim') : null,
