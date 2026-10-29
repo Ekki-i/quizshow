@@ -41,6 +41,19 @@ function tick() {
   if (!cur) return;
   const now = Date.now();
   const phase = now < cur.runAt ? 'announce' : now < cur.endAt ? 'run' : 'over';
+  // Team-iPads: nur zeigen, solange das Team noch antworten kann. Beim Ablauf wird
+  // festgehalten, ob es betroffen war (danach ist sein Feld ja abgeschickt).
+  if (cur.hooks.isActive) {
+    if (phase !== 'over') cur.active = cur.hooks.isActive();
+    else if (cur.active === undefined) cur.active = cur.hooks.isActive();
+    layer.style.display = cur.active ? '' : 'none';
+    if (!cur.active) {
+      cur.phase = phase === 'over' ? 'over' : null;
+      if (phase === 'over') cur.locked = true;
+      document.body.classList.remove('timer-locked');
+      return;
+    }
+  }
   if (phase !== cur.phase) {
     cur.phase = phase;
     draw(phase);
