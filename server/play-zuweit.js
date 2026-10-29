@@ -12,6 +12,34 @@ const { datasetByName, entriesFor, valueOf, difference } = require('./datasets')
 
 const today = (now) => new Date(now).toISOString().slice(0, 10);
 
+// Vergleich ohne Groß-/Kleinschreibung, Akzente und Satzzeichen; kleine Tippfehler erlaubt.
+const norm = (s) => String(s || '').toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  const d = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0];
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = d[j];
+      d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return d[b.length];
+}
+// Eingabe → Eintrag der Datenbank (genau, sonst eindeutig mit kleinem Tippfehler).
+function resolve(entries, input) {
+  const n = norm(input);
+  if (!n) return null;
+  const exact = entries.filter((e) => norm(e.name) === n);
+  if (exact.length) return exact[0];
+  const tol = 1; // nur ein vertippter Buchstabe – sonst lieber nachfragen
+  const close = entries.map((e) => ({ e, d: lev(norm(e.name), n) })).filter((x) => x.d <= tol).sort((x, y) => x.d - y.d);
+  if (close.length && (close.length === 1 || close[0].d < close[1].d)) return close[0].e;
+  return null;
+}
+
 function setup(game, i, now) {
   const rd = game.content.rounds[i];
   const ds = datasetByName(rd.dataset);
@@ -78,12 +106,22 @@ module.exports = {
       if (!r.open) fail('Die Abgabe ist geschlossen.');
       if (r.picks[ctx.teamId]) fail('Ihr habt schon abgegeben.');
       const { entries } = setup(game, st.index, ctx.now);
-      const a = entries.find((e) => e.name.toLowerCase() === String(p.a || '').trim().toLowerCase());
-      const b = entries.find((e) => e.name.toLowerCase() === String(p.b || '').trim().toLowerCase());
-      if (!a || !b) fail('Bitte zwei Einträge aus der Liste wählen.');
+      const a = resolve(entries, p.a);
+      const b = resolve(entries, p.b);
+      if (!a) fail(`„${String(p.a || '').slice(0, 60)}“ steht nicht in der Liste – bitte einen Vorschlag antippen.`);
+      if (!b) fail(`„${String(p.b || '').slice(0, 60)}“ steht nicht in der Liste – bitte einen Vorschlag antippen.`);
       if (a.name === b.name) fail('Bitte zwei unterschiedliche Einträge wählen.');
       r.picks[ctx.teamId] = { a: a.name, b: b.name, at: ctx.now };
       log(db, ctx, 'antwort', `${teamName(db, ctx.teamId)} hat abgegeben`);
+    },
+
+    // Namensliste der Runde einmalig holen (nicht bei jeder Aktualisierung mitschicken –
+    // die großen Listen haben die iPads ausgebremst).
+    options(db, ctx, game, st) {
+      const r = current(st);
+      if (!r.open || r.picks[ctx.teamId]) return { data: [] };
+      const { entries } = setup(game, st.index, ctx.now);
+      return { data: entries.map((e) => e.name) };
     },
   },
 
@@ -165,8 +203,9 @@ module.exports = {
       task: rd.task,
       dataset: ds.name,
       mode: rd.mode,
-      // Alle Einträge der Datenbank (auch außerhalb der Grenzen) – die Liste verrät nichts.
-      options: r.open && !r.picks[teamId] ? entries.map((e) => e.name) : null,
+      // Die Namensliste holt das iPad einmal per „play.options“ (Schlüssel ändert sich je Runde).
+      optionsKey: r.open && !r.picks[teamId] ? `${game.id}:${st.index}:${entries.length}` : null,
+      optionCount: entries.length,
       open: r.open,
       pick: r.picks[teamId] ? { a: r.picks[teamId].a, b: r.picks[teamId].b } : null,
       evaluated: r.evaluated && !r.tie,

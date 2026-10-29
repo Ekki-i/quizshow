@@ -199,7 +199,7 @@ export function createLocalServer() {
       const result = game.applyAction(draft, ctx, msg.name, msg.payload, typeof msg.id === 'string' ? msg.id : null);
       data = draft;
       save();
-      send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate, notice: result.notice || null });
+      send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate, notice: result.notice || null, data: result.data ?? null });
       if (result.kick) kickTeam(result.kick);
       broadcast();
       scheduleWake();

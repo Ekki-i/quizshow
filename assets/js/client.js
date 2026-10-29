@@ -365,3 +365,19 @@ export async function run(conn, name, payload) {
     return null;
   }
 }
+
+// Blickschutz auf den Team-iPads: Nach dem Abgeben bleibt die eigene Antwort verdeckt,
+// damit Nachbarteams nicht mitlesen. Gedrückt halten zeigt sie kurz an.
+export function shield(...children) {
+  const box = h('div', { class: 'shield' },
+    h('div', { class: 'shield-content' }, ...children),
+    h('div', { class: 'shield-cover' },
+      h('b', {}, '🔒 Abgegeben'),
+      h('small', {}, 'Blickschutz aktiv – zum Ansehen gedrückt halten')));
+  const on = (ev) => { ev.preventDefault(); box.classList.add('peek'); };
+  const off = () => box.classList.remove('peek');
+  box.addEventListener('pointerdown', on);
+  for (const t of ['pointerup', 'pointerleave', 'pointercancel']) box.addEventListener(t, off);
+  box.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  return box;
+}

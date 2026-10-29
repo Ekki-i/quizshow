@@ -63,9 +63,16 @@ function dummes(v, teamOf) {
 // ---------- 3 ----------
 function land(v, teamOf) {
   if (v.waiting) return [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5vw,5rem)' } }, 'Ich sehe ein Land …'), h('div', { class: 'map-box beamer-map' }, mapView(v.map))];
-  const markers = (v.guesses || []).map((g) => ({ lat: g.lat, lng: g.lng, color: teamOf(g.teamId).color, label: `${teamOf(g.teamId).name}${g.hit === true ? ' ✓' : ''}`, showLabel: true }));
+  const tag = (g) => {
+    const n = teamOf(g.teamId).name;
+    if (g.km === null || g.km === undefined) return n;
+    if (g.hit === true) return `${n} · ✓ im Land`;
+    if (g.hit === false) return `${n} · ${g.km.toLocaleString('de-DE')} km daneben`;
+    return `${n} · ${g.km.toLocaleString('de-DE')} km`;
+  };
+  const markers = (v.guesses || []).map((g) => ({ lat: g.lat, lng: g.lng, color: teamOf(g.teamId).color, label: tag(g), showLabel: true }));
   if (v.target && !v.target.country) markers.push({ lat: v.target.lat, lng: v.target.lng, kind: 'target', label: v.target.name });
-  const map = h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers, area: v.target && v.target.country ? v.target.shape : null }));
+  const map = h('div', { class: 'map-box beamer-map' }, mapView(v.map, { markers, area: v.target && v.target.country ? v.target.shape : null, fit: !!v.target }));
   let out;
   if (v.image) {
     // Bildfrage (z. B. Wahrzeichen): Bild links, Karte rechts.
@@ -163,15 +170,18 @@ function jauch(v, teamOf, s) {
   }
   const jokers = v.jokers || { fifty: [], phone: [] };
   const live = !v.revealed && v.phoneRunning ? 'phone' : null;
+  // Joker dieser Frage: sofort sichtbar, welches Team welchen Joker genommen hat.
+  const roundJ = v.roundJokers || [];
+  const whoNow = (kind) => roundJ.filter((j) => j.kind === kind).map((j) => teamOf(j.teamId));
   const jokerBtn = (kind, content) => {
     const used = jokers[kind] || [];
     const allUsed = v.teams ? v.teams.filter((t) => t.status === 'active').every((t) => used.includes(t.teamId)) && used.length > 0 : false;
-    const now = (v.joker && v.joker.kind === kind) || live === kind;
+    const now = whoNow(kind).length > 0 || live === kind;
     const btn = h('div', { class: `wwm-joker${now ? ' now' : ''}${allUsed ? ' gone' : ''}`, title: kind === 'fifty' ? '50:50-Joker' : 'Telefonjoker' });
     if (typeof content === 'string' && content.startsWith('<svg')) btn.innerHTML = content; else btn.append(content);
     return h('div', { class: 'wwm-joker-wrap' }, btn,
       used.length ? h('div', { class: 'wwm-joker-teams' }, used.map((id) => dot(teamOf(id)))) : null,
-      v.joker && v.joker.kind === kind ? h('div', { class: 'wwm-joker-who' }, teamOf(v.joker.teamId).name) : live === kind ? h('div', { class: 'wwm-joker-who' }, 'läuft …') : null);
+      whoNow(kind).length ? h('div', { class: 'wwm-joker-who' }, whoNow(kind).map((t, i) => h('span', { style: { color: t.color, display: 'block' } }, t.name)), live === kind ? h('em', {}, 'telefoniert …') : null) : null);
   };
   const ring = v.revealed
     ? h('div', { class: 'wwm-ring done' }, h('b', {}, v.correct), h('small', {}, 'richtig'))
@@ -187,6 +197,9 @@ function jauch(v, teamOf, s) {
       ladder),
     hexBar('wwm-q', v.question),
     h('div', { class: 'wwm-answers' }, opt('A'), opt('B'), opt('C'), opt('D'))];
+  if (!v.revealed && (v.quitNow || []).length) {
+    out.push(h('div', { class: 'wwm-teams' }, v.quitNow.map((id) => chip(teamOf(id), '', ' · steigt aus und sichert'))));
+  }
   if (v.revealed && v.teams) {
     const label = { active: 'im Spiel', quit: 'ausgestiegen', out: 'raus', done: 'geschafft' };
     out.push(h('div', { class: 'wwm-teams' }, v.teams.map((t) => chip(teamOf(t.teamId), t.status === 'out' ? 'wrong' : '', ` · ${label[t.status]} · ${t.secured} P`))));

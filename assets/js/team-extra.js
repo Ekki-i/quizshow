@@ -2,7 +2,7 @@
 // Die Sicht kommt bereits gefiltert vom Server (keine fremden Antworten, keine
 // geheimen Joker); hier wird nur dargestellt und eingegeben.
 
-import { h, run, ask, toast } from './client.js';
+import { h, run, ask, toast, shield } from './client.js';
 import { inkPad, clearInkDraft } from './ink.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -56,8 +56,8 @@ function dumm3(g, ui) {
     return out;
   }
   if (g.entry) {
-    out.push(abcd(g.options, { selected: g.entry.choice, disabled: true }));
-    out.push(stateBox('', '🔒', `Verbindlich abgegeben: ${g.entry.choice} mit Einsatz ${g.entry.stake}`));
+    out.push(abcd(g.options, { disabled: true }));
+    out.push(shield(stateBox('', '🔒', `Verbindlich abgegeben: ${g.entry.choice} mit Einsatz ${g.entry.stake}`)));
     return out;
   }
   if (!g.open) return [...out, stateBox('', '🔒', 'Abgabe geschlossen')];
@@ -297,18 +297,86 @@ function zuweit(g, ui) {
       `${r.a} & ${r.b}: ${r.valid ? `${String(r.diff).replace('.', ',')} ${g.unit}` : 'ungültig (außerhalb der Grenzen)'}${r.best ? ' – bestes Ergebnis, +2' : r.worst ? ' – schlechtestes Ergebnis, −1' : ''}`));
     return out;
   }
-  if (g.pick) return [...out, stateBox('', '🔒', `Abgegeben: ${g.pick.a} & ${g.pick.b}`)];
-  if (!g.open || !g.options) return [...out, stateBox('', '🔒', 'Abgabe geschlossen')];
+  if (g.pick) return [...out, shield(stateBox('', '🔒', `Abgegeben: ${g.pick.a} & ${g.pick.b}`))];
+  if (!g.open || !g.optionsKey) return [...out, stateBox('', '🔒', 'Abgabe geschlossen')];
   const d = (zuDraft[g.index] ||= { a: '', b: '' });
-  const listId = `zu-list-${g.index}`;
-  const field = (k, label) => h('div', { class: 'field' }, h('label', { for: `zu-${k}` }, label),
-    h('input', { id: `zu-${k}`, list: listId, value: d[k], autocomplete: 'off', placeholder: 'Tippen und aus der Liste wählen …', oninput: (ev) => { d[k] = ev.target.value; } }));
-  out.push(h('datalist', { id: listId }, g.options.map((o) => h('option', { value: o }))),
-    field('a', 'Erster Eintrag'), field('b', 'Zweiter Eintrag'),
-    h('button', { class: 'btn pink huge', style: { width: '100%' }, onclick: async () => {
+  const box = h('div', { class: 'zu-form' }, muted('Liste wird geladen …'));
+  loadZuOptions(ui, g.optionsKey).then((names) => {
+    if (!names) { box.replaceChildren(stateBox('bad', '⚠', 'Die Liste konnte nicht geladen werden. Bitte Seite neu laden.')); return; }
+    const index = names.map((n) => ({ n, k: zuNorm(n) }));
+    const send = h('button', { class: 'btn pink huge', style: { width: '100%' } }, 'Abgeben');
+    const field = (k, label) => suggestField(index, d, k, label, () => {});
+    send.onclick = async () => {
       if (await run(ui.conn, 'play.submit', { a: d.a, b: d.b })) delete zuDraft[g.index];
-    } }, 'Abgeben'));
+    };
+    box.replaceChildren(field('a', 'Erster Eintrag'), field('b', 'Zweiter Eintrag'),
+      muted(`${names.length.toLocaleString('de-DE')} Einträge in der Liste · Groß-/Kleinschreibung und kleine Tippfehler sind egal`), send);
+  });
+  out.push(box);
   return out;
+}
+
+// Namensliste einer Runde nur einmal laden (große Datenbanken!).
+const zuCache = new Map();
+function loadZuOptions(ui, key) {
+  if (!zuCache.has(key)) {
+    zuCache.set(key, ui.conn.action('play.options', {}).then((res) => (res && Array.isArray(res.data) ? res.data : null)).catch(() => null));
+  }
+  return zuCache.get(key).then((v) => { if (!v) zuCache.delete(key); return v; });
+}
+const zuNorm = (s) => String(s || '').toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+function zuLev(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < best) best = cur[j];
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+// Passende Vorschläge: Anfang > Wortanfang > enthalten > kleiner Tippfehler.
+function zuSuggest(index, q, limit = 8) {
+  const n = zuNorm(q);
+  if (!n) return [];
+  const scored = [];
+  for (const it of index) {
+    let sc = -1;
+    if (it.k === n) sc = 0;
+    else if (it.k.startsWith(n)) sc = 1;
+    else if (it.k.includes(` ${n}`)) sc = 2;
+    else if (it.k.includes(n)) sc = 3;
+    else if (n.length >= 3) {
+      const tol = n.length < 6 ? 1 : 2;
+      // Tippfehler: mit dem Anfang gleicher Länge bzw. dem ganzen Namen vergleichen
+      if (zuLev(it.k.slice(0, n.length), n, tol) <= tol || zuLev(it.k, n, tol) <= tol) sc = 4;
+    }
+    if (sc >= 0) scored.push({ n: it.n, sc });
+  }
+  scored.sort((a, b) => a.sc - b.sc || a.n.length - b.n.length || a.n.localeCompare(b.n, 'de'));
+  return scored.slice(0, limit).map((x) => x.n);
+}
+// Eingabefeld mit gut sichtbaren Vorschlägen zum Antippen.
+function suggestField(index, d, k, label, onChange) {
+  const list = h('div', { class: 'zu-suggest' });
+  const chosen = h('div', { class: 'zu-chosen' });
+  const input = h('input', { id: `zu-${k}`, value: d[k], autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: 'Tippen – Vorschläge erscheinen darunter …' });
+  const showChosen = () => chosen.replaceChildren(d[k] && index.some((it) => it.n === d[k]) ? h('span', {}, '✓ ', h('b', {}, d[k])) : '');
+  const update = () => {
+    const sug = zuSuggest(index, input.value);
+    list.replaceChildren(...sug.map((name) => h('button', { type: 'button', class: `zu-opt${name === d[k] ? ' on' : ''}`,
+      onclick: () => { d[k] = name; input.value = name; list.replaceChildren(); showChosen(); onChange(); } }, name)));
+    if (input.value.trim() && !sug.length) list.replaceChildren(h('p', { class: 'muted', style: { margin: '6px 2px' } }, 'Kein passender Eintrag – anders schreiben?'));
+  };
+  input.addEventListener('input', () => { d[k] = input.value; showChosen(); update(); onChange(); });
+  input.addEventListener('focus', update);
+  showChosen();
+  return h('div', { class: 'field zu-field' }, h('label', { for: `zu-${k}` }, label), input, chosen, list);
 }
 
 // ---------- Brain or Dreh'n ----------
@@ -345,8 +413,8 @@ function brain(g, ui) {
         h('div', { class: 'row' }, h('button', { class: 'btn pink', onclick: () => run(ui.conn, 'play.swap', { swap: true }) }, `Ja, ${g.swap.theirs} nehmen`), h('button', { class: 'btn ghost', onclick: () => run(ui.conn, 'play.swap', { swap: false }) }, 'Eigene behalten')));
     }
     const canAnswer = !g.answer && !(g.detective && g.detective.waiting);
-    out.push(abcd(g.options, { selected: g.answer, removed: g.removed, disabled: !canAnswer, onPick: canAnswer ? (l) => run(ui.conn, 'play.answer', { choice: l }) : null }));
-    if (g.answer) out.push(stateBox('', '🔒', `Eingeloggt: ${g.answer}`));
+    out.push(abcd(g.options, { selected: null, removed: g.removed, disabled: !canAnswer, onPick: canAnswer ? (l) => run(ui.conn, 'play.answer', { choice: l }) : null }));
+    if (g.answer) out.push(shield(stateBox('', '🔒', `Eingeloggt: ${g.answer}`)));
     return out;
   }
   out.push(abcd(g.options, { selected: g.answer, correct: g.correct, removed: g.removed }));

@@ -49,6 +49,17 @@ function newTeamCode(taken = []) {
   return String(10000 + crypto.randomInt(90000));
 }
 
+// Das Finale bestreitet immer das Team mit der 3. Münze (Gewinnstufe 3, nach Position 8).
+// Steht dort schon ein anderes Team (z. B. nach Korrekturen), wird das Finale neu geladen.
+function syncFinaleTeam(db, ctx) {
+  const c8 = db.live.coins.find((c) => c.position === 8);
+  if (!c8 || !db.project.teams.some((t) => t.id === c8.teamId)) return;
+  if (db.live.finale && db.live.finale.teamId !== c8.teamId) {
+    FINALE.start(db, ctx, c8.teamId);
+    log(db, ctx, 'finale', `Finale neu geladen: ${teamName(db, c8.teamId)} hat die 3. Münze`);
+  }
+}
+
 function freshLive() {
   return {
     activeGame: null, // ID der aktiven Spielinstanz in der Show
@@ -422,6 +433,7 @@ function runStep(db, ctx, index) {
   db.live.run = index;
   if (game && db.live.activeGame !== game.id) moderatorActions['show.activate'](db, ctx, { gameId: game.id });
   const view = { start: 'start', end: 'start', video: 'video', intro: 'intro', pyramid: 'pyramid', title: 'title', game: 'game', pause: 'pause', ranking: 'ranking', coin: 'coin', finale: 'finale' }[st.kind];
+  if (st.kind === 'finaleTitle' || st.kind === 'finale') syncFinaleTeam(db, ctx);
   if (st.kind === 'finaleTitle') {
     if (db.live.activeGame) moderatorActions['show.activate'](db, ctx, { gameId: null });
     db.live.beamer = { view: 'finaleTitle', data: {} };
@@ -823,6 +835,7 @@ const moderatorActions = {
     db.live.coins.push({ position: pos, teamId: top[0].teamId, at: ctx.now, method: 'Punkte', points: top[0].points });
     db.live.warning = null;
     log(db, ctx, 'muenze', `Münze nach Position ${pos} an ${top[0].name} (${top[0].points} Punkte)`);
+    syncFinaleTeam(db, ctx);
   },
 
   // Nach einer Schätzfrage vergibt die Moderation die Münze ausdrücklich und protokolliert.
@@ -833,6 +846,7 @@ const moderatorActions = {
     db.live.coins.push({ position: w.position, teamId: p.teamId, at: ctx.now, method: 'Schätzfrage', points: w.points });
     db.live.warning = null;
     log(db, ctx, 'muenze', `Münze nach Position ${w.position} per Schätzfrage an ${teamName(db, p.teamId)}`);
+    syncFinaleTeam(db, ctx);
     // Steht der Ablauf gerade auf dieser Münzvergabe, sofort die Münze zeigen.
     const cur = rundown(db)[db.live.run ?? -1];
     if (cur && cur.kind === 'coin' && cur.pos === w.position) {
@@ -933,6 +947,18 @@ const moderatorActions = {
     log(db, ctx, 'ablauf', 'Standard-Showablauf wiederhergestellt');
   },
 
+  // Letzte Aktion der Moderation rückgängig machen (Spielstand, Punkte, Münzen, Ablauf).
+  'undo.last'(db, ctx) {
+    const st = undoStack(db);
+    const snap = st[st.length - 1];
+    if (!snap) fail('Es gibt nichts zum Rückgängigmachen.');
+    if (snap.project !== showKey(db)) { st.length = 0; fail('Inzwischen wurde eine andere Show geöffnet – Rückgängig ist nicht mehr möglich.'); }
+    st.pop();
+    db.live = snap.live;
+    db.ledger = snap.ledger;
+    log(db, ctx, 'ablauf', `Rückgängig: ${snap.label}`);
+  },
+
   'live.reset'(db, ctx, p) {
     if (p.confirm !== 'NEUSTART') fail('Neustart nicht bestätigt.');
     db.live = freshLive();
@@ -952,10 +978,26 @@ function tick(db, now = Date.now()) {
   return !!fn(db, { role: 'system', actor: 'system', now }, g, gameState(db, g));
 }
 
+// ----- Allgemeines „Rückgängig“ für die Moderation -----
+// Vor jeder Live-Aktion der Moderation wird der Spielstand (live + Punktebuchungen)
+// im Speicher gemerkt; „undo.last“ stellt den Stand vor der letzten Aktion wieder her.
+// Nur im Arbeitsspeicher (nicht in der Datei); gilt für die gerade geöffnete Show.
+const UNDO_STACK = [];
+const UNDO_MAX = 25;
+function undoStack() {
+  return UNDO_STACK;
+}
+const showKey = (db) => db.project.id || db.project.name;
+function isUndoable(ctx, name) {
+  if (ctx.role !== 'moderator' || typeof name !== 'string' || name === 'undo.last') return false;
+  return /^(play|run|show|points|coin|beamer)\./.test(name) || name === 'live.reset' || name.startsWith('finale.') && !['finale.undo', 'finale.config', 'finale.setIntro'].includes(name);
+}
+
 function applyAction(db, ctx, name, payload, actionId) {
   if (actionId && db.processed.includes(actionId)) return { duplicate: true };
   tick(db, ctx.now);
   let result;
+  const snap = isUndoable(ctx, name) ? { live: clone(db.live), ledger: clone(db.ledger), project: showKey(db), logLen: db.log.length, name, at: ctx.now, teamSince: 0 } : null;
   // Für „Rückgängig“ im Finale: Zustand vor jeder Finale-Aktion merken.
   const before = typeof name === 'string' && FINALE_UNDOABLE(name) && db.live.finale ? clone(db.live.finale) : null;
   if (ctx.role === 'beamer') {
@@ -972,6 +1014,17 @@ function applyAction(db, ctx, name, payload, actionId) {
     result = fn(db, ctx, payload || {}) || {};
   }
   rememberFinale(db, name, before);
+  if (snap) {
+    const added = db.log.slice(snap.logLen);
+    snap.label = (added.length ? added[added.length - 1].detail : name).slice(0, 140);
+    delete snap.logLen;
+    const st = undoStack(db);
+    st.push(snap);
+    if (st.length > UNDO_MAX) st.shift();
+  } else if ((ctx.role === 'team' || ctx.role === 'host') && name !== 'play.options') {
+    const st = undoStack(db);
+    if (st.length) st[st.length - 1].teamSince += 1;
+  }
   if (actionId) {
     db.processed.push(actionId);
     if (db.processed.length > MAX_PROCESSED) db.processed.splice(0, db.processed.length - MAX_PROCESSED);
@@ -1138,6 +1191,8 @@ function moderatorView(db, connections) {
     // Vergleichs-Datenbanken für „Das geht mir zu weit“ (zum Prüfen im Editor).
     datasets: DATASETS.map((d) => ({ name: d.name, kind: d.kind, unit: d.unit, source: d.source, asOf: d.asOf, method: d.method, fixHelp: d.fixHelp, entries: d.entries })),
     showSize: SHOW_SIZE,
+    // „Rückgängig“: was zuletzt passiert ist und ob Teams seitdem etwas abgegeben haben.
+    undo: (() => { const st = undoStack(db); const u = st[st.length - 1]; return u && u.project === showKey(db) ? { label: u.label, teamSince: u.teamSince, count: st.length } : null; })(),
     live: { ...db.live, finaleHistory: undefined },
     totals: totals(db),
     ledger: db.ledger.slice(-100),

@@ -257,6 +257,7 @@ const q = (correct) => ({ question: 'Frage?', options: { A: 'a', B: 'b', C: 'c',
 test('Jauch: Leiter, Sicherheitsstufe, Aussteigen und Joker', () => {
   const { db, ids } = setup(3);
   activate(db, 'jauch', { questions: Array.from({ length: 8 }, () => q('A')) });
+  game.applyAction(db, mod(), 'beamer.show', { view: 'game' });
   const [a, b, c] = ids;
   const play = (t, name, p) => game.applyAction(db, team(t), `play.${name}`, p);
 
@@ -264,15 +265,20 @@ test('Jauch: Leiter, Sicherheitsstufe, Aussteigen und Joker', () => {
   for (let i = 0; i < 4; i++) {
     game.applyAction(db, mod(), 'play.next');
     if (i === 0) {
+      // 50:50 darf jedes Team jederzeit nehmen – auch wenn andere schon Joker genommen haben.
       play(a, 'joker', { kind: 'fifty' });
-      assert.throws(() => play(b, 'joker', { kind: 'phone' }), /bereits ein Team/);
+      play(b, 'joker', { kind: 'phone' });
+      play(c, 'joker', { kind: 'fifty' });
+      assert.throws(() => play(a, 'joker', { kind: 'phone' }), /telefoniert schon/);
       assert.equal(game.teamView(db, a).play.removed.length, 2);
       assert.ok(!game.teamView(db, a).play.removed.includes('A'));
       assert.equal(game.teamView(db, b).play.removed.length, 0);
+      // Beamer zeigt sofort, wer welchen Joker genommen hat.
+      assert.deepEqual(game.beamerView(db).gameView.roundJokers, [{ teamId: a, kind: 'fifty' }, { teamId: b, kind: 'phone' }, { teamId: c, kind: 'fifty' }]);
     }
     play(a, 'answer', { choice: 'A' });
-    play(b, 'answer', { choice: 'A' });
     if (game.teamView(db, c).play.status === 'active') play(c, 'answer', { choice: i === 1 ? 'B' : 'A' });
+    play(b, 'answer', { choice: 'A' }); // b hat in Frage 1 telefoniert: antwortet zuletzt
     assert.throws(() => game.applyAction(db, mod(), 'play.next'), /auflösen/);
     game.applyAction(db, mod(), 'play.reveal');
   }
@@ -280,12 +286,16 @@ test('Jauch: Leiter, Sicherheitsstufe, Aussteigen und Joker', () => {
   assert.equal(game.teamView(db, c).play.status, 'out');
   assert.equal(game.teamView(db, c).play.outAt, 2);
 
-  // b steigt freiwillig aus und behält 5.
-  play(b, 'quit');
-  // Frage 5: a mit Telefonjoker; a darf erst antworten, wenn alle anderen gesperrt haben – hier ist a allein.
+  // Frage 5: b steigt während der laufenden Frage aus (statt zu antworten) und behält 5.
   game.applyAction(db, mod(), 'play.next');
+  assert.equal(game.teamView(db, b).play.canQuit, true);
   play(a, 'joker', { kind: 'phone' });
+  assert.throws(() => play(a, 'answer', { choice: 'A' }), /Telefonjoker/); // b muss erst sperren oder aussteigen
+  play(b, 'quit');
+  assert.deepEqual(game.beamerView(db).gameView.quitNow, [b]);
+  assert.equal(game.teamView(db, b).play.status, 'quit');
   play(a, 'answer', { choice: 'A' });
+  assert.throws(() => play(a, 'quit'), /schon gesperrt/);
   game.applyAction(db, mod(), 'play.reveal');
   assert.equal(game.totals(db)[a], 6);
   // Frage 6 falsch: Rückfall auf die Sicherheitsstufe 5.
@@ -294,8 +304,6 @@ test('Jauch: Leiter, Sicherheitsstufe, Aussteigen und Joker', () => {
   game.applyAction(db, mod(), 'play.reveal');
   assert.deepEqual([a, b, c].map((t) => game.totals(db)[t]), [5, 5, 0]);
   assert.throws(() => game.applyAction(db, mod(), 'play.next'), /Kein Team/);
-  const beamer = game.beamerView(db);
-  assert.equal(beamer.gameView, undefined);
 });
 
 test('Jauch: Telefonjoker wartet, bis alle anderen gesperrt haben; Antworten bleiben geheim', () => {
@@ -313,7 +321,7 @@ test('Jauch: Telefonjoker wartet, bis alle anderen gesperrt haben; Antworten ble
   game.applyAction(db, mod(), 'play.reveal');
   const v = game.beamerView(db).gameView;
   assert.equal(v.correct, 'C');
-  assert.equal(v.joker.kind, 'phone');
+  assert.deepEqual(v.roundJokers, [{ teamId: ids[0], kind: 'phone' }]);
   assert.equal(game.totals(db)[ids[0]], 1);
 });
 
@@ -972,4 +980,37 @@ test('Land: Küste und Kleinstaat zählen mit Toleranz', () => {
   assert.equal(land.judgeCountry('Italien', 'Europa', { lat: 40.6, lng: 14.0 }).hit, true); // im Golf von Neapel, knapp vor der Küste
   assert.equal(land.judgeCountry('Monaco', 'Europa', { lat: 43.75, lng: 7.3 }).hit, true); // Kleinstaat, knapp daneben in Frankreich
   assert.equal(land.judgeCountry('Italien', 'Europa', { lat: 46.0, lng: 8.95 }).hit, false); // Lugano: Schweiz
+});
+
+test('Rückgängig: letzte Aktion der Moderation zurücknehmen, mit Hinweis auf Team-Abgaben', () => {
+  const { db, ids } = setup(2);
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
+  game.applyAction(db, mod(), 'play.open', { qIndex: 0 });
+  game.applyAction(db, team(ids[0]), 'play.submit', { text: '1440' });
+  game.applyAction(db, mod(), 'play.grade', { teamId: ids[0], correct: true });
+  assert.equal(game.totals(db)[ids[0]], 1);
+  let v = game.moderatorView(db, {});
+  assert.match(v.undo.label, /.+/);
+  assert.equal(v.undo.teamSince, 0);
+  game.applyAction(db, mod(), 'undo.last');
+  assert.equal(game.totals(db)[ids[0]] || 0, 0); // Bewertung zurückgenommen
+  assert.ok(game.teamView(db, ids[0]).play); // Abgabe bleibt (lag vor der Bewertung)
+  // Team gibt nach einer Moderationsaktion ab → wird gezählt
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[1], points: 2, reason: 'Bonus' });
+  game.applyAction(db, team(ids[1]), 'play.submit', { text: 'x' });
+  v = game.moderatorView(db, {});
+  assert.equal(v.undo.teamSince, 1);
+  game.applyAction(db, mod(), 'undo.last');
+  assert.equal(game.totals(db)[ids[1]] || 0, 0);
+});
+
+test('Finale: das Team mit der 3. Münze steht im Finale, auch wenn vorher ein anderes geladen war', () => {
+  const { db, ids } = setup(3);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[0], points: 5, reason: 'x' });
+  const steps = game.moderatorView(db, {}).rundown;
+  game.applyAction(db, mod(), 'run.goto', { index: steps.findIndex((s) => s.kind === 'finale') });
+  assert.equal(db.live.finale.teamId, ids[0]);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[2], points: 10, reason: 'x' });
+  game.applyAction(db, mod(), 'coin.determine', { position: 8 }); // 3. Münze an ids[2]
+  assert.equal(db.live.finale.teamId, ids[2]);
 });

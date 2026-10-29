@@ -1,6 +1,6 @@
 import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
-import { mapView } from './map.js';
+import { mapView, zoomState } from './map.js';
 import { buildFinaleLive, buildFinaleEditor } from './mod-finale.js';
 
 const token = store('quiz.modToken') || localServer?.demoToken;
@@ -52,8 +52,25 @@ for (const b of document.querySelectorAll('[role=tab]')) {
 
 // ---------- Rendering-Grundgerüst ----------
 
+// „↶ Rückgängig“ oben in der Kopfzeile: macht die letzte Aktion der Moderation rückgängig.
+function renderUndo() {
+  const b = document.getElementById('undo-btn');
+  if (!b) return;
+  const u = S.undo;
+  b.disabled = !u;
+  b.title = u ? `Rückgängig: ${u.label}` : 'Nichts zum Rückgängigmachen';
+  b.textContent = u ? '↶ Rückgängig' : '↶ Rückgängig';
+}
+document.getElementById('undo-btn')?.addEventListener('click', async () => {
+  const u = S && S.undo;
+  if (!u) return;
+  const warn = u.teamSince ? ` Achtung: Seitdem haben Teams ${u.teamSince}× etwas abgegeben – das geht dabei ebenfalls verloren.` : '';
+  if (await ask(`Letzten Schritt rückgängig machen?\n„${u.label}“${warn}`, { confirmLabel: 'Rückgängig machen' })) act('undo.last');
+});
+
 function renderAll(force = false) {
   if (!S) return;
+  renderUndo();
   setShowTitle(document.getElementById('show-name'), S.project.name);
   const inEditor = EDITOR_TABS.includes(tab);
   for (const b of document.querySelectorAll('[role=tab]')) {
@@ -193,8 +210,14 @@ function buildRun() {
     }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
   const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
     h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'));
-  // Aktuellen Schritt in der Leiste sichtbar halten.
-  requestAnimationFrame(() => panel.querySelector('.run-step.current')?.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  // Aktuellen Schritt in der Leiste sichtbar halten – nur die Leiste waagerecht scrollen,
+  // nie die ganze Seite (sonst sprang die Regie bei jeder Abgabe nach oben).
+  requestAnimationFrame(() => {
+    const cur = strip.querySelector('.run-step.current');
+    if (!cur) return;
+    const sr = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect();
+    strip.scrollLeft += (cr.left + cr.width / 2) - (sr.left + sr.width / 2);
+  });
   return panel;
 }
 
@@ -1067,6 +1090,7 @@ let editorContent = null; // Inhalt des gerade bearbeiteten Spiels (für die Sta
 const MAP_BOUNDS = { Europa: [34, 71.5, -25, 45], Deutschland: [46.8, 55.4, 4.5, 16.5] };
 function geoPicker(item, save, idBase) {
   const box = h('div', { class: 'map-box geo-pick' });
+  const zoom = zoomState(); // zum genauen Antippen zoomen (+/−, Mausrad)
   const note = h('p', { class: 'muted', style: { margin: '6px 0 0' } });
   const mapName = () => (['Welt', 'Europa', 'Deutschland'].includes(item.map) ? item.map : (editorContent && editorContent.map) || 'Welt');
   const draw = () => {
@@ -1075,6 +1099,7 @@ function geoPicker(item, save, idBase) {
     box.replaceChildren(mapView(name, {
       markers: has ? [{ lat: item.lat, lng: item.lng, kind: 'target', label: item.target || 'Ziel' }] : [],
       label: `Karte ${name} – Ort antippen`,
+      zoom,
       onPick: ({ lat, lng }) => {
         item.lat = lat;
         item.lng = lng;
