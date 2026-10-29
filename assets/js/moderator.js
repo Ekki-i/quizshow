@@ -53,20 +53,20 @@ for (const b of document.querySelectorAll('[role=tab]')) {
 // ---------- Rendering-Grundgerüst ----------
 
 // „↶ Rückgängig“ oben in der Kopfzeile: macht die letzte Aktion der Moderation rückgängig.
-function renderUndo() {
-  const b = document.getElementById('undo-btn');
-  if (!b) return;
-  const u = S.undo;
-  b.disabled = !u;
-  b.title = u ? `Rückgängig: ${u.label}` : 'Nichts zum Rückgängigmachen';
-  b.textContent = u ? '↶ Rückgängig' : '↶ Rückgängig';
-}
-document.getElementById('undo-btn')?.addEventListener('click', async () => {
+// „Rückgängig“ sitzt in der Live-Regie direkt bei der Spielsteuerung (Auswertung der Fragen).
+function renderUndo() {}
+async function undoLast() {
   const u = S && S.undo;
   if (!u) return;
   const warn = u.teamSince ? ` Achtung: Seitdem haben Teams ${u.teamSince}× etwas abgegeben – das geht dabei ebenfalls verloren.` : '';
   if (await ask(`Letzten Schritt rückgängig machen?\n„${u.label}“${warn}`, { confirmLabel: 'Rückgängig machen' })) act('undo.last');
-});
+}
+function undoButton() {
+  const u = S.undo;
+  return h('span', { class: 'undo-wrap' },
+    h('button', { class: 'btn ghost', id: 'undo-btn', type: 'button', disabled: !u, title: u ? `Rückgängig: ${u.label}` : 'Nichts zum Rückgängigmachen', onclick: undoLast }, '↶ Rückgängig'),
+    u ? h('small', { class: 'muted undo-label' }, `zuletzt: ${u.label}`) : null);
+}
 
 function renderAll(force = false) {
   if (!S) return;
@@ -480,7 +480,7 @@ function activeGameOf() {
 
 function buildGameControl() {
   const g = activeGameOf();
-  if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Der Showablauf aktiviert die Spiele; Ausnahmen ganz unten unter „Spiele (direkt aktivieren)“.'));
+  if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Der Showablauf aktiviert die Spiele; Ausnahmen ganz unten unter „Spiele (direkt aktivieren)“.'), h('div', { class: 'row' }, undoButton()));
   const st = S.live.games[g.id] || {};
   const pos = S.project.games.indexOf(g) + 1;
   return h('div', {}, timerBar(), buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor, ask }, g, st, pos));
@@ -496,10 +496,11 @@ function timerBar() {
   else if (t.phase === 'over') status = h('b', { style: { color: 'var(--bad)' } }, 'Zeit abgelaufen – Antworten gesperrt');
   else status = h('span', {}, t.phase === 'announce' ? 'Wird angekündigt … ' : 'Läuft: ', h('b', { 'data-deadline': String(now + t.remainingMs) }, `${Math.ceil(t.remainingMs / 1000)} s`));
   return h('section', { class: 'card timer-bar' },
-    h('div', { class: 'row', style: { alignItems: 'center', gap: '12px' } },
-      h('button', { class: 'btn pink', onclick: () => act('timer.start'), disabled: !!t && t.phase !== 'over' }, t ? '⏱ Timer neu starten' : '⏱ 10-Sekunden-Timer'),
+    h('div', { class: 'row', style: { alignItems: 'center', gap: '12px', flexWrap: 'nowrap' } },
+      h('button', { class: 'btn pink', style: { whiteSpace: 'nowrap', flexShrink: 0 }, onclick: () => act('timer.start'), disabled: !!t && t.phase !== 'over' }, t ? '⏱ Timer neu starten' : '⏱ 10-Sekunden-Timer'),
       t ? h('button', { class: 'btn ghost', onclick: () => act('timer.stop') }, t.phase === 'over' ? 'Sperre aufheben' : 'Abbrechen') : null,
-      h('span', { class: 'grow' }, status)));
+      h('span', { class: 'grow', style: { minWidth: 0, fontSize: '0.9rem' } }, status),
+      undoButton()));
 }
 
 // Beamer: Umschalten übernimmt der Showablauf – hier nur, was gerade läuft.
