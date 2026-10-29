@@ -79,7 +79,7 @@ function drawStrokes(ctx, strokes, w, hgt, color = '#111', weight = 1) {
 export function inkPad({ draftKey, label, button, onSubmit, ask, toast, onChange = null, noSubmit = false, small = false }) {
   const strokes = loadDraft(draftKey);
   const canvas = h('canvas', { class: 'ink-canvas', 'aria-label': `${label} – mit dem Stift hineinschreiben`, role: 'img' });
-  const hint = h('p', { class: 'ink-hint' }, 'Mit dem Apple Pencil in das weiße Feld schreiben');
+  const hint = h('p', { class: 'ink-hint' }, 'Mit dem Apple Pencil in das dunkle Feld schreiben');
   let penSeen = false;
   let current = null;
   let activeId = null;
@@ -97,7 +97,7 @@ export function inkPad({ draftKey, label, button, onSubmit, ask, toast, onChange
     const ctx = canvas.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawStrokes(ctx, strokes, canvas.width, canvas.height);
+    drawStrokes(ctx, strokes, canvas.width, canvas.height, '#fff');
     hint.style.visibility = strokes.length ? 'hidden' : 'visible';
   }
 
