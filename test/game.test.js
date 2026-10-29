@@ -981,3 +981,36 @@ test('Land: Küste und Kleinstaat zählen mit Toleranz', () => {
   assert.equal(land.judgeCountry('Monaco', 'Europa', { lat: 43.75, lng: 7.3 }).hit, true); // Kleinstaat, knapp daneben in Frankreich
   assert.equal(land.judgeCountry('Italien', 'Europa', { lat: 46.0, lng: 8.95 }).hit, false); // Lugano: Schweiz
 });
+
+test('Rückgängig: letzte Aktion der Moderation zurücknehmen, mit Hinweis auf Team-Abgaben', () => {
+  const { db, ids } = setup(2);
+  game.applyAction(db, mod(), 'show.activate', { gameId: gid(db, 'leichte5') });
+  game.applyAction(db, mod(), 'play.open', { qIndex: 0 });
+  game.applyAction(db, team(ids[0]), 'play.submit', { text: '1440' });
+  game.applyAction(db, mod(), 'play.grade', { teamId: ids[0], correct: true });
+  assert.equal(game.totals(db)[ids[0]], 1);
+  let v = game.moderatorView(db, {});
+  assert.match(v.undo.label, /.+/);
+  assert.equal(v.undo.teamSince, 0);
+  game.applyAction(db, mod(), 'undo.last');
+  assert.equal(game.totals(db)[ids[0]] || 0, 0); // Bewertung zurückgenommen
+  assert.ok(game.teamView(db, ids[0]).play); // Abgabe bleibt (lag vor der Bewertung)
+  // Team gibt nach einer Moderationsaktion ab → wird gezählt
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[1], points: 2, reason: 'Bonus' });
+  game.applyAction(db, team(ids[1]), 'play.submit', { text: 'x' });
+  v = game.moderatorView(db, {});
+  assert.equal(v.undo.teamSince, 1);
+  game.applyAction(db, mod(), 'undo.last');
+  assert.equal(game.totals(db)[ids[1]] || 0, 0);
+});
+
+test('Finale: das Team mit der 3. Münze steht im Finale, auch wenn vorher ein anderes geladen war', () => {
+  const { db, ids } = setup(3);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[0], points: 5, reason: 'x' });
+  const steps = game.moderatorView(db, {}).rundown;
+  game.applyAction(db, mod(), 'run.goto', { index: steps.findIndex((s) => s.kind === 'finale') });
+  assert.equal(db.live.finale.teamId, ids[0]);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[2], points: 10, reason: 'x' });
+  game.applyAction(db, mod(), 'coin.determine', { position: 8 }); // 3. Münze an ids[2]
+  assert.equal(db.live.finale.teamId, ids[2]);
+});

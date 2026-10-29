@@ -77,7 +77,7 @@ function placeLabels(items, pinR, bounds) {
 // markers: [{ lat, lng, color, label, kind: 'team' | 'target' | 'pending', showLabel }]
 // area: Umriss eines gesuchten Landes, Ringe aus [lng, lat] – wird hervorgehoben.
 // zoom: Objekt aus zoomState() → Karte wird zoom- und verschiebbar.
-export function mapView(name, { markers = [], onPick = null, label = 'Karte', area = null, zoom = null } = {}) {
+export function mapView(name, { markers = [], onPick = null, label = 'Karte', area = null, zoom = null, fit = false } = {}) {
   const m = MAPS[name] || MAPS.Welt;
   const R = m.width / 160; // Grundgröße der Markierungen (klein, für präzises Tippen)
   const svg = el('svg', { viewBox: `0 0 ${m.width} ${m.height}`, class: `map${onPick ? ' pickable' : ''}`, role: 'img', 'aria-label': label });
@@ -153,7 +153,18 @@ export function mapView(name, { markers = [], onPick = null, label = 'Karte', ar
     pt.y = clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
   };
+  // fit: bei der Auflösung auf alle Tipps (und Ziel bzw. Land) heranzoomen.
+  const fitBox = () => {
+    const pts = markers.map((mk) => project(m, mk.lat, mk.lng));
+    if (area && area.length) for (const ring of area) for (const [lng, lat] of ring) pts.push(project(m, lat, lng));
+    if (!pts.length) return null;
+    let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
+    let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+    const w = Math.max((x1 - x0) * 1.6, ((y1 - y0) * 1.6 * m.width) / m.height, m.width / 7);
+    return { k: Math.min(12, m.width / w), cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  };
   if (zoom && zoom.k > 1 && zoom.cx !== null) setZoom(zoom.k, zoom.cx, zoom.cy);
+  else if (fit && fitBox()) { const f = fitBox(); setZoom(f.k, f.cx, f.cy); }
   else apply();
 
   let wrap = svg;

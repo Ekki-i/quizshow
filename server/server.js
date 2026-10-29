@@ -343,7 +343,7 @@ function handleAction(c, msg) {
     const result = game.applyAction(draft, ctx, msg.name, msg.payload, typeof msg.id === 'string' ? msg.id : null);
     store.data = draft;
     store.save();
-    send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate, notice: result.notice || null });
+    send(c, { type: 'ack', id: msg.id, ok: true, duplicate: !!result.duplicate, notice: result.notice || null, data: result.data ?? null });
     if (result.kick) kickTeam(result.kick);
     // Videos, auf die keine Show mehr verweist (ersetzt, entfernt, Show gelöscht), aufräumen.
     for (const id of mediaBefore) releaseMedia(id);

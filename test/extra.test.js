@@ -317,7 +317,7 @@ test('Das geht mir zu weit: Differenzen, Grenzen, +2/−1 und Gleichstand durch 
   ] });
   act(db, mod(), 'open', { index: 0 });
   assert.throws(() => act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Gold' }), /unterschiedliche/);
-  assert.throws(() => act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Kryptonit' }), /aus der Liste/);
+  assert.throws(() => act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Kryptonitxx' }), /Liste/);
   act(db, team(ids[0]), 'submit', { a: 'Gold', b: 'Quecksilber' }); // 79/80 → 1
   act(db, team(ids[1]), 'submit', { a: 'Wasserstoff', b: 'Helium' }); // 1
   act(db, team(ids[2]), 'submit', { a: 'Eisen', b: 'Gold' }); // 53
@@ -537,4 +537,19 @@ test('Umbenennung: „Keine Kon-Sequenz“ heißt jetzt „Hits me baby, one mor
   g.migrate(db);
   assert.equal(db.library.find((e) => e.id === lib.id).title, 'Hits me baby, one more time');
   assert.equal(db.library.find((e) => e.id === 'lib_x').title, 'Mein eigener Name');
+});
+
+test('Das geht mir zu weit: Liste nur auf Anfrage, Eingabe tolerant (Groß/klein, Akzente, Tippfehler)', () => {
+  const { db, ids } = setup(2);
+  use(db, 'zuweit');
+  act(db, mod(), 'open', { index: 0 });
+  const v = tv(db, ids[0]);
+  assert.equal(v.options, undefined); // nicht mehr bei jeder Aktualisierung
+  assert.ok(v.optionsKey);
+  const res = game.applyAction(db, team(ids[0]), 'play.options', {});
+  assert.ok(Array.isArray(res.data) && res.data.length > 10);
+  const [x, y] = res.data;
+  const typo = (s) => s.toUpperCase().replace(/E/, '3'); // GROSS geschrieben und ein Tippfehler
+  act(db, team(ids[0]), 'submit', { a: typo(x), b: y.toLowerCase() });
+  assert.throws(() => act(db, team(ids[1]), 'submit', { a: 'völlig unbekannt xyz', b: y }), /nicht in der Liste/);
 });

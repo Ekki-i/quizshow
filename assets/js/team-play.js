@@ -162,9 +162,11 @@ function land(g, ui) {
   if (g.target && !g.target.country) markers.push({ lat: g.target.lat, lng: g.target.lng, kind: 'target', label: g.target.name });
   const canPick = g.open && !g.own;
   const box = h('div', { class: 'map-box' });
-  if (landZoom.key !== `${key}:${g.map}`) landZoom = { key: `${key}:${g.map}`, z: zoomState() };
+  const zk = `${key}:${g.map}:${g.target ? "aufgel" : "offen"}`; // bei der Auflösung neu: auf alle Tipps heranzoomen
+  if (landZoom.key !== zk) landZoom = { key: zk, z: zoomState() };
   const draw = () => box.replaceChildren(mapView(g.map, {
     zoom: landZoom.z,
+    fit: !!g.target,
     area: g.target && g.target.country ? g.target.shape : null,
     markers: [...markers, ...(landPending ? [{ ...landPending, color: ui.team.color, kind: 'pending', label: 'Euer Tipp' }] : [])],
     onPick: canPick ? (pt) => {

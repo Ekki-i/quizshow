@@ -598,7 +598,7 @@
         : h('div', { class: 'fx-board-body' }, r.teamAnswered ? h('span', { class: 'fx-locked' }, '🔒 abgegeben') : waitDots());
       const flipped = !!(r && r.challenged && r.modAnswer);
       const modBoard = h('div', { class: `fx-flip${flipped ? ' flipped' : ''}${an(isNew.challenge, 'go')}` },
-        h('div', { class: 'fx-face back' }, !r ? h('span', { class: 'fx-big' }, '?') : r.modAnswered ? [h('span', { class: 'fx-big' }, '?'), h('small', {}, 'verdeckt')] : waitDots()),
+        h('div', { class: 'fx-face back' }, !r ? h('span', { class: 'fx-big' }, '?') : r.modAnswered ? [h('span', { class: 'fx-big' }, '?'), h('small', {}, 'abgegeben')] : waitDots()),
         h('div', { class: 'fx-face front' }, flipped ? boardInk(r.modAnswer) : null));
       // Münzen des Teams: verfügbar, gerade im Einsatz (Platzhalter), verloren (leerer Platz)
       const coinRow = h('div', { class: 'fx-coins' }, f.coinsTotal
