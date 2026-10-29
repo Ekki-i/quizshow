@@ -250,8 +250,9 @@ function trumpf5(g, ui) {
   const out = [
     h('p', { class: 'muted' }, `Begriff ${g.termIndex + 1} von 5 · Kategorie`),
     h('p', { class: 'question' }, g.category),
-    g.hints.length ? h('ol', { class: 'hint-list' }, g.hints.map((t, i) => h('li', {}, h('b', {}, `${i + 1}. `), t))) : h('p', { class: 'muted' }, 'Noch kein Hinweis freigegeben.'),
-    buzzer(ui, g.canBuzz),
+    g.hints.length ? h('ol', { class: 'hint-list' }, g.hints.map((t, i) => h('li', { style: g.resolved && i >= g.shown ? { opacity: 0.6, fontStyle: 'italic' } : null }, h('b', {}, `${i + 1}. `), t))) : h('p', { class: 'muted' }, 'Noch kein Hinweis freigegeben.'),
+    g.term ? stateBox('', '💡', `Lösung: ${g.term}`) : null,
+    g.resolved ? null : buzzer(ui, g.canBuzz),
   ];
   const s = buzzState(g, { locked: 'Falsch – für diesen Begriff gesperrt', resolved: 'Begriff beendet' });
   if (s) out.push(s);

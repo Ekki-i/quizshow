@@ -120,7 +120,9 @@ function trumpf5(v, teamOf) {
   const slots = Array.from({ length: 5 }, (_, i) => {
     const text = v.hints[i];
     const value = 5 - i;
-    return h('li', { class: text === undefined ? 'empty' : '' },
+    // Nach der Auflösung nachträglich aufgedeckte Hinweise: eigene Optik, nacheinander eingeblendet.
+    const late = v.resolved && text !== undefined && i >= (v.shown ?? 5);
+    return h('li', { class: text === undefined ? 'empty' : late ? 'late' : '', style: late ? { animationDelay: `${0.5 + (i - v.shown) * 0.45}s` } : null },
       h('span', { class: 'pv', 'aria-label': `${value} ${value === 1 ? 'Punkt' : 'Punkte'}` }, String(value)),
       h('span', { class: 'tx' }, text === undefined ? '' : text));
   });

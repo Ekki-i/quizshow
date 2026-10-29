@@ -77,8 +77,10 @@ module.exports = {
     return {
       termIndex: st.termIndex,
       category: term.category,
-      hints: term.hints.slice(0, r.hintLevel),
+      hints: r.resolved ? term.hints.slice(0, 5) : term.hints.slice(0, r.hintLevel),
+      shown: r.hintLevel,
       resolved: r.resolved,
+      term: r.resolved ? term.term : null,
       ...b,
       canBuzz: !r.resolved && r.hintLevel >= 1 && !b.buzzed && !b.locked,
     };
@@ -93,7 +95,9 @@ module.exports = {
     return {
       termIndex: st.termIndex,
       category: term.category,
-      hints: term.hints.slice(0, r.hintLevel),
+      // Nach der Auflösung werden alle übrigen Hinweise einmal aufgedeckt.
+      hints: r.resolved ? term.hints.slice(0, 5) : term.hints.slice(0, r.hintLevel),
+      shown: r.hintLevel,
       value: pointsFor(r.hintLevel),
       buzzOrder: r.buzzes.map((b) => ({ teamId: b.teamId, status: b.status })),
       answering: current ? current.teamId : null,

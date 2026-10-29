@@ -107,13 +107,13 @@ function weissnicht2(ui, g, st) {
   const i = st.index ?? -1;
   const r = (st.rounds || {})[i];
   const out = [tabs(g.content.rounds.map((_, k) => `Runde ${k + 1}`), i, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.evaluated)];
-  if (i < 0 || !r) return [...out, muted('Runde öffnen: alle schreiben; wer abgegeben hat, darf buzzern. Der schnellste schätzt nach allen Abgaben ein.')];
+  if (i < 0 || !r) return [...out, muted('Runde öffnen: alle schreiben; wer abgegeben hat, darf buzzern. Der schnellste schätzt sofort ein – jedes Team, sobald es abgegeben hat.')];
   const item = g.content.rounds[i];
   out.push(h('p', {}, item.question || '', ' · Lösung: ', h('b', {}, item.solution || '–')));
   const ids = ui.S.project.teams.map((t) => t.id);
   const allIn = r.closedSubmissions || ids.every((id) => r.answers[id]);
   out.push(h('p', {}, r.buzz ? ['🔔 Schnellster Buzzer: ', h('b', {}, ui.teamName(r.buzz.teamId))] : 'Noch kein Buzzer.',
-    r.buzz ? (r.guesses ? ' · Einschätzung abgegeben' : allIn ? ' · schätzt gerade ein …' : ' · wartet auf alle Abgaben') : ''));
+    r.buzz ? (r.guesses ? ' · Einschätzung abgegeben' : ' · schätzt gerade ein …') : ''));
   out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
     const a = r.answers[t.id];
     const guess = r.guesses ? r.guesses[t.id] : undefined;
