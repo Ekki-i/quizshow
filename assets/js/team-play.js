@@ -72,6 +72,11 @@ function buzzState(b, { correct = 'Richtig!', locked = 'Falsch – für diese Au
 function leichte5(g, ui) {
   if (!g.question) return wait(`Frage ${g.qIndex + 1} kommt gleich …`);
   const out = [h('p', { class: 'muted' }, `Frage ${g.qIndex + 1} von ${g.count}`), h('p', { class: 'question' }, g.question)];
+  if (g.image) {
+    const img = h('img', { class: 'land-image ipad', alt: 'Bild zur Frage' });
+    mediaUrl(g.image.id).then((url) => { if (url) img.src = url; });
+    out.push(img);
+  }
   if (g.answer) {
     const card = h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('div', { style: { fontSize: '1.6rem', margin: 0 } }, answerContent(g.answer)));
     if (g.answer.grade === true) out.push(card, stateBox('ok', '✓', 'Richtig! +1 Punkt'));

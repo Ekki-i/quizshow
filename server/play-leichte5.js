@@ -71,6 +71,7 @@ module.exports = {
       qIndex: st.qIndex,
       count: game.content.questions.length,
       question: r.open || r.solutionRevealed ? game.content.questions[st.qIndex].question : null,
+      image: (r.open || r.solutionRevealed) && game.content.questions[st.qIndex].image ? { id: game.content.questions[st.qIndex].image.id, type: game.content.questions[st.qIndex].image.type } : null,
       open: r.open,
       answer: own ? { text: own.text, ink: own.ink || null, grade: own.grade } : null,
     };
@@ -83,6 +84,7 @@ module.exports = {
     return {
       qIndex: st.qIndex,
       question: visible ? game.content.questions[st.qIndex].question : null,
+      image: visible && game.content.questions[st.qIndex].image ? { id: game.content.questions[st.qIndex].image.id, type: game.content.questions[st.qIndex].image.type } : null,
       submittedCount: Object.keys(r.answers).length,
       teamCount: db.project.teams.length,
       answers: Object.entries(r.answers).filter(([, a]) => a.onBeamer).map(([teamId, a]) => ({ teamId, text: a.text, ink: a.ink || null, grade: a.grade })),

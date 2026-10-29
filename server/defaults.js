@@ -28,7 +28,7 @@ const TYPES = {
     summary: 'Fünf Alltagsfragen, Freitext auf dem iPad, 1 Punkt pro richtiger Antwort.',
     schema: [
       { key: 'questions', label: 'Fragen', type: 'list', min: 5, max: 5, itemLabel: (i) => `Frage ${i + 1}`,
-        fields: [area('question', 'Frage', 300), text('solution', 'Musterlösung')] },
+        fields: [area('question', 'Frage', 300), { key: 'image', label: 'Bild zur Frage (optional)', type: 'media', accept: 'image' }, text('solution', 'Musterlösung')] },
     ],
     example: {
       questions: [
