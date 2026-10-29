@@ -180,6 +180,12 @@ function runNext() { return act('run.next'); }
 
 // Neustart: Punkte, Münzen, Antworten und Finale weg, zurück zur ersten Folie.
 // Teams, Editor, Spieledatenbank, Ablauf und Medien bleiben erhalten.
+// Vor der echten Show: alles aus Proben und Tests verwerfen und mit Schritt 1 beginnen.
+async function startShowNow() {
+  const ok = await ask('Show jetzt starten? Alles, was du vorher zum Testen geklickt hast, wird verworfen: Punkte, Münzen, Antworten, Spielstände und Entwürfe auf den iPads. Der Beamer beginnt mit Schritt 1. Deine Inhalte im Editor bleiben erhalten.', { confirmLabel: '🎬 Show jetzt starten' });
+  if (ok) act('live.startShow');
+}
+
 async function restartShow() {
   const ok = await ask('Show wirklich neu starten? Alle Punkte und Münzen gehen auf 0, alle Fragen sind wieder unbeantwortet, der Beamer springt zurück auf die erste Folie. Deine Inhalte im Editor bleiben erhalten.', { requireText: 'NEUSTART', confirmLabel: 'Show neu starten', danger: true });
   if (ok) act('live.reset', { confirm: 'NEUSTART' });
@@ -200,7 +206,7 @@ function buildRun() {
     h('div', { class: 'run-buttons' },
       now && now.kind === 'video' && S.project.introVideo ? h('button', { class: 'btn ghost', onclick: () => act('run.goto', { index: cur }) }, '⟲ Video von vorn') : null,
       h('button', { class: 'btn ghost', disabled: cur <= 0, onclick: runPrev, title: 'Zurück (Pfeil links)' }, '◀ Zurück'),
-      h('button', { class: 'btn pink run-go', disabled: cur >= steps.length - 1, onclick: runNext, title: 'Weiter (Pfeil rechts, Leertaste)' }, started ? 'Weiter ▶' : 'Show starten ▶')));
+      h('button', { class: 'btn pink run-go', disabled: cur >= steps.length - 1, onclick: runNext, title: 'Weiter (Pfeil rechts, Leertaste)' }, started ? 'Weiter ▶' : 'Erster Schritt ▶')));
   const strip = h('ol', { class: 'run-strip', 'aria-label': 'Alle Schritte' }, steps.map((st, i) => h('li', {},
     h('button', {
       class: `run-step k-${st.kind} ${i === cur ? 'current' : ''} ${i < cur ? 'done' : ''}`,
@@ -208,7 +214,10 @@ function buildRun() {
       title: `${i + 1}. ${st.text}`,
       onclick: () => act('run.goto', { index: i }),
     }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
-  const panel = h('section', { class: 'card run-card' }, h('h3', {}, 'Showablauf'), head, strip,
+  const title = h('div', { class: 'row', style: { justifyContent: 'space-between', alignItems: 'center' } },
+    h('h3', { style: { margin: 0 } }, 'Showablauf'),
+    h('button', { class: 'btn ok', onclick: startShowNow, title: 'Proben und Tests verwerfen, Punkte auf 0 und mit Schritt 1 beginnen' }, '🎬 Show jetzt starten'));
+  const panel = h('section', { class: 'card run-card' }, title, head, strip,
     h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'));
   // Aktuellen Schritt in der Leiste sichtbar halten – nur die Leiste waagerecht scrollen,
   // nie die ganze Seite (sonst sprang die Regie bei jeder Abgabe nach oben).

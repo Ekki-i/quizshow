@@ -969,9 +969,23 @@ const moderatorActions = {
     log(db, ctx, 'ablauf', `Rückgängig: ${snap.label}`);
   },
 
+  // „Show jetzt starten“: alles aus Proben und Tests verwerfen (Punkte, Münzen,
+  // Antworten, Spielstände, Rückgängig-Verlauf, Entwürfe auf den iPads) und mit
+  // Schritt 1 des Showablaufs beginnen. Inhalte im Editor bleiben unverändert.
+  'live.startShow'(db, ctx) {
+    db.live = freshLive();
+    db.live.session = ctx.now;
+    db.ledger = [];
+    const key = showKey(db);
+    for (let i = UNDO_STACK.length - 1; i >= 0; i--) if (UNDO_STACK[i].project === key) UNDO_STACK.splice(i, 1);
+    log(db, ctx, 'ablauf', 'Show gestartet – Proben und Tests verworfen');
+    if (rundown(db).length) runStep(db, ctx, 0);
+    return { reset: true };
+  },
   'live.reset'(db, ctx, p) {
     if (p.confirm !== 'NEUSTART') fail('Neustart nicht bestätigt.');
     db.live = freshLive();
+    db.live.session = ctx.now;
     db.ledger = [];
     log(db, ctx, 'ablauf', 'Kontrollierter Neustart: Spielstand und Punkte zurückgesetzt');
   },
@@ -1133,6 +1147,8 @@ function teamView(db, teamId, now = Date.now()) {
     show: { name: db.project.name, subtitle: db.project.subtitle },
     team: { id: team.id, name: team.name, color: team.color },
     teams: publicTeams(db),
+    // Wechselt bei „Show jetzt starten“/Neustart: iPads verwerfen dann alte Entwürfe.
+    session: db.live.session || 0,
     game: gameHeader(db),
     settings: { reducedMotion: db.project.settings.reducedMotion },
   };
