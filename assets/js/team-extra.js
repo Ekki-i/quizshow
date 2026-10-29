@@ -40,6 +40,7 @@ function inkBuzzer(ui, { draftKey, label, action, payloadKey = 'ink', hint = 'Bu
     if (await run(ui.conn, action, { [payloadKey]: pad.inkApi.png() })) clearInkDraft(draftKey);
     else btn.disabled = false;
   });
+  pad.inkApi.autoSubmit = () => { if (pad.inkApi.hasInk() && !btn.disabled) btn.click(); };
   return [pad, muted(hint), btn];
 }
 

@@ -17,6 +17,7 @@
 
   <script type="module">
     import { h, connect, store, localServer, setShowTitle } from './assets/js/client.js';
+    import { syncTimer } from './assets/js/timer-ui.js';
     import { renderPlay, renderFinale } from './assets/js/team-play.js';
 
     const params = new URLSearchParams(location.search);
@@ -90,6 +91,11 @@
         parts.push(h('section', { class: 'card', style: { marginTop: '24px' } }, h('h3', {}, 'Punktestand'),
           h('ul', { class: 'list' }, s.ranking.map((r) => h('li', {}, h('span', { class: 'dot', style: { background: r.color } }), h('span', { class: 'grow' }, r.name), h('b', {}, r.points))))));
       }
+
+      // 10-Sekunden-Timer: Anzeige oben; bei Ablauf wird jedes beschriebene Feld automatisch abgeschickt.
+      syncTimer(s.play ? s.timer || null : null, 'team', {
+        onLock: () => document.querySelectorAll('#main .ink').forEach((el) => el.inkApi?.autoSubmit?.()),
+      });
 
       // Ein offenes Eingabefeld nicht bei jedem Update neu aufbauen (Fokus/Tastatur bleiben).
       const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.finale || null, s.ranking || null, s.waitKind || null]);

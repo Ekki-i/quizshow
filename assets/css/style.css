@@ -1414,3 +1414,42 @@ body:not(.beamer-page) .card { background: rgba(20, 22, 52, 0.84); border: 1px s
 .beamer .wn2-group .answer.tip-bad .guess-tag { background: var(--bad); color: #fff; font-size: 2vh; }
 .beamer .wn2-group .answer.tip-ok .guess-tag { background: var(--ok); color: #062b14; }
 .beamer .wn2-group.buzz { flex: 0 0 21vw !important; }
+
+/* ---------- 10-Sekunden-Timer ---------- */
+.qtimer-layer { position: fixed; inset: 0; pointer-events: none; z-index: 900; font-family: var(--font-display, inherit); }
+.qtimer-layer:empty { display: none; }
+.qt-announce { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; gap: 1vh; background: rgba(5, 5, 10, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; animation: qtIn 0.35s ease-out both; }
+.qt-announce .qt-icon { font-size: 16vh; line-height: 1; animation: qtPulse 0.8s ease-in-out infinite alternate; }
+.qt-announce .qt-big { font-size: 15vh; font-weight: 900; text-transform: uppercase; letter-spacing: 0.02em; color: #ffd23f; text-shadow: 0 0 4vh rgba(255, 210, 63, 0.6); animation: qtZoom 0.6s cubic-bezier(.2,1.5,.4,1) both; }
+.qt-announce .qt-sub { font-size: 4vh; font-weight: 700; }
+.qt-run { position: absolute; top: 3vh; right: 2.5vw; animation: qtIn 0.3s ease-out both; }
+.qt-ring { --p: 1; width: 20vh; height: 20vh; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(#ffd23f calc(var(--p) * 360deg), rgba(255, 255, 255, 0.12) 0); box-shadow: 0 1vh 4vh rgba(0, 0, 0, 0.6); position: relative; }
+.qt-ring::before { content: ''; position: absolute; inset: 1.6vh; border-radius: 50%; background: #0b0b12; }
+.qt-num { position: relative; font-size: 10vh; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+.qt-run.hurry .qt-ring { background: conic-gradient(var(--bad, #ff4a4a) calc(var(--p) * 360deg), rgba(255, 255, 255, 0.12) 0); animation: qtPulse 0.5s ease-in-out infinite alternate; }
+.qt-run.hurry .qt-num { color: var(--bad, #ff4a4a); }
+.qt-over { position: absolute; left: 50%; top: 50%; translate: -50% -50%; padding: 4vh 5vw; background: var(--bad, #ff4a4a); color: #fff; text-align: center; box-shadow: 0 2vh 8vh rgba(0, 0, 0, 0.6); animation: qtZoom 0.45s cubic-bezier(.2,1.5,.4,1) both; transition: all 0.5s ease; }
+.qt-over .qt-big { font-size: 10vh; font-weight: 900; text-transform: uppercase; white-space: nowrap; }
+.qt-over .qt-sub { font-size: 3.6vh; font-weight: 700; }
+.qt-over.small { left: auto; right: 2.5vw; top: 3vh; translate: 0 0; padding: 1vh 1.4vw; }
+.qt-over.small .qt-big { font-size: 3.4vh; }
+.qt-over.small .qt-sub { font-size: 1.8vh; }
+@keyframes qtIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes qtZoom { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes qtPulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+/* Team-iPads: kleinere Maße, gesperrte Eingaben */
+.qtimer-layer.team .qt-announce .qt-icon { font-size: 5rem; }
+.qtimer-layer.team .qt-announce .qt-big { font-size: 4rem; }
+.qtimer-layer.team .qt-announce .qt-sub { font-size: 1.4rem; padding: 0 16px; }
+.qtimer-layer.team .qt-run { top: 12px; right: 12px; }
+.qtimer-layer.team .qt-ring { width: 96px; height: 96px; }
+.qtimer-layer.team .qt-ring::before { inset: 8px; }
+.qtimer-layer.team .qt-num { font-size: 2.8rem; }
+.qtimer-layer.team .qt-over { padding: 24px 28px; border-radius: 16px; }
+.qtimer-layer.team .qt-over .qt-big { font-size: 2.4rem; }
+.qtimer-layer.team .qt-over .qt-sub { font-size: 1.1rem; }
+.qtimer-layer.team .qt-over.small { right: 12px; top: 12px; padding: 8px 14px; border-radius: 10px; }
+.qtimer-layer.team .qt-over.small .qt-big { font-size: 1.1rem; }
+.qtimer-layer.team .qt-over.small .qt-sub { font-size: 0.85rem; }
+body.timer-locked #main * { pointer-events: none !important; }
+body.timer-locked #main .ink-frame, body.timer-locked #main .abcd, body.timer-locked #main .buzzer { opacity: 0.55; }

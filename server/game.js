@@ -6,7 +6,7 @@
 const crypto = require('crypto');
 const { DATASETS } = require('./datasets');
 const { TYPES, DEFAULT_ORDER, LIBRARY_ORDER, EXTRA_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
-const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage } = require('./core');
+const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage, TIMER } = require('./core');
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
 // Moderationsaktionen sowie die Sichten für Teams und Beamer.
@@ -491,6 +491,16 @@ function introEnded(db, ctx, p) {
 // ---------- Aktionen ----------
 
 const moderatorActions = {
+  'timer.start'(db, ctx) {
+    const g = activeGame(db);
+    if (!g) fail('Gerade läuft kein Spiel.');
+    db.live.timer = { gameId: g.id, startedAt: ctx.now };
+    log(db, ctx, 'ablauf', `10-Sekunden-Timer gestartet (${g.title})`);
+  },
+  'timer.stop'(db, ctx) {
+    delete db.live.timer;
+    log(db, ctx, 'ablauf', 'Timer abgebrochen');
+  },
   ...FINALE.mod,
 
   // Finale: letzten Schritt zurücknehmen (z. B. falsch geklickte Bewertung nach einem Münzeinsatz).
@@ -987,6 +997,34 @@ const UNDO_MAX = 25;
 function undoStack() {
   return UNDO_STACK;
 }
+// ----- 10-Sekunden-Timer (für jedes Spiel von der Moderation startbar) -----
+// Erst groß angekündigt, dann 10 Sekunden Countdown. Danach sind alle Antworten
+// gesperrt; kurz nach Ablauf nimmt der Server noch die automatisch abgeschickten
+// Schreibfelder an (GRACE), danach nichts mehr.
+// Diese Moderationsaktionen starten eine neue Frage: der Timer wird zurückgesetzt.
+const TIMER_RESET = new Set(['open', 'start', 'next', 'pick', 'showQuestion', 'nextHint', 'play', 'replay', 'startMovie', 'openWheel', 'spinFor', 'allowLate']);
+function timerInfo(db, now = Date.now()) {
+  const t = db.live.timer;
+  const g = activeGame(db);
+  if (!t || !g || t.gameId !== g.id) return null;
+  const runAt = t.startedAt + TIMER.announce, endsAt = runAt + TIMER.run;
+  return {
+    phase: now < runAt ? 'announce' : now < endsAt ? 'run' : 'over',
+    startsIn: Math.max(0, runAt - now),
+    remainingMs: Math.max(0, endsAt - now),
+    durationMs: TIMER.run,
+    locked: now >= endsAt,
+    closed: now > endsAt + TIMER.grace,
+    id: t.startedAt,
+  };
+}
+function timerWake(db, now) {
+  const t = db.live.timer;
+  if (!t) return null;
+  const runAt = t.startedAt + TIMER.announce;
+  return [runAt, runAt + TIMER.run, runAt + TIMER.run + TIMER.grace + 10].find((x) => x > now) || null;
+}
+
 const showKey = (db) => db.project.id || db.project.name;
 function isUndoable(ctx, name) {
   if (ctx.role !== 'moderator' || typeof name !== 'string' || name === 'undo.last') return false;
@@ -1005,7 +1043,12 @@ function applyAction(db, ctx, name, payload, actionId) {
     if (name !== 'beamer.introEnded') fail('Diese Aktion ist für diese Rolle nicht erlaubt.');
     result = introEnded(db, ctx, payload || {}) || {};
   } else if (typeof name === 'string' && name.startsWith('play.') && (ctx.role === 'moderator' || ctx.role === 'team')) {
+    if (ctx.role === 'team' && name !== 'play.options') {
+      const ti = timerInfo(db, ctx.now);
+      if (ti && ti.closed) fail('Die Zeit ist abgelaufen – Antworten sind gesperrt.');
+    }
     result = playAction(db, ctx, name.slice(5), payload || {}) || {};
+    if (ctx.role === 'moderator' && TIMER_RESET.has(name.slice(5))) delete db.live.timer;
   } else if (ctx.role === 'team' && Object.prototype.hasOwnProperty.call(FINALE.team, name)) {
     result = FINALE.team[name](db, ctx, payload || {}) || {};
   } else {
@@ -1013,6 +1056,7 @@ function applyAction(db, ctx, name, payload, actionId) {
     if (!fn) fail('Diese Aktion ist für diese Rolle nicht erlaubt.');
     result = fn(db, ctx, payload || {}) || {};
   }
+  if (ctx.role === 'moderator' && typeof name === 'string' && (name.startsWith('run.') || name === 'show.activate')) delete db.live.timer;
   rememberFinale(db, name, before);
   if (snap) {
     const added = db.log.slice(snap.logLen);
@@ -1105,6 +1149,7 @@ function teamView(db, teamId, now = Date.now()) {
   if (g) {
     const play = PLAY[g.type].teamView(db, g, gameState(db, g), teamId, now);
     if (play) view.play = { type: g.type, ...play };
+    if (play) view.timer = timerInfo(db, now);
   } else if (db.live.finale) {
     view.finale = FINALE.teamView(db, teamId);
   }
@@ -1119,7 +1164,9 @@ function publicTeams(db) {
 function nextWake(db, now = Date.now()) {
   const g = activeGame(db);
   const fn = g && PLAY[g.type].wakeAt;
-  return fn ? fn(db, g, gameState(db, g), now) : null;
+  const own = fn ? fn(db, g, gameState(db, g), now) : null;
+  const tw = timerWake(db, now);
+  return [own, tw].filter(Boolean).sort((x, y) => x - y)[0] || null;
 }
 
 function beamerGameView(db) {
@@ -1165,7 +1212,7 @@ function beamerView(db) {
     view.pauseCoinPos = nextCoin ? nextCoin.pos : null;
   }
   if (b.view === 'video') view.introVideo = pr.introVideo ? { id: pr.introVideo.id, type: pr.introVideo.type } : null;
-  if (b.view === 'game') view.gameView = beamerGameView(db);
+  if (b.view === 'game') { view.gameView = beamerGameView(db); view.timer = timerInfo(db); }
   if (b.view === 'ranking') view.ranking = b.data.ranking;
   if (b.view === 'coin') view.coin = b.data;
   if (b.view === 'finale') view.finale = FINALE.beamerView(db);
@@ -1194,6 +1241,7 @@ function moderatorView(db, connections) {
     // „Rückgängig“: was zuletzt passiert ist und ob Teams seitdem etwas abgegeben haben.
     undo: (() => { const st = undoStack(db); const u = st[st.length - 1]; return u && u.project === showKey(db) ? { label: u.label, teamSince: u.teamSince, count: st.length } : null; })(),
     live: { ...db.live, finaleHistory: undefined },
+    timer: timerInfo(db),
     totals: totals(db),
     ledger: db.ledger.slice(-100),
     log: db.log.slice(-60),

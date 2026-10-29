@@ -21,6 +21,7 @@
 
   <script type="module">
     import { h, connect, mediaUrl, coinImg } from './assets/js/client.js';
+    import { syncTimer } from './assets/js/timer-ui.js';
     import { renderGame } from './assets/js/beamer-play.js';
     import { setMediaEnv, syncMedia, soundEnabled } from './assets/js/beamer-extra.js';
     import { answerContent } from './assets/js/ink.js';
@@ -211,6 +212,14 @@
       const titleSlide = s.effect.kind === 'title' && ['title', 'stageTitle', 'finaleTitle', 'finale'].includes(s.view);
       if (fresh && s.settings.sound && !embedded && !titleSlide) SOUNDS[s.effect.kind]?.();
       lastEffect = s.effect.seq;
+
+      // 10-Sekunden-Timer über der aktiven Fragenfolie (mit Ton: Ankündigung, letzte 3 Sekunden, Ablauf).
+      const snd = s.settings.sound && !embedded;
+      syncTimer(s.view === 'game' ? s.timer || null : null, 'beamer', {
+        onAnnounce: () => snd && tone([523, 659, 784], 0.16, 'triangle'),
+        onSecond: (sec) => snd && sec <= 3 && sec > 0 && tone([880], 0.12, 'sine'),
+        onLock: () => snd && buzzer(),
+      });
 
       const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.pauseCoinPos, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');

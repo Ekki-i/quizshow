@@ -130,7 +130,17 @@ function distanceKm(a, b) {
   return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(x)));
 }
 
+// 10-Sekunden-Timer der Moderation (siehe game.js): Ankündigung, Countdown, Nachfrist.
+const TIMER = { announce: 2500, run: 10000, grace: 4000 };
+// Ist der Timer für dieses Spiel abgelaufen (inkl. Nachfrist für automatische Abgaben)?
+function timerClosed(db, gameId, now = Date.now()) {
+  const t = db.live && db.live.timer;
+  return !!t && (!gameId || t.gameId === gameId) && now > t.startedAt + TIMER.announce + TIMER.run + TIMER.grace;
+}
+
 module.exports = {
+  TIMER,
+  timerClosed,
   QuizError, fail, newId, randomInt, log, effect, teamName, teamIds, totals, bookTarget, cleanText, cleanInk, cleanImage, cleanChoice, pts,
   buzzIn, currentBuzz, buzzTeamView, distanceKm,
 };

@@ -474,7 +474,23 @@ function buildGameControl() {
   if (!g) return card('Spielsteuerung', h('p', { class: 'muted' }, 'Kein Spiel aktiv. Der Showablauf aktiviert die Spiele; Ausnahmen ganz unten unter „Spiele (direkt aktivieren)“.'));
   const st = S.live.games[g.id] || {};
   const pos = S.project.games.indexOf(g) + 1;
-  return buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor, ask }, g, st, pos);
+  return h('div', {}, timerBar(), buildPlay({ S, card, dot, act, confirmAct, teamName, teamColor, ask }, g, st, pos));
+}
+
+// 10-Sekunden-Timer: Beamer kündigt groß an, dann läuft er auf der Fragenfolie ab.
+// Danach sind alle Antworten gesperrt; Schreibfelder werden automatisch abgeschickt.
+function timerBar() {
+  const t = S.timer;
+  const now = Date.now();
+  let status;
+  if (!t) status = h('span', { class: 'muted' }, 'Für die aktuelle Frage: groß ankündigen, 10 s Countdown, danach gesperrt.');
+  else if (t.phase === 'over') status = h('b', { style: { color: 'var(--bad)' } }, 'Zeit abgelaufen – Antworten gesperrt');
+  else status = h('span', {}, t.phase === 'announce' ? 'Wird angekündigt … ' : 'Läuft: ', h('b', { 'data-deadline': String(now + t.remainingMs) }, `${Math.ceil(t.remainingMs / 1000)} s`));
+  return h('section', { class: 'card timer-bar' },
+    h('div', { class: 'row', style: { alignItems: 'center', gap: '12px' } },
+      h('button', { class: 'btn pink', onclick: () => act('timer.start'), disabled: !!t && t.phase !== 'over' }, t ? '⏱ Timer neu starten' : '⏱ 10-Sekunden-Timer'),
+      t ? h('button', { class: 'btn ghost', onclick: () => act('timer.stop') }, t.phase === 'over' ? 'Sperre aufheben' : 'Abbrechen') : null,
+      h('span', { class: 'grow' }, status)));
 }
 
 // Beamer: Umschalten übernimmt der Showablauf – hier nur, was gerade läuft.
@@ -1078,6 +1094,9 @@ function buildGameEditor(kind, item) {
       formFields(type.schema, d.content, save, rerender, key)));
 }
 
+// Welche Fragen/Einträge im Editor aufgeklappt sind (pro Feld gemerkt).
+const ITEM_OPEN = new Map();
+
 function formFields(fields, obj, save, rerender, idBase) {
   const out = fields.map((f) => formField(f, obj, f.key, save, rerender, `${idBase}-${f.key}`));
   // Orte mit Breiten- und Längengrad: zusätzlich auf der Karte antippen.
@@ -1155,12 +1174,15 @@ function formField(f, holder, k, save, rerender, id) {
             h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, h('input', { id: `${id}-${i}`, value: item ?? '', maxlength: String(f.maxLength || 300), oninput: (ev) => { arr[i] = ev.target.value; save(); } }), remove));
         }
         const preview = Object.values(item).find((v) => typeof v === 'string' && v.trim()) || 'noch leer';
-        return h('details', { class: 'item', open: arr.length <= 5 || i === 0 },
+        // Auf-/Zugeklappt bleibt erhalten, auch wenn der Editor neu gezeichnet wird.
+        const openKey = `${id}-${i}`;
+        const isOpen = ITEM_OPEN.has(openKey) ? ITEM_OPEN.get(openKey) : arr.length <= 3;
+        return h('details', { class: 'item', open: isOpen, ontoggle: (ev) => ITEM_OPEN.set(openKey, ev.target.open) },
           h('summary', {}, h('b', {}, label), h('span', { class: 'muted' }, ` · ${preview.slice(0, 60)}`)),
           h('div', { class: 'item-body' }, formFields(f.fields, item, save, rerender, `${id}-${i}`), remove ? h('div', { style: { marginTop: '8px' } }, remove) : null));
       });
       const add = canChange && arr.length < f.max
-        ? h('button', { type: 'button', class: 'btn small', onclick: () => { arr.push(f.of === 'text' ? '' : emptyItem(f.fields)); rerender(); } }, `+ ${f.addLabel || 'Eintrag hinzufügen'}`)
+        ? h('button', { type: 'button', class: 'btn small', onclick: () => { ITEM_OPEN.set(`${id}-${arr.length}`, true); arr.push(f.of === 'text' ? '' : emptyItem(f.fields)); rerender(); } }, `+ ${f.addLabel || 'Eintrag hinzufügen'}`)
         : null;
       return h('fieldset', { class: 'group' }, h('legend', {}, f.label, canChange ? h('span', { class: 'muted' }, ` (${arr.length} von max. ${f.max})`) : null), h('div', { class: f.of === 'text' ? 'field-grid' : 'items' }, items), add);
     }
