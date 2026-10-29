@@ -55,6 +55,9 @@
         h('p', {}, h('a', { class: 'btn', href: 'index.html' }, 'Zur Startseite'))));
     }
 
+    // Bedienelemente, an denen man erkennt, dass ein Team noch antworten kann.
+    const ANSWER_CONTROLS = 'canvas.ink-canvas, svg.map.pickable, input:not(:disabled), select:not(:disabled), textarea:not(:disabled), .buzzer:not(:disabled), .abcd-opt:not(:disabled), .btn.huge:not(:disabled), .zu-opt, .guess-row, .team-pick button:not(:disabled)';
+
     function render(s) {
       document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
       document.title = `${s.team.name} – ${s.show.name}`;
@@ -94,6 +97,8 @@
 
       // 10-Sekunden-Timer: Anzeige oben; bei Ablauf wird jedes beschriebene Feld automatisch abgeschickt.
       syncTimer(s.play ? s.timer || null : null, 'team', {
+        // Nur Teams, die noch etwas eingeben können, sehen den Timer (wer schon abgegeben hat, nicht).
+        isActive: () => !!main.querySelector(ANSWER_CONTROLS),
         onLock: () => document.querySelectorAll('#main .ink').forEach((el) => el.inkApi?.autoSubmit?.()),
       });
 
