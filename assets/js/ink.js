@@ -192,6 +192,8 @@ export function inkPad({ draftKey, label, button, onSubmit, ask, toast, onChange
     h('div', { class: 'ink-frame' }, canvas, hint),
     noSubmit ? null : h('p', {}, submit));
   el.inkApi = { hasInk: () => strokes.length > 0, png: () => exportPng(), clear: () => clearInkDraft(draftKey) };
+  // Timer abgelaufen: das, was gerade im Feld steht, automatisch abschicken.
+  if (!noSubmit) el.inkApi.autoSubmit = () => { if (strokes.length && !submit.disabled) submit.click(); };
   return el;
 }
 

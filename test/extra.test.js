@@ -569,3 +569,29 @@ test('Ich weiß nicht 2.0: Einschätzung eines Teams ohne Abgabe zählt nicht', 
   act(db, mod(), 'evaluate');
   assert.equal(totals(db)[ids[0]], 2); // 1 Einschätzung + eigene Antwort
 });
+
+test('10-Sekunden-Timer: Ankündigung, Countdown, Nachfrist für Schreibfelder, danach gesperrt; neue Runde setzt zurück', () => {
+  const { db, ids } = setup(3);
+  use(db, 'weissnicht2');
+  act(db, mod(), 'open', { index: 0 });
+  const t0 = clock;
+  game.applyAction(db, { role: 'moderator', actor: 'moderator', now: t0 }, 'timer.start', {});
+  assert.equal(game.teamView(db, ids[0], t0 + 1000).timer.phase, 'announce');
+  assert.equal(game.teamView(db, ids[0], t0 + 5000).timer.phase, 'run');
+  assert.equal(game.teamView(db, ids[0], t0 + 13000).timer.phase, 'over');
+  assert.equal(game.nextWake(db, t0 + 100), t0 + 2500);
+  act(db, team(ids[0], t0 + 3000), 'submit', { ink }); // läuft noch
+  act(db, team(ids[1], t0 + 14000), 'submit', { ink }); // Nachfrist: automatisch abgeschickt
+  assert.throws(() => act(db, team(ids[2], t0 + 17000), 'submit', { ink }), /Zeit ist abgelaufen/);
+});
+
+test('10-Sekunden-Timer: neue Runde oder Schritt setzt ihn zurück', () => {
+  const { db, ids } = setup(2);
+  use(db, 'weissnicht2');
+  act(db, mod(), 'open', { index: 0 });
+  game.applyAction(db, { role: 'moderator', actor: 'moderator', now: 1 }, 'timer.start', {});
+  assert.ok(game.beamerView(db).timer);
+  act(db, mod(), 'open', { index: 1 });
+  assert.equal(game.beamerView(db).timer, null);
+  act(db, team(ids[0]), 'submit', { ink });
+});

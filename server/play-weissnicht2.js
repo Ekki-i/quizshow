@@ -8,7 +8,7 @@
 // alle Punkte des Buzzer-Teams zunichte – auch den für die eigene richtige
 // Antwort. Alle anderen Teams bekommen für ihre richtige Antwort +1.
 
-const { fail, log, effect, teamName, teamIds, bookTarget, cleanInk } = require('./core');
+const { fail, log, effect, teamName, teamIds, bookTarget, cleanInk, timerClosed } = require('./core');
 
 function round(st, i) {
   if (!st.rounds[i]) st.rounds[i] = { open: false, answers: {}, buzz: null, guesses: null, grades: {}, closedSubmissions: false, evaluated: false };
@@ -22,7 +22,8 @@ function current(st) {
 
 // Einschätzen ist erst möglich, wenn alle Teams abgegeben haben (oder die Moderation die Abgabe schließt).
 function allIn(db, r) {
-  return r.closedSubmissions || teamIds(db).every((id) => r.answers[id]);
+  // Nach Ablauf des 10-Sekunden-Timers gilt die Abgabe als geschlossen.
+  return r.closedSubmissions || timerClosed(db) || teamIds(db).every((id) => r.answers[id]);
 }
 
 // Alle Teams außer dem Buzzer-Team, die richtig geantwortet haben (+1 je Team).
