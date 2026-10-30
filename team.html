@@ -59,7 +59,7 @@
     }
 
     // Bedienelemente, an denen man erkennt, dass ein Team noch antworten kann.
-    const ANSWER_CONTROLS = 'canvas.ink-canvas, svg.map.pickable, input:not(:disabled), select:not(:disabled), textarea:not(:disabled), .buzzer:not(:disabled), .abcd-opt:not(:disabled), .btn.huge:not(:disabled), .zu-opt, .guess-row, .team-pick button:not(:disabled)';
+    const ANSWER_CONTROLS = 'canvas.ink-canvas:not(.notes-canvas), svg.map.pickable, input:not(:disabled), select:not(:disabled), textarea:not(:disabled), .buzzer:not(:disabled), .abcd-opt:not(:disabled), .btn.huge:not(:disabled), .zu-opt, .guess-row, .team-pick button:not(:disabled)';
 
     // Neue Show-Sitzung („Show jetzt starten“): alte Entwürfe aus Proben verwerfen und neu laden.
     function checkSession(s) {

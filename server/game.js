@@ -1151,7 +1151,7 @@ function applyAction(db, ctx, name, payload, actionId) {
     const st = undoStack(db);
     st.push(snap);
     if (st.length > UNDO_MAX) st.shift();
-  } else if ((ctx.role === 'team' || ctx.role === 'host') && name !== 'play.options') {
+  } else if ((ctx.role === 'team' || ctx.role === 'host') && name !== 'play.options' && name !== 'play.notes') {
     const st = undoStack(db);
     if (st.length) st[st.length - 1].teamSince += 1;
   }

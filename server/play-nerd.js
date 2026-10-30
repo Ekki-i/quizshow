@@ -4,7 +4,7 @@
 // ein Team nennen kann. Das höchste Gebot spielt (3 Fehler erlaubt bis zum
 // Scheitern), danach höchstens das zweithöchste Team (2. Fehler = Scheitern).
 
-const { fail, log, effect, teamName, teamIds, bookTarget, cleanText } = require('./core');
+const { fail, log, effect, teamName, teamIds, bookTarget, cleanText, cleanInk } = require('./core');
 
 const MAX_BID = 99;
 const TIE_SECOND = /^Gleich hohes Gebot gilt als zweithöchstes/;
@@ -114,6 +114,14 @@ module.exports = {
       r.bids[ctx.teamId] = n;
       log(db, ctx, 'gebot', `${teamName(db, ctx.teamId)} hat geboten`);
     },
+    // Notizen (Apple Pencil) während der Gebotsphase – nur für das eigene Team
+    // sichtbar; danach als Hilfe beim Antworten, aber nicht mehr änderbar.
+    notes(db, ctx, game, st, p) {
+      const r = current(st);
+      if (r.phase !== 'bidding') fail('Notizen sind nur während der Gebotsphase möglich.');
+      if (!r.notes) r.notes = {};
+      r.notes[ctx.teamId] = cleanInk(p.ink);
+    },
   },
 
   mod: {
@@ -195,7 +203,11 @@ module.exports = {
   teamView(db, game, st, teamId) {
     if (st.catIndex < 0) return null;
     const r = round(st, st.catIndex);
-    return { ...publicRound(db, game, st, r), ownBid: r.bids[teamId] ?? null, canBid: r.phase === 'bidding' && r.bids[teamId] === undefined, maxBid: MAX_BID };
+    return {
+      ...publicRound(db, game, st, r), ownBid: r.bids[teamId] ?? null, canBid: r.phase === 'bidding' && r.bids[teamId] === undefined, maxBid: MAX_BID,
+      // Während der Gebotsphase nicht mitschicken (sonst würde das Schreibfeld bei jedem Speichern neu aufgebaut).
+      notesInk: r.phase !== 'bidding' && r.notes ? r.notes[teamId] || null : null,
+    };
   },
 
   beamerView(db, game, st) {
