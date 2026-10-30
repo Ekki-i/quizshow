@@ -1467,3 +1467,50 @@ body.timer-locked #main .ink-frame, body.timer-locked #main .abcd, body.timer-lo
 .beamer .land-split .beamer-map .map { width: auto; height: auto; max-width: 100%; max-height: 62vh; display: block; }
 .undo-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; max-width: 280px; }
 .undo-wrap .undo-label { font-size: 0.75rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+
+/* Info-Fenster (Generalprobe-Check, Beamer-Vorschau) */
+.modal.info-modal { width: min(760px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+.modal.info-modal.wide { width: min(1240px, 96vw); }
+.info-modal-body { overflow: auto; }
+.check-sum { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.check-group { margin: 12px 0 4px; font-weight: 800; }
+.check-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.check-list li { padding: 8px 12px; border-radius: 8px; background: var(--surface-2, #1c1c2a); border-left: 4px solid var(--muted, #888); }
+.check-list li.fehlt { border-left-color: var(--bad); }
+.check-list li.hinweis { border-left-color: #f4b740; }
+.check-list li.ok { border-left-color: var(--ok); }
+.check-list li small { display: block; opacity: 0.7; }
+.preview-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; background: #000; display: block; }
+
+/* Zwischenstand mit Animation: Balken + Platztausch */
+.beamer .rank.rank-anim li .pos { transition: background 0.4s; }
+.beamer .rank.rank-anim li .nm { flex: 0 0 30%; }
+.beamer .rank.rank-anim li .bar { flex: 1; height: 3.2vh; background: rgba(255, 255, 255, 0.06); position: relative; overflow: hidden; }
+.beamer .rank.rank-anim li .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--team) 55%, transparent), var(--team)); transition: width calc(2.2s * var(--speed)) cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 2vh color-mix(in srgb, var(--team) 60%, transparent); }
+.beamer .rank.rank-anim li .pts { min-width: 3.2em; text-align: right; }
+.beamer .rank.rank-anim li:first-child { box-shadow: inset -0.6vw 0 0 var(--team), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .rank.rank-anim.done li.lead { box-shadow: inset -0.6vw 0 0 var(--team), 0 0 0 0.35vh var(--accent-2), 0 0 3vh rgba(255, 194, 61, 0.45); animation: rise calc(0.6s * var(--speed)) ease-out both, leadPulse 1.4s ease-in-out 2; }
+.beamer .rank.rank-anim.done li.lead .nm::after { content: ' 👑'; }
+@keyframes leadPulse { 50% { transform: scale(1.025); } }
+.beamer .rank.rank-board.rank-anim { width: min(90vw, 160vh); }
+.beamer .rank.rank-anim li .nm { flex: 0 0 36%; }
+
+/* Lautstärkeregler in der Regie */
+.vol-box { display: grid; gap: 8px; margin: 6px 0 12px; max-width: 520px; }
+.vol-row { display: grid; grid-template-columns: 150px 1fr 54px; align-items: center; gap: 10px; }
+.vol-row input[type=range] { width: 100%; accent-color: var(--accent, #ff2e93); }
+.vol-val { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Abschlussseite auf den Team-iPads */
+.end-page { text-align: center; padding: 6vh 16px; display: grid; justify-items: center; gap: 10px; animation: pop 0.6s cubic-bezier(.2,1.5,.4,1) both; }
+.end-medal { font-size: 7rem; line-height: 1; filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5)); }
+.end-place { font-family: var(--font-display, inherit); font-size: 3rem; font-weight: 900; margin: 8px 0 0; color: var(--team, #fff); text-transform: uppercase; }
+.end-sub { font-size: 1.3rem; font-weight: 700; margin: 0; }
+.end-fin { font-size: 1.25rem; font-weight: 700; margin: 10px 0 0; padding: 12px 18px; border-radius: 12px; background: var(--surface-2, #1c1c2a); }
+.end-thanks { font-size: 1.4rem; margin: 16px 0 0; }
+
+/* Einheitliche Optik: Team-Chips aller Spiele wie die Namensleisten der Antwortkarten
+   (graue Leiste, Teamfarbe als seitliche Balken, Name in Großbuchstaben). */
+.beamer .chip.team-chip { background: var(--box-2, #2b2b2e); box-shadow: inset 0.8vw 0 0 var(--chip), inset -0.8vw 0 0 var(--chip), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); padding: 0.6em 1.8em; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 800; }
+.beamer .chip.team-chip.answering { box-shadow: inset 0.8vw 0 0 var(--chip), inset -0.8vw 0 0 var(--chip), inset 0 0 0 0.45vh var(--accent-2), 0 0 2.6vh rgba(255, 194, 61, 0.5); }
+.beamer .chip.team-chip b { text-transform: none; }

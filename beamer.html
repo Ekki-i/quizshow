@@ -29,10 +29,13 @@
     import { studioRoom } from './assets/js/studio-room.js';
     import { qrcode } from './assets/js/vendor/qrcode.js';
     import { pooled, unlockMedia, playWithSound } from './assets/js/media-pool.js';
-    import { startPause, stopPause, bandScene, audioReady, preloadSongs } from './assets/js/band.js';
+    import { startPause, stopPause, bandScene, audioReady, preloadSongs, setMusicLevel } from './assets/js/band.js';
 
     const stage = document.getElementById('stage');
-    const embedded = new URLSearchParams(location.search).has('preview');
+    // ?preview: Live-Vorschau in der Regie. ?demo: Vorschau im Editor (bekommt einen
+    // nachgestellten Zustand per Nachricht, keine Verbindung zum Server).
+    const demo = new URLSearchParams(location.search).has('demo');
+    const embedded = new URLSearchParams(location.search).has('preview') || demo;
     let lastEffect = null;
     let lastKey = null;
     let titleTimer = null;
@@ -139,6 +142,25 @@
     showControls();
     if (embedded) document.getElementById('beamer-controls').remove();
 
+    // Lautstärke aus der Regie: Effekttöne (synthetisch) und Musik/Videos getrennt.
+    let fxLevel = 0.8, musicLevel = 0.8;
+    setMusicLevel(musicLevel);
+    function applyVolumes(settings) {
+      fxLevel = Math.max(0, Math.min(1, (settings.fxVolume ?? 80) / 100));
+      const m = Math.max(0, Math.min(1, (settings.musicVolume ?? 80) / 100));
+      if (m !== musicLevel) { musicLevel = m; setMusicLevel(m); }
+      applyMediaVolume();
+    }
+    // Alle Videos und Lieder (außer der Pausenmusik, die über Web Audio läuft, und
+    // einem gerade ausblendenden Spieltitel-Lied) auf die Musiklautstärke setzen.
+    function applyMediaVolume() {
+      for (const el of document.querySelectorAll('audio, video')) {
+        if (el.__source || el.dataset.fading) continue;
+        if (Math.abs(el.volume - musicLevel) > 0.01) el.volume = musicLevel;
+      }
+    }
+    setInterval(applyMediaVolume, 400);
+
     function tone(freqs, dur = 0.18, type = 'square') {
       if (!audio) return;
       let t = audio.currentTime;
@@ -147,7 +169,7 @@
         const g = audio.createGain();
         o.type = type;
         o.frequency.value = f;
-        g.gain.setValueAtTime(0.18, t);
+        g.gain.setValueAtTime(0.18 * fxLevel, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + dur);
         o.connect(g).connect(audio.destination);
         o.start(t);
@@ -163,8 +185,8 @@
       const t = audio.currentTime + 0.01;
       const out = audio.createGain();
       out.gain.setValueAtTime(0, t);
-      out.gain.linearRampToValueAtTime(0.42, t + 0.02);
-      out.gain.setValueAtTime(0.42, t + 0.62);
+      out.gain.linearRampToValueAtTime(0.42 * fxLevel, t + 0.02);
+      out.gain.setValueAtTime(0.42 * fxLevel, t + 0.62);
       out.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
       const lp = audio.createBiquadFilter();
       lp.type = 'lowpass';
@@ -190,7 +212,7 @@
       title: () => tone([392, 392, 523, 659, 523, 784], 0.2, 'square'),
     };
 
-    const conn = connect({
+    const conn = demo ? { action: () => Promise.resolve(null) } : connect({
       hello: () => ({ role: 'beamer', preview: embedded }),
       quiet: embedded,
       onState: (s, serverTime) => {
@@ -198,6 +220,13 @@
         render(s);
       },
     });
+    if (demo) {
+      window.addEventListener('message', (ev) => {
+        const m = ev.data;
+        if (m && m.quizDemo === 'state' && m.state) { lastKey = null; render(m.state); }
+      });
+      window.parent.postMessage({ quizDemo: 'ready' }, '*');
+    }
 
     function teamOf(s, id) {
       return s.teams.find((t) => t.id === id) || { name: '?', color: '#888' };
@@ -206,6 +235,7 @@
     function render(s) {
       document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
       document.title = `${s.show.name} – Beamer`;
+      applyVolumes(s.settings);
       if (!embedded && s.settings.sound) preloadSongs(s.preloadSongs || []);
       const fresh = lastEffect !== null && s.effect.seq !== lastEffect;
       // Spieltitel, Gewinnstufen und Finale: nur der eigene Intro-Song, kein zusätzlicher Effektton.
@@ -448,12 +478,13 @@
       const token = introToken;
       const start = el.volume;
       let k = 0;
+      el.dataset.fading = '1';
       clearInterval(introFade);
       introFade = setInterval(() => {
         k += 1;
         if (token !== introToken) { clearInterval(introFade); return; } // inzwischen neues Intro
         el.volume = Math.max(0, start * (1 - k / 10));
-        if (k >= 10) { clearInterval(introFade); el.pause(); }
+        if (k >= 10) { clearInterval(introFade); el.pause(); delete el.dataset.fading; }
       }, 80);
     }
     // which: undefined = Spiel, 'finale' = Finale, { stage: n } = Gewinnstufe
@@ -467,7 +498,8 @@
       clearInterval(introFade);
       introToken += 1;
       el.pause();
-      el.volume = 1;
+      delete el.dataset.fading;
+      el.volume = musicLevel;
       el.muted = !audio;
       // Lied zu Ende → automatisch weiter zum Spiel (der Server prüft, ob noch der Spieltitel läuft).
       el.onended = () => { if (gameIntro === el) conn.action('beamer.introEnded', which === 'finale' ? { pos: 'finale' } : which && which.stage ? { pos: 'stage', stage: which.stage } : { pos: s.game.position }).catch(() => {}); };
@@ -521,13 +553,59 @@
     }
 
     // Rangliste von unten nach oben aufbauen: der letzte Platz erscheint zuerst.
+    // Zwischenstand mit Animation: Teams stehen zuerst in Pultreihenfolge, die Balken
+    // fahren hoch und die Punkte zählen mit; dann tauschen die Teams sichtbar die Plätze.
     function ranking(s) {
       const list = s.ranking || [];
-      return [
-        h('div', { class: 'q rank-title' }, 'Zwischenstand'),
-        h('ol', { class: `rank rank-board n${list.length}` }, list.map((r, i) => h('li', { '--team': r.color, style: { animationDelay: `${(list.length - 1 - i) * 0.6}s` } },
-          h('span', { class: 'pos' }, String(i + 1)), h('span', { class: 'nm' }, r.name), h('span', { class: 'pts' }, r.points)))),
-      ];
+      const max = Math.max(1, ...list.map((r) => r.points));
+      const start = (s.teams || []).map((t) => list.find((r) => r.teamId === t.id)).filter(Boolean);
+      for (const r of list) if (!start.includes(r)) start.push(r);
+      const rows = new Map();
+      const ol = h('ol', { class: `rank rank-board rank-anim n${list.length}` });
+      start.forEach((r, i) => {
+        const li = h('li', { '--team': r.color, style: { animationDelay: `${i * 0.12}s` } },
+          h('span', { class: 'pos' }, ''), h('span', { class: 'nm' }, r.name),
+          h('span', { class: 'bar' }, h('i', {})), h('span', { class: 'pts' }, '0'));
+        rows.set(r.teamId, li);
+        ol.append(li);
+      });
+      // Platz mit Gleichstand: gleiche Punkte = gleicher Platz.
+      const places = list.map((r, i) => (i > 0 && r.points === list[i - 1].points ? null : i + 1));
+      for (let i = 1; i < places.length; i++) if (places[i] === null) places[i] = places[i - 1];
+      const reduced = document.documentElement.classList.contains('reduced-motion');
+      const speed = Number(getComputedStyle(document.documentElement).getPropertyValue('--speed')) || 1;
+      const finish = () => {
+        list.forEach((r, i) => { const li = rows.get(r.teamId); li.querySelector('.pos').textContent = String(places[i]); li.classList.toggle('lead', places[i] === 1); });
+        ol.classList.add('done');
+      };
+      const grow = () => {
+        for (const r of list) {
+          const li = rows.get(r.teamId);
+          li.querySelector('.bar i').style.width = `${Math.max(2, (r.points / max) * 100)}%`;
+          const el = li.querySelector('.pts');
+          if (reduced) { el.textContent = String(r.points); continue; }
+          const t0 = performance.now(), dur = 2200 * speed;
+          const step = (t) => { const k = Math.min(1, (t - t0) / dur); el.textContent = String(Math.round(r.points * (1 - (1 - k) ** 3))); if (k < 1) requestAnimationFrame(step); };
+          requestAnimationFrame(step);
+        }
+      };
+      const reorder = () => {
+        // FLIP: alte Position merken, in Rangfolge umsortieren, dann sichtbar hingleiten.
+        const before = new Map([...rows].map(([id, li]) => [id, li.getBoundingClientRect().top]));
+        for (const r of list) ol.append(rows.get(r.teamId));
+        for (const [id, li] of rows) {
+          const dy = before.get(id) - li.getBoundingClientRect().top;
+          if (!dy) continue;
+          li.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 1400 * speed, easing: 'cubic-bezier(.45,0,.2,1)', delay: 0 });
+        }
+        setTimeout(finish, 1400 * speed);
+      };
+      if (reduced) { grow(); for (const r of list) ol.append(rows.get(r.teamId)); finish(); }
+      else {
+        setTimeout(grow, (0.6 + start.length * 0.12) * 1000 * speed);
+        setTimeout(reorder, (3.4 + start.length * 0.12) * 1000 * speed);
+      }
+      return [h('div', { class: 'q rank-title' }, 'Zwischenstand'), ol];
     }
 
     // Intro-Video der Show, bildschirmfüllend. Ohne Video (oder am Ende) das Logo.
