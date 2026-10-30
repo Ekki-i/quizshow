@@ -223,9 +223,157 @@ const EXTRA_TYPES = {
     ],
     example: { rounds: Array.from({ length: 8 }, (_, i) => ({ image: null, question: i === 0 ? 'Was ist auf dem Bild zu sehen?' : '', solution: '' })) },
   },
+
+  // ===== Sieben neue Module (Master-Prompt „7 neue Module“) =====
+  sortieren: {
+    title: 'Blamieren oder Sortieren',
+    playable: true,
+    summary: 'Fünf Bilder oder Begriffe in die richtige Reihenfolge ziehen. Je Element auf dem richtigen Platz 1 Punkt (0–5), kein Bonus, kein Timer.',
+    schema: [
+      { key: 'tasks', label: 'Aufgaben', type: 'list', min: 1, max: 15, itemLabel: (i) => `Aufgabe ${i + 1}`, addLabel: 'Aufgabe hinzufügen',
+        fields: [
+          text('category', 'Kategorie / Aufgabe (z. B. „Nach Alter sortieren – jüngste zuerst“)', 160),
+          { key: 'items', label: 'Die fünf Elemente – in der RICHTIGEN Reihenfolge (Platz 1 zuerst; zum Umsortieren ziehen)', type: 'list', min: 5, max: 5, itemLabel: (i) => `Platz ${i + 1}`,
+            fields: [text('label', 'Begriff / Name (bei einem Bild optional)', 80), media('image', 'Bild / Foto (optional)', 'image'), text('info', 'Wert für die Auflösung (optional, z. B. „1879“ oder „8.849 m“)', 60)] },
+        ] },
+    ],
+    example: {
+      tasks: [
+        { category: 'Sortiert nach Geburtsjahr – der Älteste zuerst', items: [
+          { label: 'Albert Einstein', image: null, info: '1879' }, { label: 'Marilyn Monroe', image: null, info: '1926' },
+          { label: 'Michael Jackson', image: null, info: '1958' }, { label: 'Lionel Messi', image: null, info: '1987' }, { label: 'Billie Eilish', image: null, info: '2001' }] },
+        { category: 'Sortiert nach Einwohnerzahl – die größte Stadt zuerst', items: [
+          { label: 'Berlin', image: null, info: '3,7 Mio.' }, { label: 'Hamburg', image: null, info: '1,9 Mio.' },
+          { label: 'München', image: null, info: '1,5 Mio.' }, { label: 'Köln', image: null, info: '1,1 Mio.' }, { label: 'Frankfurt am Main', image: null, info: '0,8 Mio.' }] },
+      ],
+    },
+  },
+
+  gier: {
+    title: 'Riskier die Gier',
+    playable: true,
+    summary: 'Schätzfragen mit 100 fiktiven Gier-Punkten je Team: Die Abweichung wird abgezogen, bei 0 oder weniger ist man raus. Platzierung bringt 10/6/4/3/2/1 Showpunkte.',
+    schema: [
+      num('seconds', 'Antwortzeit pro Frage in Sekunden (Standard 60)', 10, 300),
+      { key: 'questions', label: 'Schätzfragen', type: 'list', min: 1, max: 20, itemLabel: (i) => `Frage ${i + 1}`, addLabel: 'Frage hinzufügen',
+        fields: [area('question', 'Schätzfrage', 300), num('answer', 'Richtige Antwort (Zahl)', 0, 1000000000000, 0.01), text('unit', 'Einheit (optional, z. B. „km“ oder „Jahre“)', 30)] },
+    ],
+    example: {
+      seconds: 60,
+      questions: [
+        { question: 'Wie hoch ist die Zugspitze (in Metern)?', answer: 2962, unit: 'm' },
+        { question: 'In welchem Jahr wurde die erste SMS verschickt?', answer: 1992, unit: '' },
+        { question: 'Wie viele Knochen hat ein erwachsener Mensch?', answer: 206, unit: '' },
+        { question: 'Wie lang ist der Rhein (in Kilometern)?', answer: 1233, unit: 'km' },
+        { question: 'Wie viele Länder sind Mitglied der Vereinten Nationen?', answer: 193, unit: '' },
+      ],
+    },
+  },
+
+  top100: {
+    title: 'Quizzen, wo man steht',
+    playable: true,
+    summary: 'Top-100-Listen: Jedes Team nennt einen Eintrag. Rang 1–20 = 1 Punkt … Rang 81–100 = 5 Punkte, nicht gelistet = 0. Unsichere Treffer entscheidet die Moderation.',
+    schema: [
+      { key: 'rounds', label: 'Kategorien / Runden', type: 'list', min: 1, max: 10, itemLabel: (i) => `Runde ${i + 1}`, addLabel: 'Runde hinzufügen',
+        fields: [
+          text('category', 'Kategorie (z. B. „Größte Städte Europas nach Einwohnern“)', 160),
+          text('source', 'Quelle (Name oder Link – vor der Show prüfen!)', 300),
+          text('period', 'Jahr / Zeitraum (z. B. „2023“)', 60),
+          text('asOf', 'Datenstand (optional, z. B. „Stand 01/2024“)', 60),
+          area('entries', 'Top-100-Liste: genau 100 Zeilen, Zeile 1 = Rang 1. Varianten und Abkürzungen mit „/“ trennen (z. B. „Volkswagen / VW“)', 20000, { rows: 12 }),
+        ] },
+    ],
+    example: { rounds: [{ category: '', source: '', period: '', asOf: '', entries: '' }] },
+  },
+
+  star: {
+    title: 'Ich bin ein Star, lüg mich nicht an',
+    playable: true,
+    summary: 'In der Mitte ein Star, Film oder Franchise, rundherum acht Begriffe – genau einer ist falsch. Buzzern macht die Wahl verbindlich; das schnellste Team mit richtiger Wahl bekommt 1 Punkt.',
+    schema: [
+      { key: 'puzzles', label: 'Rätsel', type: 'list', min: 1, max: 15, itemLabel: (i) => `Rätsel ${i + 1}`, addLabel: 'Rätsel hinzufügen',
+        fields: [
+          text('center', 'In der Mitte: Schauspieler/in, Film, Rolle, Franchise oder Regisseur', 100),
+          media('image', 'Bild für die Mitte (optional)', 'image'),
+          { key: 'terms', label: 'Die acht Begriffe im Uhrzeigersinn', type: 'list', min: 8, max: 8, itemLabel: (i) => `Begriff ${i + 1}`, of: 'text', maxLength: 80 },
+          { key: 'wrong', label: 'Welcher Begriff ist der FALSCHE? (genau einer)', type: 'select', options: ['– bitte wählen –', ...Array.from({ length: 8 }, (_, i) => `Begriff ${i + 1}`)] },
+        ] },
+    ],
+    example: {
+      puzzles: [
+        { center: 'Leonardo DiCaprio', image: null, terms: ['Titanic', 'Inception', 'The Revenant', 'Catch Me If You Can', 'Der Pate', 'Shutter Island', 'The Wolf of Wall Street', 'Django Unchained'], wrong: 'Begriff 5' },
+        { center: 'Harry Potter (Filmreihe)', image: null, terms: ['Der Stein der Weisen', 'Die Kammer des Schreckens', 'Der Gefangene von Askaban', 'Der Feuerkelch', 'Der Orden des Phönix', 'Der Ring des Zauberers', 'Der Halbblutprinz', 'Die Heiligtümer des Todes'], wrong: 'Begriff 6' },
+      ],
+    },
+  },
+
+  timeline: {
+    title: 'Remember the Timeline',
+    playable: true,
+    summary: 'Reihum Begriffe auf eine Zeitachse legen. Richtig = 1 Punkt, falsch = alle Punkte des Durchgangs weg und raus. Freiwilliger Ausstieg behält die Punkte.',
+    schema: [
+      { key: 'rounds', label: 'Durchgänge', type: 'list', min: 1, max: 10, itemLabel: (i) => `Durchgang ${i + 1}`, addLabel: 'Durchgang hinzufügen',
+        fields: [
+          text('category', 'Kategorie (z. B. „Die letzten zehn James-Bond-Filme“)', 160),
+          text('reference', 'Referenzbegriff (liegt zu Beginn schon auf der Zeitachse)', 80),
+          text('refValue', 'Sortierwert des Referenzbegriffs (Jahr, Datum wie 2001-09-11, oder Zahl)', 30),
+          { key: 'items', label: 'Die zehn Begriffe zum Einordnen (Reihenfolge egal; gleiche Sortierwerte sind nicht erlaubt)', type: 'list', min: 10, max: 10, itemLabel: (i) => `Begriff ${i + 1}`,
+            fields: [text('label', 'Begriff', 80), text('value', 'Sortierwert (Jahr, Datum oder Zahl)', 30)] },
+        ] },
+    ],
+    example: {
+      rounds: [
+        { category: 'Erscheinungsjahr der Filme', reference: 'Titanic', refValue: '1997', items: [
+          { label: 'Der weiße Hai', value: '1975' }, { label: 'Krieg der Sterne', value: '1977' }, { label: 'E.T. – Der Außerirdische', value: '1982' },
+          { label: 'Zurück in die Zukunft', value: '1985' }, { label: 'Jurassic Park', value: '1993' }, { label: 'Matrix', value: '1999' },
+          { label: 'Der Herr der Ringe: Die Gefährten', value: '2001' }, { label: 'Avatar', value: '2009' }, { label: 'Inception', value: '2010' }, { label: 'Barbie', value: '2023' }] },
+      ],
+    },
+  },
+
+  chat: {
+    title: 'Guck mal, wer da spricht',
+    playable: true,
+    summary: 'Ein Messenger-Chat mit acht Nachrichten verrät nach und nach eine berühmte Person. Buzzer ab der ersten Nachricht: richtig = 1 Punkt, falsch = für die Runde gesperrt.',
+    schema: [
+      { key: 'chats', label: 'Chats', type: 'list', min: 1, max: 15, itemLabel: (i) => `Chat ${i + 1}`, addLabel: 'Chat hinzufügen',
+        fields: [
+          text('person', 'Gesuchte Persönlichkeit (Lösung, erscheint bei der Auflösung oben als Kontakt)', 80),
+          media('photo', 'Kontaktbild für die Auflösung (optional)', 'image'),
+          { key: 'messages', label: 'Die acht Nachrichten (je vier links und rechts; zum Umsortieren ziehen)', type: 'list', min: 8, max: 8, itemLabel: (i) => `Nachricht ${i + 1}`,
+            fields: [{ key: 'from', label: 'Seite', type: 'select', options: ['Links (grau)', 'Rechts (blau)'] }, area('text', 'Text', 300, { rows: 2 })] },
+        ] },
+    ],
+    example: {
+      chats: [
+        { person: 'Albert Einstein', photo: null, messages: [
+          { from: 'Links (grau)', text: 'Na, hast du deine Haare heute schon gekämmt? 😄' }, { from: 'Rechts (blau)', text: 'Wozu? Zeit ist doch relativ.' },
+          { from: 'Links (grau)', text: 'Wie war es eigentlich damals beim Patentamt in Bern?' }, { from: 'Rechts (blau)', text: 'Langweilig – da hatte ich Zeit zum Nachdenken.' },
+          { from: 'Links (grau)', text: 'Und dann kam 1921 der Anruf aus Stockholm …' }, { from: 'Rechts (blau)', text: 'Ja, aber nicht für das, was alle denken.' },
+          { from: 'Links (grau)', text: 'Streckst du auf dem Foto wieder die Zunge raus?' }, { from: 'Rechts (blau)', text: 'E = mc² – das muss reichen!' }] },
+      ],
+    },
+  },
+
+  hostdu: {
+    title: 'Host du das Zeug dafür?',
+    playable: true,
+    summary: 'Teams erfinden Antworten, alle werden mit der richtigen gemischt. Richtige Option gewählt = 1 Punkt; für jede falsche Option bekommt ihr Einreicher 1 Punkt je Team, das darauf hereinfällt.',
+    schema: [
+      { key: 'questions', label: 'Fragen', type: 'list', min: 1, max: 15, itemLabel: (i) => `Frage ${i + 1}`, addLabel: 'Frage hinzufügen',
+        fields: [area('question', 'Frage', 300), text('answer', 'Einzig richtige Antwort', 120), text('aliases', 'Auch als richtig erkennen (optional, Varianten mit Komma)', 300)] },
+    ],
+    example: {
+      questions: [
+        { question: 'Was ist ein „Petrichor“?', answer: 'Der Geruch von Regen auf trockener Erde', aliases: '' },
+        { question: 'Wofür wurde das Kaugummi ursprünglich erfunden?', answer: 'Als Ersatz für Kautabak', aliases: '' },
+      ],
+    },
+  },
 };
 
 // Reihenfolge in der Spiele-Datenbank.
-const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain'];
+const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain', 'sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu'];
 
 module.exports = { EXTRA_TYPES, EXTRA_ORDER, WHEEL };

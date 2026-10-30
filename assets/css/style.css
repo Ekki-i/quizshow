@@ -1514,3 +1514,183 @@ body.timer-locked #main .ink-frame, body.timer-locked #main .abcd, body.timer-lo
 .beamer .chip.team-chip { background: var(--box-2, #2b2b2e); box-shadow: inset 0.8vw 0 0 var(--chip), inset -0.8vw 0 0 var(--chip), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); padding: 0.6em 1.8em; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 800; }
 .beamer .chip.team-chip.answering { box-shadow: inset 0.8vw 0 0 var(--chip), inset -0.8vw 0 0 var(--chip), inset 0 0 0 0.45vh var(--accent-2), 0 0 2.6vh rgba(255, 194, 61, 0.5); }
 .beamer .chip.team-chip b { text-transform: none; }
+
+/* ================= Sieben neue Module ================= */
+/* Gemeinsam: Ziehen mit dem Finger */
+.drag-ghost { opacity: 0.9; transform: scale(1.05) rotate(-2deg); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); }
+.dragging { opacity: 0.35; }
+[data-drop].over { outline: 3px dashed var(--accent-2, #ffc23d); outline-offset: 2px; }
+.big-input { width: 100%; font-size: 1.6rem; padding: 16px 18px; border-radius: 12px; }
+
+/* Blamieren oder Sortieren – iPad */
+.sort-slots { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 10px; }
+.sort-slots li { display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 8px 12px; border-radius: 14px; background: var(--surface-2, #1c1c2a); border: 2px dashed rgba(255, 255, 255, 0.18); }
+.sort-slots li > b { font-size: 1.8rem; width: 1.6em; text-align: center; color: var(--accent-2, #ffc23d); }
+.sort-slots li:not(.empty) { border-style: solid; border-color: var(--team, var(--accent)); }
+.sort-slots.done li { border-style: solid; }
+.sort-pool { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 14px; padding: 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); min-height: 90px; }
+.sort-card { display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: #2b2b3a; color: #fff; font-weight: 700; font-size: 1.15rem; cursor: grab; user-select: none; -webkit-user-select: none; min-height: 64px; }
+.sort-card.sel { outline: 3px solid var(--accent-2, #ffc23d); }
+.sort-img { height: 64px; width: 64px; object-fit: cover; border-radius: 8px; }
+.sort-solution { list-style: none; padding: 0; display: grid; gap: 8px; }
+.sort-solution li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2, #1c1c2a); border-left: 6px solid var(--bad); }
+.sort-solution li.ok { border-left-color: var(--ok); }
+.sort-solution li small { opacity: 0.8; }
+.sort-solution .mine { margin-left: auto; font-weight: 700; }
+
+/* Riskier die Gier – iPad */
+.gier-balance { display: flex; align-items: baseline; gap: 12px; padding: 10px 16px; border-radius: 12px; background: var(--surface-2, #1c1c2a); margin-bottom: 10px; }
+.gier-balance b { font-size: 2rem; color: var(--accent-2, #ffc23d); }
+.gier-balance.out b { color: var(--bad); text-decoration: line-through; }
+.gier-time { font-size: 1.4rem; font-weight: 800; }
+.keypad { max-width: 420px; margin: 0 auto; }
+.keypad-display { font-size: 2.6rem; font-weight: 900; text-align: right; padding: 12px 18px; border-radius: 12px; background: #0b0b12; margin-bottom: 10px; font-variant-numeric: tabular-nums; min-height: 1.4em; }
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.key { min-height: 76px; font-size: 2rem; font-weight: 800; border-radius: 14px; border: 0; background: #2b2b3a; color: #fff; }
+.key:active { transform: scale(0.97); }
+.key.clear { font-size: 1.1rem; background: #3a3a4a; }
+.key.send { font-size: 1.1rem; background: var(--accent, #ff2e93); }
+.key.send:disabled { opacity: 0.4; }
+
+/* Ich bin ein Star – iPad */
+.star-center { font-size: 1.8rem; font-weight: 900; text-align: center; margin: 4px 0 8px; }
+.star-terms { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 14px; }
+.star-term { min-height: 72px; padding: 10px 14px; border-radius: 12px; border: 2px solid transparent; background: #2b2b3a; color: #fff; font-weight: 700; font-size: 1.1rem; text-align: left; display: flex; gap: 10px; align-items: center; }
+.star-term small { opacity: 0.6; }
+.star-term.selected { border-color: var(--accent-2, #ffc23d); background: #3b3420; }
+.star-term.wrong { border-color: var(--bad); background: #3b1d22; }
+
+/* Remember the Timeline – iPad */
+.tl-me { display: flex; align-items: baseline; gap: 12px; padding: 10px 16px; border-radius: 12px; background: var(--surface-2, #1c1c2a); margin-bottom: 10px; }
+.tl-me b { font-size: 2rem; color: var(--accent-2, #ffc23d); }
+.tl-me.out b { color: var(--bad); }
+.tl-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.tl-card { padding: 12px 16px; border-radius: 12px; background: #2b2b3a; font-weight: 700; cursor: grab; user-select: none; -webkit-user-select: none; }
+.tl-card.sel { outline: 3px solid var(--accent-2, #ffc23d); }
+.tl-line { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 4px; }
+.tl-item { display: flex; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 10px; background: #23233a; border-left: 6px solid var(--accent, #ff2e93); }
+.tl-item.ref { border-left-color: var(--accent-2, #ffc23d); }
+.tl-item span { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.tl-gap { min-height: 14px; border-radius: 8px; text-align: center; font-weight: 800; color: var(--accent-2, #ffc23d); }
+.tl-gap.ready { min-height: 48px; border: 2px dashed var(--accent-2, #ffc23d); display: grid; place-items: center; cursor: pointer; }
+
+/* Guck mal, wer da spricht – Smartphone-Chat (Beamer und iPad) */
+.phone-chat { width: min(42vh, 92vw); aspect-ratio: 9 / 18; border-radius: 4.5vh; background: #000; border: 1.1vh solid #1d1d22; box-shadow: 0 2vh 6vh rgba(0, 0, 0, 0.6), inset 0 0 0 0.3vh #3a3a40; display: flex; flex-direction: column; overflow: hidden; }
+.pc-head { display: flex; flex-direction: column; align-items: center; gap: 0.6vh; padding: 3.2vh 1vh 1.4vh; background: rgba(28, 28, 30, 0.95); border-bottom: 1px solid #2c2c2e; color: #fff; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+.pc-head b { font-size: 2vh; font-weight: 600; }
+.pc-avatar, .pc-photo { width: 6vh; height: 6vh; border-radius: 50%; background: linear-gradient(#8e8e93, #636366); display: grid; place-items: center; font-size: 3vh; font-weight: 700; color: #fff; object-fit: cover; }
+.pc-head.known b { color: #fff; font-size: 2.6vh; }
+.pc-body { flex: 1; display: flex; flex-direction: column; gap: 0.9vh; padding: 1.6vh 1.4vh; overflow: hidden; justify-content: flex-end; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+.pc-msg { max-width: 78%; padding: 1vh 1.5vh; border-radius: 2.2vh; font-size: 1.9vh; line-height: 1.3; color: #fff; }
+.pc-msg.left { align-self: flex-start; background: #3a3a3c; border-bottom-left-radius: 0.6vh; }
+.pc-msg.right { align-self: flex-end; background: #0a84ff; border-bottom-right-radius: 0.6vh; }
+.pc-msg.new { animation: pop 0.4s cubic-bezier(.2,1.5,.4,1) both; }
+.phone-chat.small { width: 100%; aspect-ratio: auto; border-radius: 22px; border-width: 6px; margin: 8px 0 12px; }
+.phone-chat.small .pc-head { padding: 10px; font-size: 1rem; }
+.phone-chat.small .pc-body { padding: 10px; gap: 6px; }
+.phone-chat.small .pc-msg { font-size: 1rem; padding: 8px 12px; border-radius: 16px; }
+
+/* Host du das Zeug dafür – iPad und Regie */
+.hd-options { display: grid; gap: 10px; margin: 10px 0; }
+.hd-opt { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 10px 16px; border-radius: 12px; border: 2px solid transparent; background: #2b2b3a; color: #fff; font-size: 1.15rem; font-weight: 700; text-align: left; }
+.hd-opt b { font-size: 1.5rem; color: var(--accent-2, #ffc23d); width: 1.4em; }
+.hd-opt small { margin-left: auto; font-weight: 400; opacity: 0.8; }
+.hd-opt.own { opacity: 0.45; border-style: dashed; border-color: rgba(255, 255, 255, 0.3); }
+.hd-opt.selected { border-color: var(--accent-2, #ffc23d); }
+.hd-opt.correct { border-color: var(--ok); background: #183222; }
+.hd-groups { display: grid; gap: 8px; margin: 10px 0; }
+.hd-group { padding: 10px 12px; border-radius: 10px; background: var(--surface-2, #1c1c2a); border-left: 5px solid #888; }
+.hd-group.correct { border-left-color: var(--ok); }
+
+/* ---- Beamer ---- */
+.beamer .nb-sort-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.4vw; width: min(94vw, 170vh); margin: 2vh auto 0; }
+.beamer .nb-sort-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vh; min-height: 30vh; padding: 1.4vh 1vw; background: var(--box); box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.5); color: #fff; text-align: center; }
+.beamer .nb-sort-card .nm { font-weight: 800; font-size: clamp(1rem, 2.2vw, 2.6rem); line-height: 1.1; }
+.beamer .nb-sort-card .info { font-size: 2.4vh; color: var(--accent-2); font-weight: 800; }
+.beamer .nb-sort-img { width: 100%; height: 20vh; object-fit: contain; }
+.beamer .nb-sort-row.solved .nb-sort-card { min-height: 24vh; animation: rise 0.5s ease-out both; }
+.beamer .nb-sort-row.solved .nb-sort-card:nth-child(2) { animation-delay: 0.3s; }
+.beamer .nb-sort-row.solved .nb-sort-card:nth-child(3) { animation-delay: 0.6s; }
+.beamer .nb-sort-row.solved .nb-sort-card:nth-child(4) { animation-delay: 0.9s; }
+.beamer .nb-sort-row.solved .nb-sort-card:nth-child(5) { animation-delay: 1.2s; }
+.beamer .nb-sort-card .pos { position: absolute; top: -1.6vh; left: -0.6vw; width: 5vh; height: 5vh; display: grid; place-items: center; background: var(--accent-2); color: #111; font-size: 3vh; }
+.beamer .nb-sort-row.solved .nb-sort-img { height: 13vh; }
+.beamer .nb-sort-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1vh 2vw; width: min(90vw, 160vh); margin: 2.4vh auto 0; }
+.beamer .nb-sort-res { display: flex; align-items: center; gap: 1vw; }
+.beamer .nb-sort-res .marks { display: flex; gap: 0.4vw; }
+.beamer .nb-sort-res .marks i { font-style: normal; width: 3.6vh; height: 3.6vh; display: grid; place-items: center; font-weight: 900; font-size: 2.2vh; }
+.beamer .nb-sort-res .marks i.ok { background: var(--ok); color: #062b14; }
+.beamer .nb-sort-res .marks i.bad { background: var(--bad); color: #fff; }
+.beamer .nb-sort-res .p { margin-left: auto; font-size: 3.4vh; color: var(--accent-2); }
+
+.beamer .nb-gier-time { text-align: center; font-size: 10vh; font-weight: 900; font-family: var(--font-display); color: #fff; margin: 1vh 0; }
+.beamer .nb-gier-time.grace { color: var(--bad); font-size: 7vh; }
+.beamer .nb-gier-bars { display: grid; gap: 1vh; width: min(88vw, 150vh); margin: 2vh auto 0; }
+.beamer .nb-gier-bar { display: grid; grid-template-columns: 22% 1fr 9% 18% 6%; align-items: center; gap: 1vw; background: var(--box); padding: 0.8vh 1vw; box-shadow: inset 0.6vw 0 0 var(--team); font-size: 2.6vh; color: #fff; }
+.beamer .nb-gier-bar .nm { font-weight: 800; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 0.8vw; }
+.beamer .nb-gier-bar .track { height: 2.6vh; background: rgba(255, 255, 255, 0.07); position: relative; }
+.beamer .nb-gier-bar .track i { position: absolute; inset: 0 auto 0 0; background: var(--team); transition: width 1.6s cubic-bezier(.2,.8,.2,1); }
+.beamer .nb-gier-bar b { text-align: right; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.beamer .nb-gier-bar small { opacity: 0.8; }
+.beamer .nb-gier-bar em { font-style: normal; color: var(--bad); font-weight: 900; text-transform: uppercase; }
+.beamer .nb-gier-bar.out { opacity: 0.55; }
+.beamer .nb-gier-final { display: grid; gap: 1.2vh; width: min(70vw, 120vh); margin: 3vh auto 0; }
+.beamer .nb-gier-place { display: flex; align-items: center; gap: 2vw; background: var(--box); padding: 1.2vh 2vw; box-shadow: inset 0.8vw 0 0 var(--team); font-size: 4vh; font-weight: 800; color: #fff; animation: rise 0.5s ease-out both; }
+.beamer .nb-gier-place .p { margin-left: auto; color: var(--accent-2); }
+
+.beamer .nb-t100-scale { display: flex; justify-content: center; gap: 1vw; margin: 1.6vh auto 0; }
+.beamer .nb-t100-scale span { display: flex; flex-direction: column; align-items: center; padding: 1vh 1.6vw; background: var(--box); color: #fff; }
+.beamer .nb-t100-scale small { font-size: 1.8vh; opacity: 0.8; }
+.beamer .nb-t100-scale b { font-size: 2.6vh; color: var(--accent-2); }
+.beamer .nb-t100-res { display: grid; gap: 1vh; width: min(88vw, 150vh); margin: 2.4vh auto 0; }
+.beamer .nb-t100-row { display: grid; grid-template-columns: 22% 1fr 20% 7%; gap: 1vw; align-items: center; background: var(--box); padding: 1.1vh 1vw; box-shadow: inset 0.6vw 0 0 var(--team); color: #fff; font-size: 2.8vh; animation: rise 0.5s ease-out both; }
+.beamer .nb-t100-row .nm { font-weight: 800; text-transform: uppercase; padding-left: 0.8vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.beamer .nb-t100-row .rank { color: var(--accent-2); font-weight: 800; }
+.beamer .nb-t100-row .p { text-align: right; color: var(--accent-2); font-size: 3.4vh; }
+.beamer .nb-t100-row.miss { opacity: 0.6; }
+.beamer .nb-t100-row.miss .rank { color: var(--bad); }
+
+.beamer .nb-star { position: relative; width: min(84vh, 90vw); aspect-ratio: 1.55; margin: 0 auto; }
+.beamer .nb-star-center { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 26%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #3a3a52, #121220); box-shadow: 0 0 0 0.6vh var(--accent-2), 0 0 5vh rgba(255, 194, 61, 0.35); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1vh; color: #fff; overflow: hidden; }
+.beamer .nb-star-center b { font-size: clamp(1rem, 2.6vh, 2.2rem); font-weight: 900; line-height: 1.1; }
+.beamer .nb-star-img { width: 70%; height: 55%; object-fit: cover; border-radius: 50%; margin-bottom: 0.6vh; }
+.beamer .nb-star-term { position: absolute; translate: -50% -50%; width: 22%; padding: 1.2vh 0.8vw; background: var(--box); color: #fff; text-align: center; font-weight: 800; font-size: clamp(0.9rem, 2.3vh, 2rem); line-height: 1.15; box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-star-term.wrong { background: var(--bad); animation: pop 0.6s cubic-bezier(.2,1.5,.4,1) both; }
+.beamer .nb-star-term.right { opacity: 0.55; }
+
+.beamer .nb-tl-line { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8vw; width: min(96vw, 175vh); margin: 2vh auto 0; }
+.beamer .nb-tl-item { display: flex; flex-direction: column; align-items: center; gap: 0.4vh; min-width: 7vw; max-width: 15vw; padding: 1vh 0.8vw; background: var(--box); color: #fff; box-shadow: inset 0 0.6vh 0 var(--accent), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); text-align: center; }
+.beamer .nb-tl-item b { font-size: 3vh; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.beamer .nb-tl-item span { font-size: 2vh; font-weight: 700; line-height: 1.15; }
+.beamer .nb-tl-item.ref { box-shadow: inset 0 0.6vh 0 var(--accent-2), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-tl-item.last { animation: pop 0.6s cubic-bezier(.2,1.5,.4,1) both; }
+.beamer .nb-tl-item.last.ok { box-shadow: inset 0 0.6vh 0 var(--ok), 0 0 3vh rgba(43, 217, 107, 0.5); }
+.beamer .nb-tl-item.last.bad { box-shadow: inset 0 0.6vh 0 var(--bad), 0 0 3vh rgba(255, 74, 74, 0.5); }
+.beamer .nb-tl-pool { text-align: center; margin-top: 1.6vh; font-size: 2.4vh; opacity: 0.8; color: #fff; }
+.beamer .nb-tl-teams { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8vw; margin-top: 1.6vh; }
+
+.beamer .nb-chat { display: flex; align-items: center; justify-content: center; gap: 4vw; }
+.beamer .nb-chat-side { display: flex; flex-direction: column; align-items: center; gap: 2vh; min-width: 30vw; }
+.beamer .nb-chat-count { font-family: var(--font-display); font-size: 8vh; font-weight: 900; color: #fff; }
+
+.beamer .nb-hd-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.4vh 1.4vw; width: min(92vw, 165vh); margin: 2vh auto 0; }
+.beamer .nb-hd-opt { display: flex; align-items: center; gap: 1.2vw; padding: 1.4vh 1.4vw; background: var(--box); color: #fff; font-size: 3vh; font-weight: 700; box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.5); flex-wrap: wrap; }
+.beamer .nb-hd-opt .l { font-family: var(--font-display); font-size: 4vh; color: var(--accent-2); }
+.beamer .nb-hd-opt .tx { flex: 1; min-width: 40%; }
+.beamer .nb-hd-opt .meta { width: 100%; display: flex; align-items: center; gap: 1vw; font-size: 2vh; }
+.beamer .nb-hd-opt .meta em { font-style: normal; opacity: 0.85; }
+.beamer .nb-hd-opt .votes { display: flex; gap: 0.4vw; margin-left: auto; }
+.beamer .nb-hd-opt .votes i { width: 2.6vh; height: 2.6vh; border-radius: 50%; display: inline-block; }
+.beamer .nb-hd-opt.correct { box-shadow: inset 0 0 0 0.5vh var(--ok), 0 0 3vh rgba(43, 217, 107, 0.4); }
+.beamer .nb-hd-opt.fake { opacity: 0.85; }
+/* Editor: Einträge per Ziehen umsortieren */
+.item-move { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; vertical-align: middle; }
+.item-move .btn { min-height: 28px; padding: 2px 8px; }
+.drag-handle { cursor: grab; font-size: 1.2rem; opacity: 0.6; padding: 0 4px; }
+details.item.dragging-item { opacity: 0.4; }
+details.item.drop-here { outline: 2px dashed var(--accent-2, #ffc23d); outline-offset: 2px; }
+.beamer .nb-star-term { width: 24%; font-size: clamp(1rem, 2.9vh, 2.4rem); padding: 1.6vh 0.8vw; }
+.beamer .nb-star { width: min(92vh, 94vw); }
+.beamer .nb-tl-item { min-width: 8.5vw; padding: 1.4vh 1vw; }
+.beamer .nb-tl-item b { font-size: 3.6vh; }
+.beamer .nb-tl-item span { font-size: 2.4vh; }

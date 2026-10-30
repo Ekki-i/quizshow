@@ -1,0 +1,214 @@
+'use strict';
+
+// Spiel „Riskier die Gier“: Schätzfragen mit eigenem, fiktivem Guthaben.
+// Jedes Team startet mit 100 Gier-Punkten (getrennt vom Show-Punktestand).
+// Alle Teams tippen gleichzeitig eine Zahl ein (Keypad), Standard 60 Sekunden.
+// Danach kann die Moderation eine Nachfrist von 10 Sekunden freigeben – nur für
+// Teams, die noch nicht abgegeben haben. Abgerechnet wird die Abweichung
+// |Schätzung − Lösung|, sie wird vom Guthaben abgezogen. Bei 0 oder darunter
+// scheidet das Team aus; wer gar nicht antwortet, scheidet ebenfalls aus.
+// Platzierung → Showpunkte 10 / 6 / 4 / 3 / 2 / 1 (letztes verbleibendes Team
+// zuerst). Mehrere Ausscheidungen in derselben Runde: das Restguthaben
+// entscheidet (stärker negativ = schlechter); gleiches Guthaben teilt sich die
+// Platzpunkte, der nächste Platz wird übersprungen.
+
+const { fail, log, effect, teamName, teamIds, bookTarget } = require('./core');
+
+const START = 100;
+const GRACE_MS = 10000;
+const PLACE_POINTS = [10, 6, 4, 3, 2, 1];
+const MAX_VALUE = 1e12;
+
+function round(st, i) {
+  if (!st.rounds[i]) st.rounds[i] = { open: false, endsAt: null, graceEndsAt: null, answers: {}, evaluated: false, results: null };
+  return st.rounds[i];
+}
+function current(st) {
+  if (st.index < 0) fail('Es läuft gerade keine Frage.');
+  return round(st, st.index);
+}
+function ensureTeams(db, st) {
+  for (const id of teamIds(db)) if (!st.teams[id]) st.teams[id] = { balance: START, outRound: null, outOrder: null };
+}
+const active = (db, st) => teamIds(db).filter((id) => st.teams[id] && st.teams[id].outRound === null);
+
+// Darf das Team gerade eine Zahl abgeben?
+function canAnswer(st, r, teamId, now) {
+  if (!r.open || r.evaluated) return false;
+  if (r.answers[teamId] !== undefined) return false;
+  if (!st.teams[teamId] || st.teams[teamId].outRound !== null) return false;
+  if (now <= r.endsAt) return true;
+  return r.graceEndsAt !== null && now <= r.graceEndsAt;
+}
+
+// Endstand: verbleibende Teams nach Guthaben, dann Ausgeschiedene (später = besser,
+// in derselben Runde nach Restguthaben). Gleiches Guthaben in derselben Gruppe = gleicher Platz.
+function standings(db, st) {
+  const ids = teamIds(db).filter((id) => st.teams[id]);
+  const key = (id) => {
+    const t = st.teams[id];
+    return t.outRound === null ? [1, Infinity, 1, t.balance] : [0, t.outRound, t.missing ? 0 : 1, t.balance];
+  };
+  const sorted = ids.slice().sort((a, b) => {
+    const ka = key(a), kb = key(b);
+    for (let i = 0; i < 4; i++) if (ka[i] !== kb[i]) return kb[i] - ka[i];
+    return 0;
+  });
+  const out = [];
+  sorted.forEach((id, i) => {
+    const prev = out[i - 1];
+    const same = prev && key(prev.teamId).every((v, j) => v === key(id)[j]);
+    const place = same ? prev.place : i + 1;
+    out.push({ teamId: id, place, balance: st.teams[id].balance, out: st.teams[id].outRound !== null, outRound: st.teams[id].outRound });
+  });
+  return out.map((x) => ({ ...x, points: PLACE_POINTS[x.place - 1] ?? (x.place > PLACE_POINTS.length ? 1 : 0) }));
+}
+const finished = (db, game, st) => active(db, st).length <= 1 || game.content.questions.every((_, i) => st.rounds[i] && st.rounds[i].evaluated);
+
+module.exports = {
+  init: () => ({ index: -1, rounds: {}, teams: {}, awarded: false }),
+  standings,
+  PLACE_POINTS,
+
+  team: {
+    answer(db, ctx, game, st, p) {
+      const r = current(st);
+      ensureTeams(db, st);
+      if (st.teams[ctx.teamId].outRound !== null) fail('Ihr seid ausgeschieden.');
+      if (r.answers[ctx.teamId] !== undefined) fail('Eure Antwort ist schon abgegeben.');
+      if (!canAnswer(st, r, ctx.teamId, ctx.now)) fail(r.endsAt && ctx.now > r.endsAt ? 'Die Zeit ist abgelaufen.' : 'Die Frage ist nicht offen.');
+      const v = Number(p.value);
+      if (!Number.isFinite(v) || v < 0 || v > MAX_VALUE || String(p.value).trim() === '') fail('Bitte eine Zahl eingeben.');
+      r.answers[ctx.teamId] = { value: v, at: ctx.now, grace: ctx.now > r.endsAt };
+      log(db, ctx, 'antwort', `${teamName(db, ctx.teamId)} hat geschätzt`);
+    },
+  },
+
+  mod: {
+    open(db, ctx, game, st, p) {
+      const i = Number(p.index);
+      const q = game.content.questions[i];
+      if (!q) fail('Frage nicht gefunden.');
+      if (q.answer === null || q.answer === undefined || q.answer === '') fail('Für diese Frage ist keine Lösung hinterlegt.');
+      ensureTeams(db, st);
+      if (finished(db, game, st) && !(st.rounds[i] && st.rounds[i].evaluated)) fail('Das Spiel ist schon entschieden – höchstens ein Team ist noch dabei.');
+      if (st.index >= 0 && st.index !== i && !round(st, st.index).evaluated) fail('Erst die laufende Frage auswerten.');
+      st.index = i;
+      const r = round(st, i);
+      if (!r.evaluated && !r.open) {
+        r.open = true;
+        const secs = Number(game.content.seconds) > 0 ? Number(game.content.seconds) : 60;
+        r.endsAt = ctx.now + secs * 1000;
+        log(db, ctx, 'ablauf', `Gier: Frage ${i + 1} offen (${secs} s)`);
+      }
+    },
+    grace(db, ctx, game, st) {
+      const r = current(st);
+      if (r.evaluated) fail('Schon ausgewertet.');
+      if (ctx.now <= r.endsAt) fail('Die Antwortzeit läuft noch.');
+      if (r.graceEndsAt !== null) fail('Die Nachfrist wurde schon freigegeben.');
+      r.graceEndsAt = ctx.now + GRACE_MS;
+      log(db, ctx, 'ablauf', 'Gier: 10 Sekunden Nachfrist freigegeben');
+    },
+    evaluate(db, ctx, game, st) {
+      const r = current(st);
+      if (r.evaluated) fail('Schon ausgewertet.');
+      const act = active(db, st);
+      const missing = act.filter((id) => r.answers[id] === undefined);
+      const timeOver = ctx.now > (r.graceEndsAt ?? r.endsAt);
+      if (missing.length && !timeOver) fail('Die Antwortzeit läuft noch.');
+      const answer = Number(game.content.questions[st.index].answer);
+      const results = [];
+      for (const id of act) {
+        const t = st.teams[id];
+        const a = r.answers[id];
+        const before = t.balance;
+        if (a === undefined) {
+          t.outRound = st.index;
+          results.push({ teamId: id, value: null, diff: null, before, after: before, out: true, missing: true });
+          continue;
+        }
+        const diff = Math.abs(a.value - answer);
+        t.balance = Math.round((before - diff) * 100) / 100;
+        const out = t.balance <= 0;
+        if (out) t.outRound = st.index;
+        results.push({ teamId: id, value: a.value, diff, before, after: t.balance, out, missing: false });
+      }
+      // Wer gar nicht geantwortet hat, landet in dieser Runde hinter allen anderen.
+      for (const x of results) if (x.missing) st.teams[x.teamId].missing = true;
+      r.results = results;
+      r.open = false;
+      r.evaluated = true;
+      log(db, ctx, 'ablauf', `Gier: Frage ${st.index + 1} ausgewertet (Lösung ${answer})`);
+      effect(db, 'reveal');
+    },
+    // Platzierungspunkte buchen (erneut aufrufbar: korrigiert statt doppelt zu buchen).
+    award(db, ctx, game, st) {
+      ensureTeams(db, st);
+      if (!finished(db, game, st)) fail('Das Spiel läuft noch: es sind mehr als ein Team dabei und noch Fragen offen.');
+      for (const s of standings(db, st)) bookTarget(db, ctx, `gier:${game.id}:${s.teamId}`, s.teamId, s.points, `${game.title}, Platz ${s.place}`);
+      st.awarded = true;
+      log(db, ctx, 'ablauf', 'Gier: Platzierungspunkte vergeben');
+      effect(db, 'coin');
+    },
+  },
+
+  wakeAt(db, game, st, now) {
+    if (st.index < 0) return null;
+    const r = round(st, st.index);
+    if (!r.open) return null;
+    return [r.endsAt, r.graceEndsAt].filter((t) => t && t > now).sort((a, b) => a - b)[0] || null;
+  },
+
+  teamView(db, game, st, teamId, now = Date.now()) {
+    ensureTeams(db, st);
+    const me = st.teams[teamId];
+    const base = { balance: me ? me.balance : START, out: !!me && me.outRound !== null, start: START };
+    if (st.index < 0) return { waiting: true, ...base };
+    const r = round(st, st.index);
+    const q = game.content.questions[st.index];
+    const own = r.answers[teamId];
+    const res = r.results ? r.results.find((x) => x.teamId === teamId) : null;
+    return {
+      ...base,
+      index: st.index,
+      count: game.content.questions.length,
+      question: q.question,
+      unit: q.unit || '',
+      canAnswer: canAnswer(st, r, teamId, now),
+      endsAt: r.endsAt,
+      graceEndsAt: r.graceEndsAt,
+      answered: own !== undefined,
+      value: own ? own.value : null,
+      evaluated: r.evaluated,
+      solution: r.evaluated ? Number(q.answer) : null,
+      result: res,
+      standings: st.awarded ? standings(db, st).filter((s) => s.teamId === teamId) : null,
+    };
+  },
+
+  beamerView(db, game, st) {
+    ensureTeams(db, st);
+    const teams = teamIds(db).map((id) => ({ teamId: id, balance: st.teams[id].balance, out: st.teams[id].outRound !== null }));
+    if (st.index < 0) return { waiting: true, teams, start: START };
+    const r = round(st, st.index);
+    const q = game.content.questions[st.index];
+    return {
+      index: st.index,
+      count: game.content.questions.length,
+      question: q.question,
+      unit: q.unit || '',
+      start: START,
+      teams,
+      open: r.open,
+      endsAt: r.endsAt,
+      graceEndsAt: r.graceEndsAt,
+      answeredCount: Object.keys(r.answers).length,
+      activeCount: active(db, st).length + (r.evaluated ? r.results.filter((x) => x.out).length : 0),
+      evaluated: r.evaluated,
+      solution: r.evaluated ? Number(q.answer) : null,
+      results: r.evaluated ? r.results : null,
+      standings: st.awarded ? standings(db, st) : null,
+    };
+  },
+};

@@ -7,7 +7,7 @@
 // kann, ob die Dateien im data-Ordner wirklich vorhanden sind.
 
 // Felder, die bewusst leer bleiben dürfen.
-const OPTIONAL_KEYS = new Set(['aliases', 'note', 'asOf', 'fixes', 'min', 'max', 'start', 'audio', 'target', 'lat', 'lng', 'country']);
+const OPTIONAL_KEYS = new Set(['aliases', 'note', 'asOf', 'fixes', 'min', 'max', 'start', 'audio', 'target', 'lat', 'lng', 'country', 'unit', 'info', 'label', 'photo']);
 const COUNTRY_MODE = /Ganzes Land/;
 
 function isEmpty(v) {
@@ -42,6 +42,12 @@ function checkFields(fields, obj, where, out, media) {
 
 // Besondere Regeln einzelner Spielarten.
 function special(type, content, where, out) {
+  const each = (list, label, fn) => (list || []).forEach((x, i) => { const err = fn(x); if (err) out.push({ level: 'fehlt', where: `${where} · ${label} ${i + 1}`, text: err }); });
+  if (type === 'star') each(content.puzzles, 'Rätsel', require('./play-star').validate);
+  if (type === 'timeline') each(content.rounds, 'Durchgang', require('./play-timeline').validate);
+  if (type === 'chat') each(content.chats, 'Chat', require('./play-chat').validate);
+  if (type === 'top100') each(content.rounds, 'Runde', (rd) => { const n = require('./play-top100').parseList(rd.entries).length; return n < 100 ? `Liste hat erst ${n} von 100 Einträgen` : null; });
+  if (type === 'sortieren') each(content.tasks, 'Aufgabe', (t) => ((t.items || []).some((it) => !(it.label || '').trim() && !it.image) ? 'Ein Element hat weder Begriff noch Bild' : null));
   if (type === 'land') {
     (content.tasks || []).forEach((t, i) => {
       const w = `${where} · Aufgabe ${i + 1}`;

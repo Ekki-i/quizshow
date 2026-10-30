@@ -4,6 +4,7 @@
 
 import { h } from './client.js';
 import { answerContent } from './ink.js';
+import { MOD_NEU } from './neu-mod.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
@@ -33,7 +34,7 @@ const gradeBtns = (ui, onGrade, current) => [
 const JOKER_NAMES = { doppel: 'Doppelpunkt', streak: 'Streak', fifty: '50-50', raeuber: 'Punkteräuber', dieb: 'Joker-Dieb', blockade: 'Team-Blockade', detektiv: 'Detektiv-Joker', tausch: 'Antworttausch' };
 const jn = (k) => JOKER_NAMES[k] || k;
 
-export const MOD_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain };
+export const MOD_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain, ...MOD_NEU };
 
 // ---------- Dumm, dumm, dumm ----------
 function dumm3(ui, g, st) {
