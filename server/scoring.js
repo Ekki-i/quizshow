@@ -23,6 +23,7 @@ const SCORING = {
   songsong: [S('correct', 'Beide Songs erkannt', 1)],
   dgf: [S('term', 'Je richtig ausgewählter Begriff', 1)],
   fragen: [S('correct', 'Richtige Antwort auf die Frage', 1), S('askerNobody', 'Fragesteller, wenn niemand richtig liegt', 2), S('askerSomeone', 'Fragesteller, wenn jemand richtig liegt', -1)],
+  nerd: [S('maxPenalty', 'Höchststrafe beim gescheiterten zweiten Versuch', 3)],
   zuweit: [S('best', 'Bestes Ergebnis der Runde', 2), S('worst', 'Schlechtestes Ergebnis der Runde', -1)],
   sortieren: [S('position', 'Je Element auf dem richtigen Platz', 1)],
   gier: [1, 2, 3, 4, 5, 6].map((n, i) => S(`place${n}`, `Platz ${n}`, [10, 6, 4, 3, 2, 1][i])),

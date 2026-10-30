@@ -1266,7 +1266,7 @@ function formField(f, holder, k, save, rerender, id) {
       holder[k] = holder[k] || {};
       return h('fieldset', { class: 'group' }, h('legend', {}, f.label), h('div', { class: 'field-grid' }, formFields(f.fields, holder[k], save, rerender, id)));
     case 'list': {
-      const arr = (holder[k] = holder[k] || []);
+      const arr = (holder[k] = holder[k] && holder[k].length ? holder[k] : structuredClone(f.defaultItems || []));
       const canChange = f.min !== f.max;
       // Reihenfolge per Ziehen (oder ↑/↓) ändern: die gespeicherte Reihenfolge ist die Spielreihenfolge.
       const move = (from, to) => {
@@ -1279,7 +1279,7 @@ function formField(f, holder, k, save, rerender, id) {
         flags.forEach((v, j) => (v === undefined ? ITEM_OPEN.delete(`${id}-${j}`) : ITEM_OPEN.set(`${id}-${j}`, v)));
         rerender();
       };
-      const sortable = f.of !== 'text' && arr.length > 1;
+      const sortable = f.of !== 'text' && arr.length > 1 && !f.fixedOrder;
       const dragAttrs = (i) => (sortable ? {
         ondragover: (ev) => { if ([...ev.dataTransfer.types].includes('text/x-quiz-item')) { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.classList.add('drop-here'); } },
         ondragleave: (ev) => ev.currentTarget.classList.remove('drop-here'),
@@ -1315,7 +1315,7 @@ function formField(f, holder, k, save, rerender, id) {
         return h('details', { class: 'item', open: isOpen, ontoggle: (ev) => ITEM_OPEN.set(openKey, ev.target.open), ...dragAttrs(i) },
           h('summary', {}, moveBtns(i), h('b', {}, label), h('span', { class: 'muted' }, ` · ${preview.slice(0, 60)}`)),
           h('div', { class: 'item-body' },
-            previewTarget && id === `${previewTarget.key}-${f.key}` ? previewButton(previewTarget, i, label) : null,
+            previewTarget && !f.noPreview && id === `${previewTarget.key}-${f.key}` ? previewButton(previewTarget, i, label) : null,
             formFields(f.fields, item, save, rerender, `${id}-${i}`), remove ? h('div', { style: { marginTop: '8px' } }, remove) : null));
       });
       const add = canChange && arr.length < f.max

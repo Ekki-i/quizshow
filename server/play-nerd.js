@@ -5,6 +5,7 @@
 // Scheitern), danach höchstens das zweithöchste Team (2. Fehler = Scheitern).
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanText, cleanInk } = require('./core');
+const { pv } = require('./scoring');
 
 const MAX_BID = 99;
 const TIE_SECOND = /^Gleich hohes Gebot gilt als zweithöchstes/;
@@ -67,7 +68,7 @@ function finishAttempt(db, ctx, game, st, r, success) {
   a.done = success ? 'success' : 'fail';
   let points;
   if (a.which === 'first') points = success ? a.target : -a.target;
-  else points = success ? a.target : -Math.min(3, r.second.bid);
+  else points = success ? a.target : -Math.min(pv(game, 'maxPenalty'), r.second.bid);
   bookTarget(db, ctx, `nerd:${game.id}:${st.catIndex}:${a.teamId}`, a.teamId, points,
     `${game.title}, Kategorie ${st.catIndex + 1}, ${a.which === 'first' ? 'erster' : 'zweiter'} Versuch ${success ? 'geschafft' : 'gescheitert'}`);
   r.results.push({ teamId: a.teamId, which: a.which, success, points });
