@@ -5,6 +5,7 @@
 
 import { pooled, playWithSound } from './media-pool.js';
 import { h, mediaUrl } from './client.js';
+import { BEAMER_NEU } from './neu-beamer.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
@@ -189,7 +190,7 @@ export function syncMedia(s) {
   }
 }
 
-export const BEAMER_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain };
+export const BEAMER_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain, ...BEAMER_NEU };
 
 const waitTitle = (t, small) => [h('div', { class: 'mega', style: { fontSize: 'clamp(2rem,5.5vw,5.5rem)' } }, t), small ? sub(small, { marginTop: '2vh' }) : null];
 

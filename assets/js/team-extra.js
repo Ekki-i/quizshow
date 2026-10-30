@@ -4,6 +4,7 @@
 
 import { h, run, ask, toast, shield } from './client.js';
 import { inkPad, clearInkDraft } from './ink.js';
+import { TEAM_NEU } from './neu-team.js';
 
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
@@ -44,7 +45,7 @@ function inkBuzzer(ui, { draftKey, label, action, payloadKey = 'ink', hint = 'Bu
   return [pad, muted(hint), btn];
 }
 
-export const TEAM_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain };
+export const TEAM_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain, ...TEAM_NEU };
 
 // ---------- Dumm, dumm, dumm ----------
 const dummDraft = {};

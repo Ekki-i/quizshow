@@ -1268,6 +1268,37 @@ function formField(f, holder, k, save, rerender, id) {
     case 'list': {
       const arr = (holder[k] = holder[k] || []);
       const canChange = f.min !== f.max;
+      // Reihenfolge per Ziehen (oder ↑/↓) ändern: die gespeicherte Reihenfolge ist die Spielreihenfolge.
+      const move = (from, to) => {
+        if (to < 0 || to >= arr.length || from === to) return;
+        const flags = arr.map((_, j) => ITEM_OPEN.get(`${id}-${j}`));
+        const [x] = arr.splice(from, 1);
+        arr.splice(to, 0, x);
+        const [fl] = flags.splice(from, 1);
+        flags.splice(to, 0, fl);
+        flags.forEach((v, j) => (v === undefined ? ITEM_OPEN.delete(`${id}-${j}`) : ITEM_OPEN.set(`${id}-${j}`, v)));
+        rerender();
+      };
+      const sortable = f.of !== 'text' && arr.length > 1;
+      const dragAttrs = (i) => (sortable ? {
+        ondragover: (ev) => { if ([...ev.dataTransfer.types].includes('text/x-quiz-item')) { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.classList.add('drop-here'); } },
+        ondragleave: (ev) => ev.currentTarget.classList.remove('drop-here'),
+        ondrop: (ev) => {
+          ev.currentTarget.classList.remove('drop-here');
+          const [lid, from] = (ev.dataTransfer.getData('text/x-quiz-item') || '').split('|');
+          if (lid !== id) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          move(Number(from), i);
+        },
+      } : {});
+      const moveBtns = (i) => (sortable ? h('span', { class: 'item-move' },
+        // Nur der Griff ist ziehbar – so bleibt Text in den Feldern normal markierbar.
+        h('span', { class: 'drag-handle', title: 'Ziehen zum Umsortieren', draggable: 'true',
+          ondragstart: (ev) => { ev.stopPropagation(); ev.dataTransfer.setData('text/x-quiz-item', `${id}|${i}`); ev.dataTransfer.effectAllowed = 'move'; ev.currentTarget.closest('details')?.classList.add('dragging-item'); },
+          ondragend: (ev) => ev.currentTarget.closest('details')?.classList.remove('dragging-item') }, '⠿'),
+        h('button', { type: 'button', class: 'btn small ghost', title: 'Nach oben', disabled: i === 0, onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); move(i, i - 1); } }, '↑'),
+        h('button', { type: 'button', class: 'btn small ghost', title: 'Nach unten', disabled: i === arr.length - 1, onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); move(i, i + 1); } }, '↓')) : null);
       const items = arr.map((item, i) => {
         const label = f.itemLabels[i] || `${i + 1}`;
         const remove = canChange && arr.length > f.min
@@ -1281,8 +1312,8 @@ function formField(f, holder, k, save, rerender, id) {
         // Auf-/Zugeklappt bleibt erhalten, auch wenn der Editor neu gezeichnet wird.
         const openKey = `${id}-${i}`;
         const isOpen = ITEM_OPEN.has(openKey) ? ITEM_OPEN.get(openKey) : arr.length <= 3;
-        return h('details', { class: 'item', open: isOpen, ontoggle: (ev) => ITEM_OPEN.set(openKey, ev.target.open) },
-          h('summary', {}, h('b', {}, label), h('span', { class: 'muted' }, ` · ${preview.slice(0, 60)}`)),
+        return h('details', { class: 'item', open: isOpen, ontoggle: (ev) => ITEM_OPEN.set(openKey, ev.target.open), ...dragAttrs(i) },
+          h('summary', {}, moveBtns(i), h('b', {}, label), h('span', { class: 'muted' }, ` · ${preview.slice(0, 60)}`)),
           h('div', { class: 'item-body' },
             previewTarget && id === `${previewTarget.key}-${f.key}` ? previewButton(previewTarget, i, label) : null,
             formFields(f.fields, item, save, rerender, `${id}-${i}`), remove ? h('div', { style: { marginTop: '8px' } }, remove) : null));
