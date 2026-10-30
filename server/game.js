@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const { DATASETS } = require('./datasets');
 const { TYPES, DEFAULT_ORDER, LIBRARY_ORDER, EXTRA_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
+const { checkShow } = require('./check');
 const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage, TIMER } = require('./core');
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
@@ -490,7 +491,68 @@ function introEnded(db, ctx, p) {
 
 // ---------- Aktionen ----------
 
+// Beamer-Vorschau im Editor: so sähe Frage/Runde i auf dem Beamer aus. Läuft auf
+// einer Kopie des Spielstands mit den (auch ungespeicherten) Inhalten aus dem Editor –
+// der echte Spielstand bleibt unberührt.
+const PREVIEW_STEPS = {
+  leichte5: (i) => [['open', { qIndex: i }]],
+  dummes: (i) => [['open', { qIndex: i }]],
+  dumm3: (i) => [['open', { qIndex: i }]],
+  land: (i) => [['open', { taskIndex: i }]],
+  kassenschlager: (i) => [['startMovie', { movieIndex: i }]],
+  trumpf5: (i) => [['start', { termIndex: i }], ['nextHint'], ['nextHint'], ['nextHint'], ['nextHint'], ['nextHint']],
+  musik: (i) => [['pick', { cat: i, field: 0 }], ['start']],
+  jauch: () => [['next']],
+  nerd: (i) => [['open', { catIndex: i }]],
+  dgf: (i) => [['open', { catIndex: i }]],
+  fragen: (i) => [['open', { catIndex: i }]],
+  zocken: (i) => [['open', { q: i }]],
+  brain: () => [['start'], ['showQuestion']],
+};
+function previewBeamer(db, ctx, p) {
+  const type = p.type;
+  if (!TYPES[type] || !PLAY[type]) fail('Für diese Spielart gibt es keine Vorschau.');
+  const copy = clone({ project: db.project, live: db.live, ledger: db.ledger, log: [], library: db.library, shows: [], processed: [] });
+  const game = { id: 'game_preview', type, title: cleanText(p.title || '', 80) || TYPES[type].title, content: sanitizeContent(type, p.content), intro: null };
+  copy.project.games = [...copy.project.games.filter((g) => g.id !== game.id), game];
+  copy.live = freshLive();
+  const c = { role: 'moderator', actor: 'preview', now: ctx.now };
+  copy.live.activeGame = game.id;
+  gameState(copy, game);
+  const i = Math.max(0, Number(p.index) || 0);
+  const steps = (PREVIEW_STEPS[type] || ((k) => [['open', { index: k }]]))(i);
+  let note = null;
+  for (const [name, payload] of steps) {
+    try { playAction(copy, c, name, payload || {}); } catch (e) { note = e.message; break; }
+  }
+  if (type === 'jauch' && i > 0 && game.content.questions[i]) {
+    // Direkt zur gewünschten Frage springen (ohne vorherige Fragen aufzulösen).
+    const st = gameState(copy, game);
+    if (st.rounds && st.rounds[0]) { st.rounds[i] = clone(st.rounds[0]); delete st.rounds[0]; }
+    st.qIndex = i;
+  }
+  copy.live.beamer = { view: 'game', data: {} };
+  return { data: { state: beamerView(copy), note } };
+}
+
 const moderatorActions = {
+  'preview.beamer'(db, ctx, p) {
+    return previewBeamer(db, ctx, p);
+  },
+  // Lautstärke auf dem Beamer (0–100), jederzeit live einstellbar.
+  'volume.set'(db, ctx, p) {
+    const st = db.project.settings;
+    for (const k of ['fxVolume', 'musicVolume']) {
+      if (!(k in p)) continue;
+      const v = Math.round(Number(p[k]));
+      if (!(v >= 0 && v <= 100)) fail('Lautstärke muss zwischen 0 und 100 liegen.');
+      st[k] = v;
+    }
+  },
+  // Generalprobe-Check (nur lesen): was fehlt noch in dieser Show?
+  'check.show'(db) {
+    return { data: checkShow(db, TYPES) };
+  },
   'timer.start'(db, ctx) {
     const g = activeGame(db);
     if (!g) fail('Gerade läuft kein Spiel.');
@@ -895,8 +957,11 @@ const moderatorActions = {
   'shows.duplicate'(db, ctx, p) {
     if (db.shows.length >= 50) fail('Maximal 50 Shows.');
     const src = p.showId === db.project.id ? db.project : findStashed(db, p.showId).project;
-    const project = { ...clone(src), id: newId('proj'), name: `${src.name} (Kopie)`.slice(0, 80) };
+    const project = { ...clone(src), id: newId('proj'), name: (cleanText(p.name || '', 80) || `${src.name} (Kopie)`).slice(0, 80) };
+    if ('date' in p) project.date = cleanDate(p.date);
     for (const g of project.games) g.id = newId('game');
+    // Als Vorlage für die nächste Show: auf Wunsch neue Teams (neue Namen und Zugangscodes, ohne Fotos).
+    if (p.newTeams) project.teams = newProject(db.library, project.name).teams;
     db.shows.push({ project, live: freshLive(), ledger: [] });
     log(db, ctx, 'show', `Show „${src.name}“ dupliziert`);
     return { created: project.id };
@@ -1153,6 +1218,23 @@ function teamView(db, teamId, now = Date.now()) {
     settings: { reducedMotion: db.project.settings.reducedMotion },
   };
   if (db.project.settings.publicScores) view.ranking = rankingSnapshot(db).map(({ name, color, points }) => ({ name, color, points }));
+  // Abschluss der Show: jedes Team sieht seinen Platz und ein Dankeschön.
+  const step = rundown(db)[db.live.run ?? -1];
+  if (step && step.kind === 'end') {
+    const ranking = rankingSnapshot(db);
+    const me = ranking.find((r) => r.teamId === teamId);
+    const place = 1 + ranking.filter((r) => r.points > (me ? me.points : 0)).length;
+    const f = db.live.finale;
+    view.game = null;
+    view.end = {
+      place,
+      of: ranking.length,
+      points: me ? me.points : 0,
+      finale: f && f.teamId === teamId ? (f.result === 'team' ? 'won' : f.result === 'mod' ? 'lost' : 'played') : null,
+      showName: db.project.name,
+    };
+    return view;
+  }
   // Pause, Münzvergabe, Zwischenstand und Titelfolien: die iPads warten, statt den
   // letzten Stand des vorigen Spiels zu zeigen.
   const away = TEAM_WAIT_VIEWS.includes(db.live.beamer && db.live.beamer.view);
@@ -1208,7 +1290,7 @@ function beamerView(db) {
       if (avatar && (b.view === 'intro' || b.view === 'coin')) out.avatar = avatar;
       return out;
     }),
-    settings: { reducedMotion: pr.settings.reducedMotion, sound: pr.settings.sound, titleDurationSec: pr.settings.titleDurationSec },
+    settings: { reducedMotion: pr.settings.reducedMotion, sound: pr.settings.sound, titleDurationSec: pr.settings.titleDurationSec, fxVolume: pr.settings.fxVolume ?? 80, musicVolume: pr.settings.musicVolume ?? 80 },
     view: b.view,
     effect: db.live.effect,
     game: gameHeader(db),

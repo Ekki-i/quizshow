@@ -16,6 +16,8 @@
   </main>
 
   <script type="module">
+    import { keepAwake } from './assets/js/keep-awake.js';
+    keepAwake();
     import { h, connect, store, localServer, setShowTitle } from './assets/js/client.js';
     import { syncTimer } from './assets/js/timer-ui.js';
     import { clearAllInkDrafts } from './assets/js/ink.js';
@@ -72,6 +74,22 @@
       return true;
     }
 
+    // Abschlussseite nach der Show: Platz, Punkte, Dankeschön.
+    function endPage(s) {
+      const e = s.end;
+      const medal = { 1: '🥇', 2: '🥈', 3: '🥉' }[e.place] || '🎉';
+      const fin = e.finale === 'won' ? 'Und ihr habt im Finale die Show gestohlen! 🏆'
+        : e.finale === 'lost' ? 'Im Finale hat die Moderation die Show knapp behalten – stark gekämpft!'
+        : e.finale === 'played' ? 'Ihr habt es bis ins Finale geschafft!' : null;
+      return h('div', { class: 'end-page', style: { '--team': s.team.color } },
+        h('div', { class: 'end-medal' }, medal),
+        h('p', { class: 'end-place' }, `Ihr seid Platz ${e.place}`),
+        h('p', { class: 'end-sub' }, `von ${e.of} Teams · ${e.points} ${e.points === 1 ? 'Punkt' : 'Punkte'}`),
+        fin ? h('p', { class: 'end-fin' }, fin) : null,
+        h('p', { class: 'end-thanks' }, `Danke fürs Mitspielen bei „${e.showName}“!`),
+        h('p', { class: 'muted' }, 'Ihr könnt das iPad jetzt zur Seite legen.'));
+    }
+
     function render(s) {
       if (checkSession(s)) return;
       document.documentElement.classList.toggle('reduced-motion', !!s.settings.reducedMotion);
@@ -97,7 +115,8 @@
         clearDraft: () => store(draftKey, null),
       };
       draftKey = null;
-      if (s.play) parts.push(...renderPlay(s.play, ui).filter(Boolean));
+      if (s.end) parts.push(endPage(s));
+      else if (s.play) parts.push(...renderPlay(s.play, ui).filter(Boolean));
       else if (s.finale) parts.push(...renderFinale(s.finale, ui).filter(Boolean));
       else if (s.waitKind === 'pause') parts.push(h('div', { class: 'wait' },
         h('p', { class: 'big' }, 'Pause – gleich geht’s weiter!'),
@@ -118,7 +137,7 @@
       });
 
       // Ein offenes Eingabefeld nicht bei jedem Update neu aufbauen (Fokus/Tastatur bleiben).
-      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.finale || null, s.ranking || null, s.waitKind || null]);
+      const key = JSON.stringify([s.team, s.teams, s.game, s.play || null, s.finale || null, s.ranking || null, s.waitKind || null, s.end || null]);
       if (key === lastRenderKey) return;
       lastRenderKey = key;
       main.replaceChildren(...parts);

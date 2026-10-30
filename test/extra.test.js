@@ -611,3 +611,39 @@ test('Show jetzt starten: Proben verwerfen, Punkte 0, Schritt 1, neue Sitzung', 
   assert.notEqual(game.teamView(db, ids[0]).session, before);
   assert.equal(game.moderatorView(db).undo, null);
 });
+
+test('Abschluss: Team-iPads zeigen Platz und Punkte', () => {
+  const { db, ids } = setup(3);
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[1], points: 5, reason: 'x' });
+  game.applyAction(db, mod(), 'points.adjust', { teamId: ids[2], points: 2, reason: 'x' });
+  const steps = game.moderatorView(db).rundown;
+  game.applyAction(db, mod(), 'run.goto', { index: steps.findIndex((s) => s.kind === 'end') });
+  const v = game.teamView(db, ids[2]);
+  assert.deepEqual([v.end.place, v.end.of, v.end.points], [2, 3, 2]);
+  assert.equal(game.teamView(db, ids[0]).end.place, 3);
+});
+
+test('Generalprobe-Check meldet leere Frage und fehlende Koordinaten', () => {
+  const { db } = setup(2);
+  const g = db.project.games[0];
+  const content = structuredClone(g.content);
+  content.questions[1].question = '';
+  game.applyAction(db, mod(), 'game.update', { gameId: g.id, content });
+  const land = db.project.games.find((x) => x.type === 'land');
+  const lc = structuredClone(land.content);
+  lc.tasks[0].lat = null;
+  game.applyAction(db, mod(), 'game.update', { gameId: land.id, content: lc });
+  const r = game.applyAction(db, mod(), 'check.show', {}).data;
+  assert.ok(r.issues.some((x) => x.level === 'fehlt' && /Frage 2/.test(x.where) && /Frage ist leer/.test(x.text)));
+  assert.ok(r.issues.some((x) => /Koordinaten/.test(x.text)));
+});
+
+test('Show als Vorlage kopieren mit neuen Teams', () => {
+  const { db } = setup(2);
+  db.project.teams[0].name = 'Altes Team';
+  const r = game.applyAction(db, mod(), 'shows.duplicate', { showId: db.project.id, name: 'Nächste Show', newTeams: true });
+  const copy = db.shows.find((x) => x.project.id === r.created).project;
+  assert.equal(copy.name, 'Nächste Show');
+  assert.ok(!copy.teams.some((t) => t.name === 'Altes Team'));
+  assert.equal(copy.games.length, db.project.games.length);
+});

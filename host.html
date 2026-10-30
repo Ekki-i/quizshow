@@ -18,6 +18,8 @@
   </main>
 
   <script type="module">
+    import { keepAwake } from './assets/js/keep-awake.js';
+    keepAwake();
     import { h, connect, store, localServer, setShowTitle, run, ask, toast, coinImg } from './assets/js/client.js';
     import { inkPad, answerContent } from './assets/js/ink.js';
     import { stateBox } from './assets/js/team-play.js';

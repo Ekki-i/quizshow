@@ -248,6 +248,21 @@ export function ask(message, { confirmLabel = 'Ja', cancelLabel = 'Abbrechen', r
   });
 }
 
+// Größeres Info-Fenster (z. B. Generalprobe-Check, Beamer-Vorschau). Gibt close() zurück.
+export function showModal(title, content, { wide = false } = {}) {
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (ev) => ev.key === 'Escape' && close();
+  const overlay = h('div', { class: 'modal-backdrop', onclick: (ev) => { if (ev.target === overlay) close(); } },
+    h('div', { class: `modal card info-modal${wide ? ' wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+      h('div', { class: 'row', style: { justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+        h('h3', { style: { margin: 0 } }, title),
+        h('button', { class: 'btn ghost small', type: 'button', onclick: close }, 'Schließen')),
+      h('div', { class: 'info-modal-body' }, content)));
+  document.addEventListener('keydown', onKey);
+  document.body.append(overlay);
+  return close;
+}
+
 export function toast(message, kind = 'error') {
   const el = h('div', { class: `toast ${kind === 'info' ? 'info' : ''}`, role: 'status' }, message);
   document.body.append(el);

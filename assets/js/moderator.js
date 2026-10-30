@@ -1,4 +1,4 @@
-import { h, connect, run, store, toast, ask, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
+import { h, connect, run, store, toast, ask, showModal, localServer, uploadMedia, mediaUrl, setShowTitle, coinImg } from './client.js';
 import { buildPlay } from './mod-play.js';
 import { mapView, zoomState } from './map.js';
 import { buildFinaleLive, buildFinaleEditor } from './mod-finale.js';
@@ -142,7 +142,9 @@ function renderLive() {
   document.getElementById('live-bottom').replaceChildren(buildFlow(),
     h('div', { class: 'live-restart' },
       h('button', { class: 'btn ghost bad-text', onclick: restartShow, title: 'Punkte und Münzen auf 0, alle Fragen unbeantwortet, zurück zur ersten Folie. Editor-Inhalte bleiben.' }, '⟲ Show neu starten …')));
-  document.getElementById('beamer-controls').replaceChildren(...buildBeamerControls());
+  // Lautstärkeregler nicht unter dem Finger neu aufbauen.
+  const bc = document.getElementById('beamer-controls');
+  if (!(document.activeElement && document.activeElement.type === 'range' && bc.contains(document.activeElement))) bc.replaceChildren(...buildBeamerControls());
   document.getElementById('live-right').replaceChildren(buildTeamsLive(), buildCoins());
   window.scrollTo(0, scroll);
 }
@@ -180,6 +182,34 @@ function runNext() { return act('run.next'); }
 
 // Neustart: Punkte, Münzen, Antworten und Finale weg, zurück zur ersten Folie.
 // Teams, Editor, Spieledatenbank, Ablauf und Medien bleiben erhalten.
+// Generalprobe-Check: Inhalte aller Spiele prüfen und ob jede Mediendatei wirklich da ist.
+async function mediaExists(id) {
+  if (localServer) return !!(await mediaUrl(id).catch(() => null));
+  try { return (await fetch(`media/${id}`, { method: 'HEAD', cache: 'no-store' })).ok; } catch { return false; }
+}
+async function runCheck() {
+  const res = await act('check.show');
+  if (!res || !res.data) return;
+  const { issues, media } = res.data;
+  const body = h('div', {}, h('p', { class: 'muted' }, `Prüfe ${media.length} Mediendateien …`));
+  showModal('✅ Generalprobe-Check', body);
+  const missing = [];
+  await Promise.all(media.map(async (m) => { if (!(await mediaExists(m.id))) missing.push(m); }));
+  const all = [...missing.map((m) => ({ level: 'fehlt', where: m.where, text: 'Datei fehlt im data-Ordner (neu hochladen)' })), ...issues];
+  const errors = all.filter((x) => x.level === 'fehlt');
+  const hints = all.filter((x) => x.level === 'hinweis');
+  const list = (arr, cls) => h('ul', { class: 'check-list' }, arr.map((x) => h('li', { class: cls }, h('b', {}, x.text), h('small', {}, x.where))));
+  body.replaceChildren(...[
+    h('div', { class: 'check-sum' },
+      h('span', { class: `badge ${errors.length ? 'bad' : 'ok'}` }, errors.length ? `${errors.length} × fehlt` : '✓ Nichts fehlt'),
+      h('span', { class: 'badge' }, `${hints.length} Hinweise`),
+      media.length ? h('span', { class: `badge ${missing.length ? 'bad' : 'ok'}` }, `${media.length - missing.length} von ${media.length} Mediendateien vorhanden`) : null),
+    errors.length ? [h('p', { class: 'check-group' }, 'Sollte vor der Show behoben werden'), list(errors, 'fehlt')]
+      : h('ul', { class: 'check-list' }, h('li', { class: 'ok' }, h('b', {}, 'Alle Fragen, Lösungen und Dateien sind da.'), h('small', {}, 'Die Show kann starten.'))),
+    hints.length ? [h('p', { class: 'check-group' }, 'Hinweise (optional)'), list(hints, 'hinweis')] : null,
+  ].flat().filter(Boolean));
+}
+
 // Vor der echten Show: alles aus Proben und Tests verwerfen und mit Schritt 1 beginnen.
 async function startShowNow() {
   const ok = await ask('Show jetzt starten? Alles, was du vorher zum Testen geklickt hast, wird verworfen: Punkte, Münzen, Antworten, Spielstände und Entwürfe auf den iPads. Der Beamer beginnt mit Schritt 1. Deine Inhalte im Editor bleiben erhalten.', { confirmLabel: '🎬 Show jetzt starten' });
@@ -216,7 +246,9 @@ function buildRun() {
     }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 'i' }, runIcon(st.kind)), h('span', { class: 't' }, st.text)))));
   const title = h('div', { class: 'row', style: { justifyContent: 'space-between', alignItems: 'center' } },
     h('h3', { style: { margin: 0 } }, 'Showablauf'),
-    h('button', { class: 'btn ok', onclick: startShowNow, title: 'Proben und Tests verwerfen, Punkte auf 0 und mit Schritt 1 beginnen' }, '🎬 Show jetzt starten'));
+    h('div', { class: 'row', style: { gap: '8px' } },
+      h('button', { class: 'btn ghost', onclick: runCheck, title: 'Prüft alle Spiele: leere Fragen, fehlende Lösungen, fehlende Videos, Bilder und Lieder' }, '✅ Generalprobe-Check'),
+      h('button', { class: 'btn ok', onclick: startShowNow, title: 'Proben und Tests verwerfen, Punkte auf 0 und mit Schritt 1 beginnen' }, '🎬 Show jetzt starten')));
   const panel = h('section', { class: 'card run-card' }, title, head, strip,
     h('p', { class: 'muted run-hint' }, 'Tipp: Pfeil rechts, Leertaste oder ein Presenter-Klicker schalten weiter, Pfeil links zurück. Den Ablauf änderst du im Editor unter „Show-Editor“.'));
   // Aktuellen Schritt in der Leiste sichtbar halten – nur die Leiste waagerecht scrollen,
@@ -519,7 +551,19 @@ function buildBeamerControls() {
       h('div', { class: 'row' }, h('code', {}, url),
         h('button', { class: 'btn small ghost', onclick: () => Promise.resolve(navigator.clipboard?.writeText(url)).then(() => toast('Adresse kopiert', 'info'), () => toast(`Adresse: ${url}`, 'info')) }, 'Kopieren')),
       local ? h('p', { class: 'notice warn' }, 'Diese Adresse zeigt auf diesen Rechner selbst. Auf dem zweiten Gerät statt „localhost“ die IP-Adresse dieses Rechners im WLAN verwenden, z. B. http://192.168.1.20:3000/beamer.html') : null);
-  return [status, second];
+  // Lautstärke: Effekttöne (Buzzer, richtig/falsch …) und Musik/Videos getrennt.
+  const slider = (label, key, icon) => {
+    const val = S.project.settings[key] ?? 80;
+    const out = h('b', { class: 'vol-val' }, `${val} %`);
+    let t = null;
+    const input = h('input', { type: 'range', min: '0', max: '100', step: '5', value: String(val), 'aria-label': label,
+      oninput: (ev) => { out.textContent = `${ev.target.value} %`; clearTimeout(t); t = setTimeout(() => act('volume.set', { [key]: Number(ev.target.value) }), 120); } });
+    return h('div', { class: 'vol-row' }, h('span', { class: 'vol-label' }, icon, ' ', label), input, out);
+  };
+  const volume = h('div', { class: 'vol-box' },
+    slider('Effekttöne', 'fxVolume', '🔔'),
+    slider('Musik & Videos', 'musicVolume', '🎵'));
+  return [status, volume, second];
 }
 
 // Rangliste in der Regie: Punkte nachträglich von Hand anpassen (wird protokolliert).
@@ -906,6 +950,22 @@ async function createShow() {
   act('shows.create', { name: v.name, date: v.date, copyTeams: v.copyTeams });
 }
 
+// Fertige Show als Vorlage für die nächste: Spiele, Fragen, Ablauf, Lieder und Finale
+// werden übernommen; Punkte und Spielstände nicht. Teams wahlweise neu.
+async function duplicateShow(s) {
+  const v = await ask(`„${s.name}“ als Vorlage kopieren`, {
+    confirmLabel: 'Kopie anlegen',
+    fields: [
+      { name: 'name', label: 'Name der neuen Show', value: `${s.name} (Kopie)`.slice(0, 80), maxlength: 80 },
+      { name: 'date', label: 'Datum der neuen Show (optional)', type: 'date', value: '' },
+      { name: 'newTeams', label: 'Neue Teams anlegen (neue Namen und Zugangscodes) – sonst werden die Teams übernommen', type: 'checkbox', value: true },
+    ],
+  });
+  if (!v) return;
+  const r = await act('shows.duplicate', { showId: s.id, name: v.name, date: v.date, newTeams: v.newTeams });
+  if (r) toast(`„${v.name || s.name}“ angelegt – unter „Meine Shows“ öffnen`, 'info');
+}
+
 function buildShows() {
   const running = S.live.activeGame !== null;
   return card('Meine Shows',
@@ -916,7 +976,7 @@ function buildShows() {
       s.current ? h('span', { class: 'badge ok' }, 'geöffnet')
         : h('button', { class: 'btn small', disabled: running, title: running ? 'Zuerst das laufende Spiel beenden.' : '', onclick: () => act('shows.switch', { showId: s.id }) }, 'Öffnen'),
       h('button', { class: 'btn small ghost', onclick: () => renameShow(s) }, 'Umbenennen'),
-      h('button', { class: 'btn small ghost', onclick: () => act('shows.duplicate', { showId: s.id }).then((r) => r && toast(`„${s.name}“ dupliziert`, 'info')) }, 'Duplizieren'),
+      h('button', { class: 'btn small ghost', onclick: () => duplicateShow(s) }, 'Als Vorlage kopieren'),
       s.current ? null : h('button', {
         class: 'btn small ghost icon', 'aria-label': `${s.name} löschen`,
         onclick: async () => { if (await ask(`Show „${s.name}“ mit allen Teams und Punkten löschen?`, { confirmLabel: 'Löschen', danger: true })) act('shows.remove', { showId: s.id }); },
@@ -1101,7 +1161,41 @@ function buildGameEditor(kind, item) {
     h('fieldset', { disabled: running, class: 'plain' },
       h('label', { for: `${key}-title` }, 'Name in der Show (erscheint im Spieltitel auf dem Beamer)'),
       h('input', { id: `${key}-title`, value: d.title, maxlength: '80', oninput: (ev) => { d.title = ev.target.value; save(); } }),
-      formFields(type.schema, d.content, save, rerender, key)));
+      (previewTarget = { key, type: item.type, d }, formFields(type.schema, d.content, save, rerender, key))));
+}
+
+// Beamer-Vorschau im Editor: zeigt eine Frage/Runde so, wie sie auf dem Beamer
+// erscheint – mit den aktuellen (auch noch nicht gespeicherten) Inhalten.
+let previewTarget = null;
+function previewButton(t, index, label) {
+  return h('div', { style: { marginBottom: '8px' } },
+    h('button', { type: 'button', class: 'btn small ghost', onclick: () => openPreview(t, index, label) }, '👁 So sieht es auf dem Beamer aus'));
+}
+function loadPage(frame, url) {
+  if (!localServer) { frame.src = url; return; }
+  // Prototyp: die Seite kommt von der Hauptseite (wie bei der Live-Vorschau).
+  const reqId = `p${Math.random().toString(36).slice(2)}`;
+  const on = (ev) => {
+    const m = ev.data;
+    if (!m || m.quiz !== true || m.op !== 'page' || m.reqId !== reqId) return;
+    window.removeEventListener('message', on);
+    frame.srcdoc = m.html;
+  };
+  window.addEventListener('message', on);
+  window.parent.postMessage({ quiz: true, op: 'page', reqId, url }, '*');
+}
+async function openPreview(t, index, label) {
+  const res = await act('preview.beamer', { type: t.type, title: t.d.title, content: t.d.content, index });
+  if (!res || !res.data) return;
+  const frame = h('iframe', { class: 'preview-frame', title: 'Beamer-Vorschau' });
+  const note = res.data.note ? h('p', { class: 'muted' }, `Hinweis: ${res.data.note}`) : null;
+  const send = () => frame.contentWindow && frame.contentWindow.postMessage({ quizDemo: 'state', state: res.data.state }, '*');
+  const onReady = (ev) => { if (ev.source === frame.contentWindow && ev.data && ev.data.quizDemo === 'ready') send(); };
+  window.addEventListener('message', onReady);
+  const close = showModal(`Beamer-Vorschau · ${label}`, [frame, note, h('p', { class: 'muted', style: { marginBottom: 0 } }, 'So sieht die Frage zu Beginn auf dem Beamer aus (ohne Ton). Änderungen im Editor erscheinen beim nächsten Öffnen der Vorschau.')], { wide: true });
+  frame.addEventListener('load', () => setTimeout(send, 300));
+  loadPage(frame, 'beamer.html?demo');
+  void close;
 }
 
 // Welche Fragen/Einträge im Editor aufgeklappt sind (pro Feld gemerkt).
@@ -1189,7 +1283,9 @@ function formField(f, holder, k, save, rerender, id) {
         const isOpen = ITEM_OPEN.has(openKey) ? ITEM_OPEN.get(openKey) : arr.length <= 3;
         return h('details', { class: 'item', open: isOpen, ontoggle: (ev) => ITEM_OPEN.set(openKey, ev.target.open) },
           h('summary', {}, h('b', {}, label), h('span', { class: 'muted' }, ` · ${preview.slice(0, 60)}`)),
-          h('div', { class: 'item-body' }, formFields(f.fields, item, save, rerender, `${id}-${i}`), remove ? h('div', { style: { marginTop: '8px' } }, remove) : null));
+          h('div', { class: 'item-body' },
+            previewTarget && id === `${previewTarget.key}-${f.key}` ? previewButton(previewTarget, i, label) : null,
+            formFields(f.fields, item, save, rerender, `${id}-${i}`), remove ? h('div', { style: { marginTop: '8px' } }, remove) : null));
       });
       const add = canChange && arr.length < f.max
         ? h('button', { type: 'button', class: 'btn small', onclick: () => { ITEM_OPEN.set(`${id}-${arr.length}`, true); arr.push(f.of === 'text' ? '' : emptyItem(f.fields)); rerender(); } }, `+ ${f.addLabel || 'Eintrag hinzufügen'}`)

@@ -39,6 +39,17 @@ const midi = (n) => 440 * 2 ** ((n - 69) / 12);
 
 let engine = null;
 
+// Lautstärke der Pausenmusik (0–1), in der Regie einstellbar. Laufende Musik folgt sofort.
+let musicLevel = 0.8;
+let liveNodes = []; // { gain, base }
+export function setMusicLevel(v) {
+  musicLevel = Math.max(0, Math.min(1, v));
+  liveNodes = liveNodes.filter((n) => n.gain.context.state !== 'closed');
+  for (const n of liveNodes) {
+    try { n.gain.gain.cancelScheduledValues(n.gain.context.currentTime); n.gain.gain.setTargetAtTime(n.base * musicLevel, n.gain.context.currentTime, 0.1); } catch { /* ignorieren */ }
+  }
+}
+
 function createEngine(ctx) {
   const master = ctx.createGain();
   master.gain.value = 0;
@@ -46,7 +57,8 @@ function createEngine(ctx) {
   comp.threshold.value = -16;
   comp.ratio.value = 4;
   master.connect(comp).connect(ctx.destination);
-  master.gain.linearRampToValueAtTime(0.42, ctx.currentTime + 1.2);
+  master.gain.linearRampToValueAtTime(0.42 * musicLevel, ctx.currentTime + 1.2);
+  liveNodes.push({ gain: master, base: 0.42 });
 
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noise.getChannelData(0);
@@ -184,7 +196,8 @@ function createSongPlayer(ctx, songs) {
   analyser.smoothingTimeConstant = 0.55;
   source.connect(gain).connect(analyser).connect(ctx.destination);
   gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.5);
+  gain.gain.linearRampToValueAtTime(musicLevel, ctx.currentTime + 0.5);
+  liveNodes.push({ gain, base: 1 });
   const bins = new Uint8Array(analyser.frequencyBinCount);
   const hz = ctx.sampleRate / analyser.fftSize;
   const band = (lo, hi) => {
