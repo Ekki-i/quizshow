@@ -3,6 +3,7 @@
 // klar getrennt. Die Sichten kommen gefiltert vom Server.
 
 import { h, run, mediaUrl } from './client.js';
+import { hpBar } from './neu-beamer.js';
 
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 function stateBox(kind, sym, text) {
@@ -128,20 +129,21 @@ function sortieren(g, ui) {
 // ---------- Riskier die Gier ----------
 const gierDraft = {};
 function gier(g, ui) {
-  const bal = h('div', { class: `gier-balance${g.out ? ' out' : ''}` }, h('small', {}, 'Euer Gier-Guthaben'), h('b', {}, fmtNum(g.balance)), g.out ? h('span', {}, 'ausgeschieden') : null);
-  if (g.waiting) return [bal, ...wait('Gleich geht’s los!', 'Jedes Team startet mit 100 Gier-Punkten. Die Abweichung eurer Schätzung wird abgezogen.')];
+  const r0 = g.evaluated ? g.result : null;
+  const bal = h('div', { class: 'gier-balance' }, h('small', {}, 'Eure Lebensenergie (Gier-Punkte)'),
+    hpBar({ color: ui.team.color, before: r0 ? r0.before : g.balance, after: g.balance, start: g.start, diff: r0 ? r0.diff : null, out: g.out, delay: 0.4, animate: !!r0 }));
+  if (g.waiting) return [bal, ...wait('Gleich geht’s los!', 'Jedes Team startet mit 100 Lebenspunkten. Die Abweichung eurer Schätzung wird abgezogen – bei 0 ist Game Over.')];
   const out = [bal, muted(`Frage ${g.index + 1} von ${g.count}`), question(g.question)];
   if (g.evaluated) {
     const r = g.result;
     out.push(stateBox('', '💡', `Lösung: ${fmtNum(g.solution)} ${g.unit}`.trim()));
     if (r) {
-      out.push(r.missing ? stateBox('bad', '✗', 'Keine Antwort abgegeben – ausgeschieden')
-        : stateBox(r.out ? 'bad' : 'ok', r.out ? '✗' : '−', `Eure Schätzung ${fmtNum(r.value)} · Abweichung ${fmtNum(r.diff)} · Guthaben ${fmtNum(r.before)} → ${fmtNum(r.after)}${r.out ? ' – ausgeschieden' : ''}`));
+      out.push(stateBox(r.out ? 'bad' : 'ok', r.out ? '✗' : '−', `Eure Schätzung ${fmtNum(r.value)} · Abweichung ${fmtNum(r.diff)} · Guthaben ${fmtNum(r.before)} → ${fmtNum(r.after)}${r.out ? ' – ausgeschieden' : ''}`));
     }
     if (g.standings && g.standings[0]) out.push(stateBox('ok', '🏆', `Platz ${g.standings[0].place}: ${pts(g.standings[0].points)}`));
     return out;
   }
-  if (g.out) return [...out, stateBox('bad', '✗', 'Ihr seid ausgeschieden – schaut zu, wie es weitergeht.')];
+  if (g.out) return [...out, stateBox('bad', '✗', `Game Over – ihr seid ausgeschieden${g.standings && g.standings[0] ? ` (Platz ${g.standings[0].place}, ${pts(g.standings[0].points)})` : ''}. Schaut zu, wie es weitergeht.`)];
   if (g.answered) return [...out, stateBox('', '🔒', `Abgegeben: ${fmtNum(g.value)} ${g.unit} – gesperrt`.trim())];
   if (!g.canAnswer) return [...out, stateBox('', '⏱', 'Zeit abgelaufen – wartet auf die Moderation')];
   const deadline = g.graceEndsAt && Date.now() > g.endsAt ? g.graceEndsAt : g.endsAt;

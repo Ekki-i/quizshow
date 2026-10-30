@@ -1694,3 +1694,50 @@ details.item.drop-here { outline: 2px dashed var(--accent-2, #ffc23d); outline-o
 .beamer .nb-tl-item { min-width: 8.5vw; padding: 1.4vh 1vw; }
 .beamer .nb-tl-item b { font-size: 3.6vh; }
 .beamer .nb-tl-item span { font-size: 2.4vh; }
+
+/* ===== Riskier die Gier: Lebensenergie wie im Videospiel ===== */
+.hp { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 12px; position: relative; }
+.hp-name { font-weight: 800; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp-track { position: relative; height: 26px; border-radius: 6px; background: #12121a; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18), 0 0 0 2px #000; overflow: visible; }
+.hp-track > i { position: absolute; left: 2px; top: 2px; bottom: 2px; border-radius: 4px; }
+.hp-fill { width: calc(var(--to) - 4px); background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0 30%, transparent 30%); box-shadow: 0 0 14px color-mix(in srgb, var(--hpc) 60%, transparent); }
+.hp-ghost { width: calc(var(--to) - 4px); background: #fff; opacity: 0.9; }
+.hp-ticks { right: 2px; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(0, 0, 0, 0.55) calc(10% - 2px) 10%); pointer-events: none; }
+.hp-num { font-variant-numeric: tabular-nums; font-size: 1.4rem; min-width: 3.2em; text-align: right; color: #fff; }
+.hp-dmg { position: absolute; right: calc(100% - var(--from)); top: -6px; font-style: normal; font-weight: 900; font-size: 1.6rem; color: #ff4a4a; text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 74, 74, 0.8); opacity: 0; pointer-events: none; white-space: nowrap; }
+.hp-ko { font-weight: 900; color: #fff; background: var(--bad, #ff4a4a); padding: 2px 10px; border-radius: 6px; transform: rotate(-8deg); letter-spacing: 0.06em; box-shadow: 0 0 18px rgba(255, 74, 74, 0.7); }
+.hp-pts { font-weight: 900; color: #062b14; background: var(--ok, #2bd96b); padding: 2px 10px; border-radius: 6px; }
+.hp.ko .hp-name { animation: koName 0.01s linear calc(var(--d) + 1.3s) forwards; }
+.hp.ko:not(.hit) .hp-name { text-decoration: line-through; opacity: 0.7; animation: none; }
+@keyframes koName { to { text-decoration: line-through; opacity: 0.7; } }
+/* Animation: erst Treffer (Wackeln, rotes Aufblitzen, Zahl fliegt), dann leert sich der Balken; der weiße Schaden läuft hinterher. */
+.hp.hit .hp-fill { animation: hpFill 0.9s cubic-bezier(.3,.9,.3,1) calc(var(--d) + 0.25s) both; transition: background-color 0.9s linear; }
+.hp.hit .hp-ghost { animation: hpFill 0.9s cubic-bezier(.6,0,.4,1) calc(var(--d) + 1.05s) both; }
+.hp.hit .hp-track { animation: hpShake 0.45s linear var(--d) both; }
+.hp.hit .hp-track::after { content: ''; position: absolute; inset: -2px; border-radius: 6px; background: #ff2a2a; opacity: 0; animation: hpFlash 0.5s ease-out var(--d) both; pointer-events: none; }
+.hp.hit .hp-dmg { animation: hpDmg 1.4s ease-out var(--d) both; }
+.hp.ko .hp-ko { animation: hpKO 0.6s cubic-bezier(.2,1.8,.4,1) calc(var(--d) + 1.3s) both; }
+.hp .hp-pts { animation: pop 0.5s cubic-bezier(.2,1.5,.4,1) calc(var(--d) + 1.6s) both; }
+@keyframes hpFill { from { width: calc(var(--from) - 4px); } to { width: calc(var(--to) - 4px); } }
+@keyframes hpColor { from { background-color: var(--hpc0); } to { background-color: var(--hpc); } }
+@keyframes hpShake { 0%, 100% { transform: none; } 15% { transform: translate(-6px, 2px); } 30% { transform: translate(5px, -3px); } 45% { transform: translate(-4px, 1px); } 60% { transform: translate(3px, 2px); } 75% { transform: translate(-2px, -1px); } }
+@keyframes hpFlash { 0% { opacity: 0; } 8% { opacity: 0.8; } 100% { opacity: 0; } }
+@keyframes hpDmg { 0% { opacity: 0; transform: translate(50%, 6px) scale(0.6); } 15% { opacity: 1; transform: translate(50%, -10px) scale(1.25); } 70% { opacity: 1; transform: translate(50%, -34px) scale(1); } 100% { opacity: 0; transform: translate(50%, -56px) scale(0.95); } }
+@keyframes hpKO { from { opacity: 0; transform: rotate(-8deg) scale(3); } to { opacity: 1; transform: rotate(-8deg) scale(1); } }
+.reduced-motion .hp *, .reduced-motion .hp { animation: none !important; }
+
+/* Beamer-Größen */
+.beamer .nb-gier-bars { width: min(90vw, 160vh); gap: 1.4vh; }
+.beamer .hp { grid-template-columns: 20% 1fr 7% 7% 6%; gap: 1.2vw; background: var(--box); padding: 1.1vh 1.2vw; box-shadow: inset 0.6vw 0 0 var(--team), 0 0.8vh 2vh rgba(0, 0, 0, 0.45); color: #fff; }
+.beamer .hp-name { font-size: 2.6vh; padding-left: 0.8vw; }
+.beamer .hp-track { height: 3.6vh; }
+.beamer .hp-num { font-size: 3.2vh; color: var(--accent-2); }
+.beamer .hp-dmg { font-size: 4.2vh; top: -2.4vh; }
+.beamer .hp-ko { font-size: 2.6vh; justify-self: center; }
+.beamer .hp-pts { font-size: 2.6vh; justify-self: center; }
+.beamer .nb-gier-final { position: absolute; left: 50%; top: 52%; translate: -50% -50%; width: min(60vw, 100vh); padding: 3vh 3vw; background: rgba(8, 8, 14, 0.94); box-shadow: 0 0 0 0.5vh var(--accent-2), 0 2vh 8vh rgba(0, 0, 0, 0.7); display: grid; gap: 1.2vh; z-index: 5; opacity: 0; animation: qtIn 0.6s ease-out both; }
+.beamer .nb-gier-final-title { text-align: center; font-family: var(--font-display); font-size: 4.6vh; font-weight: 900; text-transform: uppercase; color: var(--accent-2); }
+/* iPad */
+.gier-balance { display: grid; gap: 6px; }
+.gier-balance .hp { grid-template-columns: 1fr auto auto auto; }
+.gier-balance .hp-num { font-size: 1.8rem; color: var(--accent-2, #ffc23d); }

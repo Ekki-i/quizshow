@@ -61,7 +61,7 @@ test('Blamieren oder Sortieren: unvollständig blockiert, 1 Punkt je richtigem P
   assert.equal(bv(db).solution.length, 5);
 });
 
-test('Riskier die Gier: 100 Startguthaben, 60 s, Nachfrist nur auf Freigabe und nur für offene Teams, getrennt vom Showkonto', () => {
+test('Riskier die Gier: 100 Startguthaben, 60 s, Nachfrist nur auf Freigabe und nur für offene Teams, jedes Team muss antworten, Punkte automatisch', () => {
   const { db, ids } = setup(3);
   use(db, 'gier', { seconds: 60, questions: [{ question: 'A', answer: 100, unit: '' }, { question: 'B', answer: 50, unit: '' }] });
   assert.equal(tv(db, ids[0]).balance, 100);
@@ -74,23 +74,21 @@ test('Riskier die Gier: 100 Startguthaben, 60 s, Nachfrist nur auf Freigabe und 
   act(db, { ...mod(), now: t0 + 62000 }, 'grace');
   act(db, team(ids[1], t0 + 65000), 'answer', { value: 99 }); // −1, in der Nachfrist
   assert.equal(tv(db, ids[0], t0 + 65000).canAnswer, false); // abgegeben bleibt gesperrt
-  assert.throws(() => act(db, { ...mod(), now: t0 + 66000 }, 'evaluate'), /läuft noch/);
-  act(db, { ...mod(), now: t0 + 73000 }, 'evaluate'); // Team 3 hat nicht geantwortet → raus
-  assert.equal(tv(db, ids[0]).balance, 70);
-  assert.equal(tv(db, ids[1]).balance, 99);
-  assert.equal(tv(db, ids[2]).out, true);
+  assert.throws(() => act(db, { ...mod(), now: t0 + 73000 }, 'evaluate'), /muss antworten/); // Team 3 fehlt
+  act(db, { ...mod(), now: t0 + 74000 }, 'grace'); // Nachfrist erneut
+  act(db, team(ids[2], t0 + 75000), 'answer', { value: 50 }); // −50
+  act(db, { ...mod(), now: t0 + 76000 }, 'evaluate');
+  assert.deepEqual(ids.map((id) => tv(db, id).balance), [70, 99, 50]);
   assert.equal(pts(db, ids[0]), 0); // Gier-Punkte sind keine Showpunkte
   const t1 = clock;
   act(db, { ...mod(), now: t1 }, 'open', { index: 1 });
   act(db, team(ids[0], t1 + 100), 'answer', { value: 150 }); // −100 → −30, raus
   act(db, team(ids[1], t1 + 100), 'answer', { value: 60 }); // −10 → 89
-  act(db, { ...mod(), now: t1 + 200 }, 'evaluate');
-  act(db, mod(), 'award');
+  act(db, team(ids[2], t1 + 100), 'answer', { value: 0 }); // −50 → 0, raus
+  act(db, { ...mod(), now: t1 + 200 }, 'evaluate'); // entschieden: automatisch gebucht
   assert.equal(pts(db, ids[1]), 10); // letztes verbleibendes Team
-  assert.equal(pts(db, ids[0]), 6);
-  assert.equal(pts(db, ids[2]), 4);
-  act(db, mod(), 'award'); // erneut: keine doppelte Buchung
-  assert.equal(pts(db, ids[1]), 10);
+  assert.equal(pts(db, ids[2]), 6); // 0 ist besser als −30
+  assert.equal(pts(db, ids[0]), 4);
 });
 
 test('Riskier die Gier: gleiche Ausscheidungsrunde nach Restguthaben, Gleichstand teilt Platz', () => {
@@ -103,7 +101,6 @@ test('Riskier die Gier: gleiche Ausscheidungsrunde nach Restguthaben, Gleichstan
   act(db, team(ids[2], t0 + 1), 'answer', { value: 104 }); // −4
   act(db, team(ids[3], t0 + 1), 'answer', { value: 102 }); // −2
   act(db, { ...mod(), now: t0 + 2 }, 'evaluate');
-  act(db, mod(), 'award');
   assert.deepEqual(ids.map((id) => pts(db, id)), [10, 6, 3, 6]); // Platz 2 geteilt, Platz 3 übersprungen → Platz 4 = 3
 });
 

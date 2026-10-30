@@ -50,20 +50,22 @@ function gier(ui, g, st) {
   if (i < 0 || !r) return [...out, muted('Frage öffnen: der 60-Sekunden-Countdown startet sofort. Danach kannst du 10 Sekunden Nachfrist für offene Teams freigeben.')];
   const q = g.content.questions[i];
   out.push(h('p', {}, q.question, ' · Lösung: ', h('b', {}, `${fmtNum(q.answer)} ${q.unit || ''}`)));
+  const isOut = (id) => T[id] && T[id].outRound !== null && T[id].outRound !== undefined;
   if (!r.evaluated) {
     const now = Date.now();
     const over = now > r.endsAt;
+    const graceRunning = r.graceEndsAt !== null && now <= r.graceEndsAt;
+    const missing = teamIds(ui).filter((id) => !isOut(id) && r.answers[id] === undefined);
     out.push(row(
-      h('span', {}, over ? (r.graceEndsAt ? (now <= r.graceEndsAt ? ['Nachfrist: ', h('b', { 'data-deadline': String(r.graceEndsAt) }, '')] : 'Nachfrist vorbei') : 'Zeit abgelaufen') : ['Läuft: ', h('b', { 'data-deadline': String(r.endsAt) }, '')]),
-      over && r.graceEndsAt === null ? btn('ghost', '+10 s Nachfrist für offene Teams', () => ui.act('play.grace')) : null,
-      btn('pink', 'Auswerten', () => ui.confirmAct('Frage auswerten? Teams ohne Antwort scheiden aus.', 'play.evaluate'))));
+      h('span', {}, !over ? ['Läuft: ', h('b', { 'data-deadline': String(r.endsAt) }, '')] : graceRunning ? ['Nachfrist: ', h('b', { 'data-deadline': String(r.graceEndsAt) }, '')] : 'Zeit abgelaufen'),
+      over && !graceRunning && missing.length ? btn('ghost', '+10 s Nachfrist für offene Teams', () => ui.act('play.grace')) : null,
+      btn('pink', missing.length ? `Warten auf ${missing.map((id) => ui.teamName(id)).join(', ')}` : 'Auswerten', () => ui.act('play.evaluate'), missing.length > 0)));
+    if (missing.length && over) out.push(muted('Jedes Team muss antworten – gib bei Bedarf noch einmal 10 Sekunden Nachfrist.'));
   } else {
-    out.push(h('ul', { class: 'list' }, r.results.map((x) => teamLi(ui, x.teamId, x.missing ? ' – keine Antwort' : ` – ${fmtNum(x.value)} (−${fmtNum(x.diff)}) · ${fmtNum(x.before)} → ${fmtNum(x.after)}`, x.out ? badge('bad', 'raus') : null))));
+    out.push(h('ul', { class: 'list' }, r.results.map((x) => teamLi(ui, x.teamId, ` – ${fmtNum(x.value)} (−${fmtNum(x.diff)}) · ${fmtNum(x.before)} → ${fmtNum(x.after)}`, x.out ? badge('bad', 'raus') : null))));
   }
-  const alive = teamIds(ui).filter((id) => !T[id] || T[id].outRound === null || T[id].outRound === undefined).length;
-  const allDone = g.content.questions.every((_, k) => st.rounds?.[k]?.evaluated);
-  out.push(row(st.awarded ? badge('ok', 'Platzierungspunkte vergeben (10/6/4/3/2/1)') : null,
-    btn(st.awarded ? 'ghost' : 'pink', st.awarded ? 'Platzierung neu buchen' : 'Spiel beenden: Platzierungspunkte vergeben', () => ui.confirmAct('Platzierungspunkte vergeben? Letztes verbleibendes Team 10, dann 6 / 4 / 3 / 2 / 1.', 'play.award'), !(alive <= 1 || allDone))));
+  out.push(row(st.awarded ? badge('ok', 'Spiel entschieden – Showpunkte 10/6/4/3/2/1 automatisch vergeben')
+    : badge('', 'Showpunkte werden automatisch vergeben: wer ausscheidet, sofort – das letzte Team am Ende')));
   return out;
 }
 
