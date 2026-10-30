@@ -436,6 +436,12 @@ body.beamer-page { background: #05060f; }
 .scene-pult.full { position: fixed; left: 50%; top: 50%; width: max(100vw, calc(100vh * 938 / 530)); translate: -50% -50%; margin: 0; z-index: 1; }
 .scene-pult.full > img:not(.scene-coin):not(.pult-coin) { border-radius: 0; }
 .reduced-motion .scene-pult .pult-coin.lift { animation: none; opacity: 0; }
+/* Moderation am Pult (Überleitung nach der Gewinnstufe) */
+.hosts-lower { position: fixed; left: 50%; bottom: 5vh; translate: -50% 0; z-index: 3; display: flex; align-items: center; gap: 1.6vw; padding: 1.4vh 2.4vw; background: #232326; border-left: 0.8vh solid var(--pink, #ff2e88); box-shadow: 0 1vh 4vh rgba(0, 0, 0, 0.6); color: #fff; animation: hostsIn calc(0.7s * var(--speed)) calc(0.6s * var(--speed)) ease-out both; }
+.hosts-lower b { font-size: 4.2vh; font-weight: 800; letter-spacing: 0.01em; }
+.hosts-lower span { font-size: 2.6vh; font-weight: 700; color: #ffc23d; text-transform: uppercase; letter-spacing: 0.06em; }
+@keyframes hostsIn { from { opacity: 0; translate: -50% 3vh; } }
+.reduced-motion .hosts-lower { animation: none; }
 /* Münzen auf den Teampulten */
 .podium-coin { filter: drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, 0.6)); }
 .podium-coin.fly { transform-box: fill-box; transform-origin: 50% 50%; }
