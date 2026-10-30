@@ -403,23 +403,29 @@ function suggestField(index, d, k, label, onChange) {
 // ---------- Brain or Dreh'n ----------
 function brain(g, ui) {
   if (g.waiting) return wait('Brain or Dreh’n', 'Gleich wird die erste Kategorie vorgestellt.');
-  const out = [muted(`Runde ${g.round + 1} von ${g.count} · eure Spielpunkte: ${g.points}${g.streak ? ` · Streak: nächste richtige ${g.streak}` : ''}${g.double ? ' · Doppelpunkt aktiv' : ''}`)];
+  const out = [muted(`Runde ${g.round + 1} von ${g.count} · eure Spielpunkte: ${g.points}${g.streak ? ` · Streak: nächste richtige ${g.streak}` : ''}${g.double ? ' · Doppelpunkt aktiv' : ''}${g.zero ? ' · 🥶 Nullrunde: nächste richtige Antwort 0 Punkte' : ''}${g.wheelBan ? ' · 🚫 Rad-Sperre' : ''}${g.rushNext ? ' · ⏱ Zeitdruck bei der nächsten Frage' : ''}`)];
   out.push(h('p', { class: 'question' }, `Kategorie: ${g.category}`));
   // Joker-Vorrat (nur für euch sichtbar)
   if (g.jokers.length) {
     out.push(h('div', { class: 'joker-stash' }, h('b', {}, 'Euer Joker-Vorrat'), g.jokers.map((j) => h('div', { class: 'joker-card' },
       h('span', { class: 'ji' }, j.icon), h('span', { class: 'grow' }, h('b', {}, j.name), h('small', {}, j.text)),
-      g.canUseJoker ? h('button', { class: 'btn small pink', disabled: !j.usable, title: j.usable ? '' : 'Kein anderes Team hat einen Joker zum Stehlen', onclick: async () => {
-        let target = null;
-        if (j.needsTarget) {
-          target = await pickTeam(ui, j.targets || g.targets, `${j.name}: Welches Team?`);
-          if (!target) return;
-        }
-        run(ui.conn, 'play.useJoker', { jokerId: j.id, target });
-      } }, j.usable ? 'Einsetzen' : 'Gerade nicht möglich') : null))));
+      j.passive ? h('span', { class: 'chip' }, 'wirkt von selbst')
+        : g.canUseJoker ? h('button', { class: 'btn small pink', disabled: !j.usable, title: j.usable ? '' : 'Gerade nicht möglich', onclick: async () => {
+          let target = null;
+          let stake = null;
+          if (j.needsTarget) {
+            target = await pickTeam(ui, j.targets || g.targets, `${j.name}: Welches Team?`);
+            if (!target) return;
+          }
+          if (j.key === 'wette') {
+            stake = await pickNumber(Array.from({ length: j.maxStake }, (_, i) => i + 1), `${j.name}: Wie viele Spielpunkte setzt ihr?`);
+            if (!stake) return;
+          }
+          run(ui.conn, 'play.useJoker', { jokerId: j.id, target, stake });
+        } }, j.usable ? 'Einsetzen' : 'Gerade nicht möglich') : null))));
     if (g.jokerLock) out.push(stateBox('bad', '🔒', 'Joker-Sperre: bei diesem Kategoriewechsel kein Joker.'));
   }
-  if (g.jokerUsed && !g.jokerUsed.other) out.push(stateBox('ok', '🃏', 'Euer Joker ist eingesetzt.'));
+  if (g.jokerUsed && !g.jokerUsed.other) out.push(stateBox('ok', '🃏', g.bet ? `Euer Joker ist eingesetzt – Einsatz: ${pts(g.bet)}.` : 'Euer Joker ist eingesetzt.'));
   // Spielpunkte aller Teams in diesem Spiel
   out.push(h('div', { class: 'brain-points ipad' }, (g.allPoints || []).map((p) => h('div', { class: 'bp', '--chip': ui.teamColor(p.teamId) }, h('span', {}, ui.teamName(p.teamId)), h('b', {}, String(p.points))))));
   if (g.phase === 'category') return [...out, ...wait('Gleich kommt die Frage …', g.canUseJoker ? 'Jetzt ist die Zeit für einen Joker – nach dem Vorlesen ist es zu spät.' : '')];
@@ -433,21 +439,46 @@ function brain(g, ui) {
       out.push(stateBox('ok', '🔁', `${ui.teamName(g.swap.target)} hat ${g.swap.theirs} geantwortet. Tauschen?`),
         h('div', { class: 'row' }, h('button', { class: 'btn pink', onclick: () => run(ui.conn, 'play.swap', { swap: true }) }, `Ja, ${g.swap.theirs} nehmen`), h('button', { class: 'btn ghost', onclick: () => run(ui.conn, 'play.swap', { swap: false }) }, 'Eigene behalten')));
     }
-    const canAnswer = !g.answer && !(g.detective && g.detective.waiting);
-    out.push(abcd(g.options, { selected: null, removed: g.removed, disabled: !canAnswer, onPick: canAnswer ? (l) => run(ui.conn, 'play.answer', { choice: l }) : null }));
-    if (g.answer) out.push(shield(stateBox('', '🔒', `Eingeloggt: ${g.answer}`)));
+    if (g.rush && !g.answer) {
+      if (g.rush.over) return [...out, stateBox('bad', '⏱', 'Zeitdruck: Eure Zeit ist abgelaufen.')];
+      out.push(h('div', { class: 'dgf-clock', style: { '--team': ui.team.color } }, '⏱ Zeitdruck – noch ', countdown(g.rush.deadline)));
+    }
+    // Zwei Kreuze: nach der ersten Antwort eine zweite, andere wählen.
+    const second = g.two && g.answer && !g.answer2;
+    const canAnswer = (!g.answer || second) && !(g.detective && g.detective.waiting);
+    if (g.two && !g.answer2) out.push(stateBox('ok', '✌️', g.answer ? 'Jetzt euer zweites Kreuz setzen.' : 'Zwei Kreuze: Ihr dürft zwei Antworten wählen.'));
+    out.push(abcd(g.options, { selected: g.answer, removed: g.removed, disabled: !canAnswer, onPick: canAnswer ? (l) => run(ui.conn, 'play.answer', { choice: l }) : null }));
+    if (g.answer && !second) out.push(shield(stateBox('', '🔒', `Eingeloggt: ${g.answer}${g.answer2 ? ` und ${g.answer2}` : ''}`)));
     return out;
   }
   out.push(abcd(g.options, { selected: g.answer, correct: g.correct, removed: g.removed }));
-  if (g.answer) out.push(g.gained ? stateBox('ok', '✓', `Richtig! +${g.gained}`) : stateBox('bad', '✗', 'Leider falsch'));
+  const right = g.answer && (g.answer === g.correct || g.answer2 === g.correct);
+  if (g.answer) out.push(right ? stateBox('ok', '✓', `Richtig! +${g.gained || 0}`) : stateBox('bad', '✗', g.gained ? `Leider falsch – trotzdem +${g.gained}` : 'Leider falsch'));
+  for (const x of g.extra || []) out.push(muted(x));
   if (g.wheel) {
-    if (g.wheel.spin) out.push(stateBox(g.wheel.spin.field.good ? 'ok' : 'bad', g.wheel.spin.field.icon, `${g.wheel.spin.field.name}: ${g.wheel.spin.field.text}`));
+    if (g.redirect) {
+      out.push(stateBox('ok', '↪️', `Umleitung! Wen soll „${g.redirect.field.name}“ treffen?`),
+        h('div', { class: 'team-pick' }, g.targets.map((id) => h('button', { class: 'btn huge', style: { '--team': ui.teamColor(id) }, onclick: () => run(ui.conn, 'play.redirect', { target: id }) }, ui.teamName(id)))));
+    } else if (g.wheel.spin) out.push(stateBox(g.wheel.spin.field.good ? 'ok' : 'bad', g.wheel.spin.field.icon, g.wheel.spin.text && !g.wheel.spin.field.good ? `${g.wheel.spin.field.name}: ${g.wheel.spin.text}` : `${g.wheel.spin.field.name}: ${g.wheel.spin.field.text}`));
     else if (g.wheel.mine) out.push(stateBox('ok', '🎡', 'Ihr dürft drehen!'), h('button', { class: 'btn pink huge', style: { width: '100%' }, onclick: () => run(ui.conn, 'play.spin') }, 'Glücksrad drehen'));
+    else if (g.wheel.banned) out.push(stateBox('bad', '🚫', 'Rad-Sperre: Diesmal dürft ihr nicht ans Glücksrad.'));
     else if (g.wheel.canBuzz) out.push(muted('Ihr lagt richtig – wer zuerst buzzert, dreht das Glücksrad.'), buzzButton('Buzzer', true, () => run(ui.conn, 'play.wheelBuzz')));
     else if (g.wheel.taken) out.push(stateBox('', '🎡', `${ui.teamName(g.wheel.taken)} dreht das Glücksrad.`));
   }
   if (g.finished) out.push(stateBox('ok', '🏁', `Spiel beendet – ${pts(g.points)} gehen in euren Punktestand.`));
   return out;
+}
+
+// Zahl auswählen (Einsatz der Wette).
+function pickNumber(nums, title) {
+  return new Promise((resolve) => {
+    const close = (v) => { overlay.remove(); resolve(v); };
+    const overlay = h('div', { class: 'modal-backdrop', role: 'dialog', 'aria-modal': 'true' },
+      h('div', { class: 'modal card' }, h('h3', {}, title),
+        h('div', { class: 'team-pick' }, nums.map((n) => h('button', { class: 'btn huge', onclick: () => close(n) }, String(n)))),
+        h('p', {}, h('button', { class: 'btn ghost', onclick: () => close(null) }, 'Abbrechen'))));
+    document.body.append(overlay);
+  });
 }
 
 // Team auswählen (für Joker mit Ziel): einfache Auswahl im Dialog.

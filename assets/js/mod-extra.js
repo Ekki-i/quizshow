@@ -36,7 +36,8 @@ const gradeBtns = (ui, onGrade, current) => [
   btn(`small ${current === false ? 'bad' : 'ghost'}`, '✗ Falsch', () => onGrade(false)),
 ];
 
-const JOKER_NAMES = { doppel: 'Doppelpunkt', streak: 'Streak', fifty: '50-50', raeuber: 'Punkteräuber', dieb: 'Joker-Dieb', blockade: 'Team-Blockade', detektiv: 'Detektiv-Joker', tausch: 'Antworttausch' };
+const JOKER_NAMES = { doppel: 'Doppelpunkt', streak: 'Streak', fifty: '50-50', raeuber: 'Punkteräuber', dieb: 'Joker-Dieb', blockade: 'Team-Blockade', detektiv: 'Detektiv-Joker', tausch: 'Antworttausch',
+  rettung: 'Rettungsring', zweikreuze: 'Zwei Kreuze', wette: 'Wette', sauger: 'Punktesauger', vorfahrt: 'Vorfahrt', schild: 'Schutzschild', umleitung: 'Umleitung' };
 const jn = (k) => JOKER_NAMES[k] || k;
 
 export const MOD_EXTRA = { dumm3, filmab, weissnicht, weissnicht2, konsequenz, songsong, dgf, zocken, fragen, zuweit, brain, ...MOD_NEU };
@@ -310,17 +311,19 @@ function brain(ui, g, st) {
   out.push(h('p', {}, h('b', {}, `Runde ${st.round + 1} von ${g.content.rounds.length}: ${q.category}`), ` · ${names[r.phase]}`));
   if (r.phase !== 'category') out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, q.question), optionsList(q));
   if (r.joker) {
-    const extra = r.joker.stolen ? ` – gezogen: ${jn(r.joker.stolen)}` : '';
+    const extra = `${r.joker.stolen ? ` – gezogen: ${jn(r.joker.stolen)}` : ''}${r.joker.stake ? ` – Einsatz ${r.joker.stake}` : ''}${r.joker.shielded ? ' – vom Schutzschild abgewehrt' : ''}`;
     out.push(h('p', { class: 'notice' }, `🃏 ${ui.teamName(r.joker.teamId)}: ${jn(r.joker.key)}${r.joker.target ? ` → ${ui.teamName(r.joker.target)}` : ''}${extra}`));
   }
   if (r.swapped) out.push(h('p', { class: 'notice' }, `🔁 Antworttausch: ${ui.teamName(r.swapped.teamId)} wertet ${r.swapped.used} statt ${r.swapped.original} (Antwort von ${ui.teamName(r.swapped.with)} bleibt ${r.swapped.used})`));
   out.push(h('ul', { class: 'list' }, ui.S.project.teams.map((t) => {
     const s = st.t[t.id] || { points: 0, jokers: [] };
     const a = r.answers[t.id];
-    const flags = [s.blockedNow ? '⛔ gesperrt' : '', s.streak ? `🔥 Streak ${s.streak}` : '', s.double ? '✖️2 Doppelpunkt' : '', s.lockNow ? '🔒 Joker-Sperre' : '', s.ban ? 'Antwortverbot nächste Frage' : ''].filter(Boolean).join(' · ');
+    const flags = [s.blockedNow ? '⛔ gesperrt' : '', s.streak ? `🔥 Streak ${s.streak}` : '', s.double ? '✖️2 Doppelpunkt' : '', s.lockNow ? '🔒 Joker-Sperre' : '', s.ban ? 'Antwortverbot nächste Frage' : '',
+      s.zero ? '🥶 Nullrunde' : '', s.wheelBanNow || s.wheelBan > 0 ? '🚫 Rad-Sperre' : '', s.rush ? '⏱ Zeitdruck nächste Frage' : '', r.rush && r.rush[t.id] && !a ? '⏱ Zeitdruck läuft' : ''].filter(Boolean).join(' · ');
     return teamLi(ui, t.id, ` · ${pts(s.points)}${flags ? ` · ${flags}` : ''}`,
       h('span', { class: 'muted' }, `Joker: ${s.jokers.length ? s.jokers.map((j) => jn(j.key)).join(', ') : '–'}`),
-      a ? badge(r.phase === 'question' ? '' : a.choice === q.correct ? 'ok' : 'bad', `Antwort ${a.choice}`) : null,
+      a ? badge(r.phase === 'question' ? '' : a.choice === q.correct || a.choice2 === q.correct ? 'ok' : 'bad', `Antwort ${a.choice}${a.choice2 ? ` + ${a.choice2}` : ''}`) : null,
+      (r.extra && r.extra[t.id] || []).map((x) => h('span', { class: 'muted' }, ` ${x}`)),
       btn('small ghost', '−1', () => ui.act('play.adjust', { teamId: t.id, delta: -1 })), btn('small ghost', '+1', () => ui.act('play.adjust', { teamId: t.id, delta: 1 })));
   })));
   const actions = [];
@@ -328,6 +331,7 @@ function brain(ui, g, st) {
   if (r.phase === 'question') actions.push(btn('pink', `Auflösen (${Object.keys(r.answers).length} Antworten)`, () => ui.confirmAct('Frage auflösen und Spielpunkte vergeben?', 'play.evaluate')));
   if (r.phase === 'evaluated') actions.push(btn('pink', 'Glücksrad freigeben', () => ui.act('play.openWheel'), !(r.correct || []).length));
   if (r.phase === 'wheel') {
+    if (r.redirect && r.redirect.pending) actions.push(h('span', {}, `↪️ ${ui.teamName(r.redirect.from)} leitet um – Ziel wählen:`), ...ui.S.project.teams.filter((t) => t.id !== r.redirect.from).map((t) => btn('small ghost', t.name, () => ui.act('play.redirectFor', { target: t.id }))));
     if (r.buzz && !r.spin) actions.push(h('span', {}, `🎡 ${ui.teamName(r.buzz)} darf drehen`), btn('ghost', 'Für das Team drehen', () => ui.act('play.spinFor')));
     else if (!r.buzz) actions.push(h('span', { class: 'muted' }, 'Warten auf den Buzzer der richtigen Teams …'));
   }

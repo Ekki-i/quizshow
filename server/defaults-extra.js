@@ -14,7 +14,7 @@ const optionsField = { key: 'options', label: 'Antwortmöglichkeiten', type: 'ob
 const correctField = { key: 'correct', label: 'Richtige Antwort', type: 'select', options: ABCD };
 const abcd = (question, o, correct, extra = {}) => ({ question, options: { A: o[0], B: o[1], C: o[2], D: o[3] }, correct, ...extra });
 
-// Glücksrad bei „Brain or Dreh'n“: 8 positive (Vorrat) und 8 negative (sofort).
+// Glücksrad bei „Brain or Dreh'n“: Joker-Datenbank mit 15 positiven (Vorrat) und 15 negativen (wirken sofort).
 const WHEEL = [
   { n: 1, key: 'doppel', good: true, icon: '✖️2', name: 'Doppelpunkt', text: 'Eure nächste richtige Antwort zählt 2 Punkte.' },
   { n: 9, key: 'minus2', good: false, icon: '➖', name: 'Punktabzug 2', text: 'Ihr verliert 2 Spielpunkte.' },
@@ -25,17 +25,32 @@ const WHEEL = [
   { n: 4, key: 'raeuber', good: true, icon: '🦹', name: 'Punkteräuber', text: 'Ihr stehlt einem Team eurer Wahl 2 Spielpunkte.' },
   { n: 12, key: 'sperre', good: false, icon: '🔒', name: 'Joker-Sperre', text: 'Beim nächsten Kategoriewechsel dürft ihr keinen Joker einsetzen.' },
   { n: 5, key: 'dieb', good: true, icon: '🎭', name: 'Joker-Dieb', text: 'Ihr stehlt einen zufälligen Joker aus dem Vorrat eines Teams eurer Wahl.' },
-  { n: 13, key: 'minus1', good: false, icon: '⬇️', name: 'Punktabzug 1', text: 'Ihr verliert 1 Spielpunkt.' },
+  { n: 13, key: 'minus1', good: false, icon: '⬇️', name: 'Punktabzug 1', text: '1 Spielpunkt geht an ein zufällig ausgelostes anderes Team.' },
   { n: 6, key: 'blockade', good: true, icon: '⛔', name: 'Team-Blockade', text: 'Ein Team eurer Wahl darf die nächste Frage nicht beantworten.' },
   { n: 14, key: 'verbot', good: false, icon: '🤐', name: 'Antwortverbot', text: 'Ihr dürft die nächste Frage nicht beantworten.' },
   { n: 7, key: 'detektiv', good: true, icon: '🕵️', name: 'Detektiv-Joker', text: 'Wählt heimlich ein Team: Sobald es geantwortet hat, seht nur ihr seine Antwort – dann antwortet ihr.' },
   { n: 15, key: 'enteignung', good: false, icon: '🗑️', name: 'Joker-Enteignung', text: 'Alle Joker in eurem Vorrat gehen verloren.' },
   { n: 8, key: 'tausch', good: true, icon: '🔁', name: 'Antworttausch', text: 'Wählt heimlich ein Team: Wenn beide geantwortet haben, dürft ihr eure Antwort gegen seine tauschen.' },
   { n: 16, key: 'reset', good: false, icon: '0️⃣', name: 'Reset', text: 'Eure Spielpunkte in diesem Spiel fallen auf 0.' },
+  // Erweiterung der Joker-Datenbank (Oktober 2026): je 7 weitere positive und negative Joker.
+  { n: 17, key: 'rettung', good: true, icon: '🛟', name: 'Rettungsring', text: 'Ist eure Antwort bei dieser Frage falsch, bekommt ihr trotzdem 1 Punkt. Eine laufende Streak bleibt erhalten.' },
+  { n: 18, key: 'zweikreuze', good: true, icon: '✌️', name: 'Zwei Kreuze', text: 'Ihr dürft bei dieser Frage zwei Antworten abgeben. Ist eine davon richtig, gibt es den Punkt.' },
+  { n: 19, key: 'wette', good: true, icon: '🎯', name: 'Wette', text: 'Ihr setzt 1 bis 3 Spielpunkte. Richtig: Ihr bekommt den Einsatz doppelt dazu. Falsch: Der Einsatz ist weg.' },
+  { n: 20, key: 'sauger', good: true, icon: '🧲', name: 'Punktesauger', text: 'Liegt ihr richtig, bekommt ihr zusätzlich 1 Punkt für jedes Team, das falsch liegt.' },
+  { n: 21, key: 'vorfahrt', good: true, icon: '🎡', name: 'Vorfahrt', text: 'Liegt ihr bei dieser Frage richtig, dreht ihr das Glücksrad – ohne Buzzer-Rennen.' },
+  { n: 22, key: 'schild', good: true, icon: '🛡️', name: 'Schutzschild', text: 'Schützt euch einmal vor Punkteräuber, Joker-Dieb oder Team-Blockade. Wirkt von selbst aus dem Vorrat.' },
+  { n: 23, key: 'umleitung', good: true, icon: '↪️', name: 'Umleitung', text: 'Das nächste fiese Feld, das ihr erdreht, schickt ihr an ein Team eurer Wahl weiter. Wirkt von selbst aus dem Vorrat.' },
+  { n: 24, key: 'halbiert', good: false, icon: '✂️', name: 'Halbiert', text: 'Eure Spielpunkte werden halbiert (abgerundet).' },
+  { n: 25, key: 'platztausch', good: false, icon: '🔄', name: 'Platztausch', text: 'Ihr tauscht eure Spielpunkte mit dem Team, das die wenigsten hat.' },
+  { n: 26, key: 'geschenk', good: false, icon: '🎁', name: 'Joker-Geschenk', text: 'Ein zufälliger Joker aus eurem Vorrat geht an ein zufällig ausgelostes anderes Team.' },
+  { n: 27, key: 'nullrunde', good: false, icon: '🥶', name: 'Nullrunde', text: 'Eure nächste richtige Antwort bringt 0 Punkte.' },
+  { n: 28, key: 'pech', good: false, icon: '🐈‍⬛', name: 'Pechsträhne', text: 'Ihr verliert 1 Spielpunkt und einen zufälligen Joker aus eurem Vorrat.' },
+  { n: 29, key: 'radsperre', good: false, icon: '🚫', name: 'Rad-Sperre', text: 'In den nächsten 2 Runden dürft ihr nicht ans Glücksrad.' },
+  { n: 30, key: 'zeitdruck', good: false, icon: '⏱️', name: 'Zeitdruck', text: 'Bei der nächsten Frage habt ihr nur 10 Sekunden für eure Antwort.' },
 ];
 
 // Standardwerte der Glücksrad-Felder mit Zahl.
-const JOKER_DEFAULT_VALUES = { doppel: 2, streak: 2, raeuber: 2, minus2: 2, minus1: 1, raub: 2 };
+const JOKER_DEFAULT_VALUES = { doppel: 2, streak: 2, raeuber: 2, minus2: 2, minus1: 1, raub: 2, rettung: 1, wette: 3, sauger: 1, pech: 1, radsperre: 2, zeitdruck: 10 };
 
 // Glücksrad: getrennt nach positiven und negativen Jokern. Je Seite eine Joker-Datenbank
 // mit 8 Jokern (Name, Symbol, Text, Wert änderbar – die Wirkung bleibt) und eine
@@ -60,11 +75,11 @@ const jokerSide = (good) => {
           // Angezeigt werden die (evtl. umbenannten) Joker aus der Datenbank dieser Seite;
           // schon gewählte Joker sind in den anderen Feldern gesperrt.
           optionSource: { path: [good ? 'good' : 'bad', 'jokers'], unique: [good ? 'good' : 'bad', 'slots'] } }] },
-      { key: 'jokers', label: `Joker-Datenbank: 8 ${good ? 'positive' : 'negative'} Joker (Name, Symbol, Text und Wert änderbar – die Wirkung bleibt)`, type: 'list', min: 8, max: 8, fixedOrder: true, noPreview: true,
+      { key: 'jokers', label: `Joker-Datenbank: ${pool.length} ${good ? 'positive' : 'negative'} Joker (Name, Symbol, Text und Wert änderbar – die Wirkung bleibt)`, type: 'list', min: pool.length, max: pool.length, fixedOrder: true, noPreview: true,
         itemLabel: (i) => `${word} ${i + 1} – Wirkung: ${pool[i].name}`,
         defaultItems: pool.map(jokerItem),
         fields: [text('name', 'Name', 40), text('icon', 'Symbol (Emoji)', 8), area('text', 'Text für Teams und Beamer', 200, { rows: 2 }),
-          num('value', 'Wert (nur bei Doppelpunkt, Streak-Start, Punkteräuber, Punktabzug, Punktraub)', 0, 50)] },
+          num('value', 'Wert (nur bei Jokern mit einer Zahl im Text, z. B. Punkte, Runden oder Sekunden)', 0, 60)] },
     ] };
 };
 // Ältere Inhalte (eine gemischte Liste „jokers“ mit 16 Einträgen, goodSlots/badSlots) umbauen.
@@ -73,8 +88,12 @@ function migrateBrainContent(c) {
   const old = Array.isArray(c.jokers) ? c.jokers : null;
   for (const good of [true, false]) {
     const k = good ? 'good' : 'bad';
-    if (c[k] && Array.isArray(c[k].jokers) && c[k].jokers.length) continue;
     const def = sideDefaults(good);
+    if (c[k] && Array.isArray(c[k].jokers) && c[k].jokers.length) {
+      // Datenbank erweitert: fehlende Joker hinten mit Standardwerten ergänzen.
+      if (c[k].jokers.length < def.jokers.length) c[k].jokers = [...c[k].jokers, ...def.jokers.slice(c[k].jokers.length)];
+      continue;
+    }
     const pool = WHEEL.filter((w) => w.good === good);
     const jokers = pool.map((w, i) => (old && old[WHEEL.indexOf(w)] ? { ...def.jokers[i], ...old[WHEEL.indexOf(w)] } : def.jokers[i]));
     const oldSlots = c[good ? 'goodSlots' : 'badSlots'];
@@ -210,7 +229,7 @@ const EXTRA_TYPES = {
   brain: {
     title: 'Brain or Dreh\'n',
     playable: true,
-    summary: '12 Kategorien mit A–D-Fragen. Wer richtig liegt, kann ans Glücksrad: 6 gute Joker, 6 fiese Felder – frei gewählt aus der Joker-Datenbank.',
+    summary: '12 Kategorien mit A–D-Fragen. Wer richtig liegt, kann ans Glücksrad: 6 positive und 6 negative Joker – gewählt aus einer Datenbank mit je 15.',
     schema: [
       { key: 'rounds', label: 'Runden', type: 'list', min: 12, max: 12, itemLabel: (i) => `Runde ${i + 1}`,
         fields: [text('category', 'Kategorie (wird groß vorgestellt)', 80), area('question', 'Frage', 300), optionsField, correctField] },
