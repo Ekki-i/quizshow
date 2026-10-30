@@ -246,6 +246,12 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 fieldset.group { border: 1px solid var(--surface-2); border-radius: var(--radius-sm); padding: 10px 14px 14px; margin: 14px 0 0; min-width: 0; }
 fieldset.group legend { font-weight: 800; padding: 0 6px; }
 .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 14px; }
+.field-stack { display: grid; gap: 10px; }
+/* Brain or Dreh'n: positive und negative Joker deutlich getrennt */
+fieldset.group.side-good { border-color: #2e9e5b; box-shadow: inset 4px 0 0 #2e9e5b; }
+fieldset.group.side-bad { border-color: #c8323c; box-shadow: inset 4px 0 0 #c8323c; }
+fieldset.group.side-good > legend { color: #5fd38d; }
+fieldset.group.side-bad > legend { color: #ff6b74; }
 .items { display: grid; gap: 8px; margin-bottom: 10px; }
 details.item { background: var(--bg); border-radius: var(--radius-sm); padding: 8px 12px; }
 details.item summary { cursor: pointer; padding: 4px 0; overflow-wrap: anywhere; }

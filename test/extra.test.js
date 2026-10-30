@@ -416,7 +416,7 @@ test('Brain or Dreh\'n: Joker, Glücksrad, Sperren, Reset nur Spielpunkte, Gehei
   const core = require('../server/core');
   const ri = core.randomInt;
   // „Reset“ als 6. fieses Feld aufs Rad legen (Index 11) und das Rad deterministisch darauf stellen.
-  g.content.badSlots[5] = { joker: 'reset' };
+  g.content.bad.slots[5] = { joker: 'reset' };
   core.randomInt = () => 11;
   try { act(db, team(A), 'spin'); } finally { core.randomInt = ri; Math.random = orig; }
   assert.equal(s.t[A].points, 0);

@@ -5,6 +5,7 @@
 
 const crypto = require('crypto');
 const { DATASETS } = require('./datasets');
+const { migrateBrainContent } = require('./defaults-extra');
 const { TYPES, DEFAULT_ORDER, LIBRARY_ORDER, EXTRA_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
 const { checkShow } = require('./check');
 const { scoringOf } = require('./scoring');
@@ -160,6 +161,8 @@ function migrate(db) {
       if (e.type === 'dgf' && e.title === 'DankeGleichFalsch') e.title = 'Danke, gleichfalsch!';
       // „Keine Kon-Sequenz“ heißt jetzt „Hits me baby, one more time“ (Wunsch von Fabian).
       if (e.type === 'konsequenz' && e.title === 'Keine Kon-Sequenz') e.title = 'Hits me baby, one more time';
+      // Brain or Dreh'n: Joker getrennt nach positiv/negativ (6 + 6 aufs Rad).
+      if (e.type === 'brain') migrateBrainContent(e.content);
     }
     // Neue Spielarten einmalig in die Datenbank aufnehmen – nur ergänzen, nichts ändern.
     db.libraryTypesAdded = db.libraryTypesAdded || [];
@@ -305,6 +308,7 @@ function sanitizeField(f, v) {
 
 function sanitizeContent(type, content) {
   if (!TYPES[type]) fail('Unbekannter Spieltyp.');
+  if (type === 'brain' && content && typeof content === 'object') content = migrateBrainContent(clone(content));
   return sanitizeFields(TYPES[type].schema, content);
 }
 
