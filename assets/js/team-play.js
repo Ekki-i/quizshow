@@ -7,6 +7,11 @@ import { mapView, zoomState } from './map.js';
 import { podiumRow } from './studio.js';
 import { TEAM_EXTRA } from './team-extra.js';
 
+// Punktwerte aus dem Editor (über den Server), sonst Standard.
+const pv = (g, k, d = 1) => (g && g.scoring && typeof g.scoring[k] === 'number' ? g.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 
@@ -79,7 +84,7 @@ function leichte5(g, ui) {
   }
   if (g.answer) {
     const card = h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Eure Antwort'), h('div', { style: { fontSize: '1.6rem', margin: 0 } }, answerContent(g.answer)));
-    if (g.answer.grade === true) out.push(card, stateBox('ok', '✓', 'Richtig! +1 Punkt'));
+    if (g.answer.grade === true) out.push(card, stateBox('ok', '✓', `Richtig! ${plus(pv(g, 'correct'))} ${Math.abs(pv(g, 'correct')) === 1 ? 'Punkt' : 'Punkte'}`));
     else if (g.answer.grade === false) out.push(card, stateBox('bad', '✗', 'Leider falsch'));
     else out.push(shield(card), stateBox('', '🔒', 'Abgegeben und gesperrt – wartet auf die Bewertung'));
     return out;
@@ -99,7 +104,7 @@ function dummes(g, ui) {
     out.push(choiceButtons(g.options, { selected: g.final, correct: g.correct }));
     if (g.swappedWith) out.push(stateBox('', '🔁', `Getauscht mit ${g.swappedWith}: eure Antwort war ${g.choice}, jetzt zählt ${g.final}.`));
     if (!g.final) out.push(stateBox('', '–', 'Keine Antwort abgegeben'));
-    else out.push(g.final === g.correct ? stateBox('ok', '✓', 'Richtig! +1 Punkt') : stateBox('bad', '✗', `Leider falsch – richtig ist ${g.correct}`));
+    else out.push(g.final === g.correct ? stateBox('ok', '✓', `Richtig! ${plus(pv(g, 'correct'))}`) : stateBox('bad', '✗', `Leider falsch – richtig ist ${g.correct}`));
     return out;
   }
   const canAnswer = g.open && !g.choice && !g.tooLate;
@@ -195,10 +200,10 @@ function land(g, ui) {
   else if (g.target) {
     const own = g.guesses?.find((x) => x.teamId === ui.team.id);
     if (g.target.country) {
-      out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Im richtigen Land – ${g.target.name}! +1 Punkt`)
+      out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Im richtigen Land – ${g.target.name}! ${plus(pv(g, 'winner'))}`)
         : stateBox('', '🗺', `${g.target.name}${own ? ` – ihr lagt ${own.km.toLocaleString('de-DE')} km daneben` : ''}`));
     } else {
-      out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Am nächsten dran! +1 Punkt${own ? ` (${own.km.toLocaleString('de-DE')} km)` : ''}`)
+      out.push(g.winners.includes(ui.team.id) ? stateBox('ok', '✓', `Am nächsten dran! ${plus(pv(g, 'winner'))}${own ? ` (${own.km.toLocaleString('de-DE')} km)` : ''}`)
         : stateBox('', '📍', `${g.target.name}${own ? ` – ihr wart ${own.km.toLocaleString('de-DE')} km entfernt` : ''}`));
     }
   } else if (g.own) out.push(stateBox('', '🔒', 'Punkt gesperrt – wartet auf die Auflösung'));

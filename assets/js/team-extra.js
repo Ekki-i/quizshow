@@ -6,6 +6,11 @@ import { h, run, ask, toast, shield } from './client.js';
 import { inkPad, clearInkDraft } from './ink.js';
 import { TEAM_NEU } from './neu-team.js';
 
+// Punktwerte aus dem Editor (über den Server), sonst Standard.
+const pv = (g, k, d = 1) => (g && g.scoring && typeof g.scoring[k] === 'number' ? g.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 const signed = (n) => `${n > 0 ? '+' : ''}${n}`;
@@ -90,7 +95,7 @@ function filmab(g, ui) {
   const out = [muted(`Film ${g.index + 1} von ${g.count}`)];
   if (g.resolved) {
     out.push(h('p', { class: 'question' }, `🎬 ${g.title}`));
-    out.push(g.winner === ui.team.id ? stateBox('ok', '✓', 'Richtig! +1 Punkt') : stateBox('', '■', g.winner ? `${ui.teamName(g.winner)} hat es erraten.` : 'Niemand hat es erraten.'));
+    out.push(g.winner === ui.team.id ? stateBox('ok', '✓', `Richtig! ${plus(pv(g, 'correct'))}`) : stateBox('', '■', g.winner ? `${ui.teamName(g.winner)} hat es erraten.` : 'Niemand hat es erraten.'));
     return out;
   }
   if (!g.started) return [...out, ...wait('Gleich läuft der Film …', 'Schaut auf die Leinwand – wer den Film erkennt, buzzert!')];
@@ -108,7 +113,7 @@ function weissnicht(g, ui) {
     if (g.solution) out.push(stateBox('', '💡', `Lösung: ${g.solution}`));
     if (g.result) {
       const winner = g.result === 'right' ? g.target : g.buzzer;
-      out.push(winner === ui.team.id ? stateBox('ok', '✓', '+1 Punkt für euch!') : stateBox('', '■', `+1 für ${ui.teamName(winner)}`));
+      out.push(winner === ui.team.id ? stateBox('ok', '✓', `${plus(pv(g, 'winner'))} für euch!`) : stateBox('', '■', `${plus(pv(g, 'winner'))} für ${ui.teamName(winner)}`));
     }
     return out;
   }
@@ -131,7 +136,7 @@ function weissnicht2(g, ui) {
   const out = [muted(`Runde ${g.index + 1} von ${g.count}`), g.question ? question(g.question) : null];
   if (g.evaluated) {
     if (g.solution) out.push(stateBox('', '💡', `Lösung: ${g.solution}`));
-    if (g.ownCorrect !== null) out.push(g.ownCorrect ? stateBox('ok', '✓', g.isBuzzer ? 'Eure Antwort war richtig.' : 'Eure Antwort war richtig: +1') : stateBox('bad', '✗', 'Eure Antwort war falsch.'));
+    if (g.ownCorrect !== null) out.push(g.ownCorrect ? stateBox('ok', '✓', g.isBuzzer ? 'Eure Antwort war richtig.' : `Eure Antwort war richtig: ${plus(pv(g, 'other'))}`) : stateBox('bad', '✗', 'Eure Antwort war falsch.'));
     if (g.result) out.push(stateBox(g.result.allRight ? 'ok' : 'bad', '★', g.result.allRight ? `Einschätzung alles richtig: +${g.result.guessPoints} · eigene Antwort +${g.result.ownPoint}` : 'Mindestens eine Einschätzung falsch – 0 Punkte, auch für eure eigene Antwort.'));
     return out;
   }
@@ -190,7 +195,7 @@ function songsong(g, ui) {
   const out = [muted(`Rätsel ${g.index + 1} von ${g.count}`)];
   if (g.done) {
     if (g.solution) out.push(question(`🎵 ${g.solution.filter(Boolean).join(' + ')}`));
-    out.push(g.won ? stateBox('ok', '✓', 'Beide Titel richtig! +1 Punkt') : g.submitted ? stateBox('bad', '✗', 'Leider nicht beide Titel richtig') : stateBox('', '■', 'Rätsel beendet'));
+    out.push(g.won ? stateBox('ok', '✓', `Beide Titel richtig! ${plus(pv(g, 'correct'))}`) : g.submitted ? stateBox('bad', '✗', 'Leider nicht beide Titel richtig') : stateBox('', '■', 'Rätsel beendet'));
     return out;
   }
   if (g.submitted) {
@@ -215,7 +220,7 @@ function dgf(g, ui) {
     const txt = { wrong: `Falsch – ausgeschieden, ${pts(g.lost)} verloren.`, timeout: `Zeit abgelaufen – ausgeschieden, ${pts(g.lost)} verloren.`, secured: 'Ausgestiegen – eure Punkte sind gesichert.', finished: 'Kategorie geschafft – Punkte gutgeschrieben.' }[g.out];
     return [...out, stateBox(g.out === 'secured' || g.out === 'finished' ? 'ok' : 'bad', g.out === 'secured' ? '✓' : '✗', txt)];
   }
-  if (g.flash?.kind === 'right') out.push(stateBox('ok', '✓', `„${g.flash.term}“ ist richtig! +1`));
+  if (g.flash?.kind === 'right') out.push(stateBox('ok', '✓', `„${g.flash.term}“ ist richtig! ${plus(pv(g, 'term'))}`));
   if (g.myTurn) out.push(h('div', { class: 'dgf-clock', style: { '--team': ui.team.color } }, '⏱ ', countdown(g.deadline)));
   else out.push(stateBox('', '⏳', h('span', {}, `${ui.teamName(g.turn)} ist dran – `, countdown(g.deadline))));
   out.push(h('div', { class: 'dgf-board' }, g.board.map((b) => h('button', {
@@ -297,7 +302,7 @@ function zuweit(g, ui) {
   if (g.result) {
     const r = g.result;
     out.push(stateBox(r.best ? 'ok' : r.worst ? 'bad' : '', r.best ? '🏆' : r.worst ? '✗' : '■',
-      `${r.a} & ${r.b}: ${r.valid ? `${String(r.diff).replace('.', ',')} ${g.unit}` : 'ungültig (außerhalb der Grenzen)'}${r.best ? ' – bestes Ergebnis, +2' : r.worst ? ' – schlechtestes Ergebnis, −1' : ''}`));
+      `${r.a} & ${r.b}: ${r.valid ? `${String(r.diff).replace('.', ',')} ${g.unit}` : 'ungültig (außerhalb der Grenzen)'}${r.best ? ` – bestes Ergebnis, ${plus(pv(g, 'best', 2))}` : r.worst ? ` – schlechtestes Ergebnis, ${plus(pv(g, 'worst', -1))}` : ''}`));
     return out;
   }
   if (g.pick) return [...out, shield(stateBox('', '🔒', `Abgegeben: ${g.pick.a} & ${g.pick.b}`))];

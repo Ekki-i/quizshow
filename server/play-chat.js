@@ -10,6 +10,7 @@
 // erst bei der Auflösung oben als Kontakt gezeigt.
 
 const { fail, log, effect, teamName, bookTarget, buzzIn, currentBuzz, buzzTeamView } = require('./core');
+const { pv } = require('./scoring');
 
 const N = 8;
 
@@ -70,7 +71,7 @@ module.exports = {
         r.resolved = true;
         r.winner = b.teamId;
         for (const x of r.buzzes) if (x.status === 'pending') x.status = 'skipped';
-        bookTarget(db, ctx, `chat:${game.id}:${st.index}`, b.teamId, 1, `${game.title}, Chat ${st.index + 1}`);
+        bookTarget(db, ctx, `chat:${game.id}:${st.index}`, b.teamId, pv(game, 'correct'), `${game.title}, Chat ${st.index + 1}`);
         effect(db, 'correct');
       } else {
         b.status = 'wrong';

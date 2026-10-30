@@ -12,6 +12,7 @@
 // Gleiche Sortierwerte sind nicht erlaubt (der Editor/Start meldet sie).
 
 const { fail, log, effect, teamName, teamIds, bookTarget, randomInt } = require('./core');
+const { pv } = require('./scoring');
 const { sortValue, shuffled } = require('./match');
 
 const N = 10;
@@ -87,7 +88,7 @@ module.exports = {
       r.pool = r.pool.filter((x) => x !== k);
       r.line.splice(ok ? pos : correctPos, 0, k);
       const t = r.teams[ctx.teamId];
-      if (ok) t.points += 1;
+      if (ok) t.points += pv(game, 'correct');
       else { t.lost = t.points; t.points = 0; t.state = 'out'; }
       r.last = { teamId: ctx.teamId, item: k, ok, pos: ok ? pos : correctPos, tried: pos, at: ctx.now };
       r.history.push(r.last);

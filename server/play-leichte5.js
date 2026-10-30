@@ -3,6 +3,7 @@
 // Spiel „Die leichten 5“: Freitext-Antworten, Moderation bewertet, 1 Punkt pro richtiger Antwort.
 
 const { fail, log, effect, teamName, bookTarget, cleanText, cleanInk } = require('./core');
+const { pv } = require('./scoring');
 
 function round(st, qIndex) {
   if (!st.rounds[qIndex]) st.rounds[qIndex] = { open: false, solutionRevealed: false, answers: {} };
@@ -48,7 +49,7 @@ module.exports = {
       const correct = !!p.correct;
       const changed = ans.grade !== null && ans.grade !== correct;
       ans.grade = correct;
-      bookTarget(db, ctx, `leichte5:${game.id}:${st.qIndex}:${p.teamId}`, p.teamId, correct ? 1 : 0,
+      bookTarget(db, ctx, `leichte5:${game.id}:${st.qIndex}:${p.teamId}`, p.teamId, correct ? pv(game, 'correct') : 0,
         `${game.title}, Frage ${st.qIndex + 1}${changed ? ', Bewertung korrigiert' : ''}`);
       log(db, ctx, 'bewertung', `${teamName(db, p.teamId)} Frage ${st.qIndex + 1}: ${correct ? 'richtig' : 'falsch'}`);
       if (ans.onBeamer) effect(db, correct ? 'correct' : 'wrong');

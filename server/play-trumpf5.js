@@ -3,9 +3,10 @@
 // Spiel „5 ist Trümpf“: bis zu fünf Hinweise, Buzzer, Punkte nach dem Hinweis beim Buzzern.
 
 const { fail, log, effect, teamName, bookTarget, buzzIn, currentBuzz, buzzTeamView } = require('./core');
+const { pv } = require('./scoring');
 
 // Hinweis 1 → 5 Punkte … Hinweis 5 → 1 Punkt.
-const pointsFor = (hintLevel) => Math.max(0, 6 - hintLevel);
+const pointsFor = (hintLevel, game = null) => (game && game.type ? (hintLevel >= 1 && hintLevel <= 5 ? pv(game, `hint${hintLevel}`) : 0) : Math.max(0, 6 - hintLevel));
 
 function round(st, i) {
   if (!st.rounds[i]) st.rounds[i] = { hintLevel: 0, buzzes: [], locked: [], resolved: false };
@@ -52,7 +53,7 @@ module.exports = {
       if (p.correct) {
         buzz.status = 'correct';
         r.resolved = true;
-        bookTarget(db, ctx, `trumpf5:${game.id}:${st.termIndex}`, buzz.teamId, pointsFor(buzz.hint), `${game.title}, Begriff ${st.termIndex + 1}, Hinweis ${buzz.hint}`);
+        bookTarget(db, ctx, `trumpf5:${game.id}:${st.termIndex}`, buzz.teamId, pointsFor(buzz.hint, game), `${game.title}, Begriff ${st.termIndex + 1}, Hinweis ${buzz.hint}`);
         effect(db, 'correct');
       } else {
         buzz.status = 'wrong';
@@ -98,7 +99,8 @@ module.exports = {
       // Nach der Auflösung werden alle übrigen Hinweise einmal aufgedeckt.
       hints: r.resolved ? term.hints.slice(0, 5) : term.hints.slice(0, r.hintLevel),
       shown: r.hintLevel,
-      value: pointsFor(r.hintLevel),
+      value: pointsFor(Math.max(1, r.hintLevel), game),
+      values: [1, 2, 3, 4, 5].map((n) => pointsFor(n, game)),
       buzzOrder: r.buzzes.map((b) => ({ teamId: b.teamId, status: b.status })),
       answering: current ? current.teamId : null,
       resolved: r.resolved,

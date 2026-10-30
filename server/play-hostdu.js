@@ -13,6 +13,7 @@
 // Täuschungspunkte. Mehrere Teams dürfen dieselbe Option wählen.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanText } = require('./core');
+const { pv } = require('./scoring');
 const { core, lev, shuffled } = require('./match');
 
 const tol = (len) => (len >= 10 ? 2 : len >= 5 ? 1 : 0);
@@ -64,13 +65,14 @@ function build(r, q) {
   return { groups, hints };
 }
 
-function score(db, r) {
+function score(db, r, game = null) {
+  const P = (k) => (game ? pv(game, k) : 1);
   const pts = Object.fromEntries(teamIds(db).map((id) => [id, { regular: 0, deceive: 0 }]));
   for (const [voter, gid] of Object.entries(r.votes)) {
     const g = r.groups.find((x) => x.id === gid);
     if (!g || g.teams.includes(voter)) continue; // eigene Option zählt nie
-    if (g.correct) pts[voter].regular += 1;
-    else for (const t of g.teams) if (pts[t]) pts[t].deceive += 1;
+    if (g.correct) pts[voter].regular += P('correct');
+    else for (const t of g.teams) if (pts[t]) pts[t].deceive += P('deceive');
   }
   return pts;
 }
@@ -159,7 +161,7 @@ module.exports = {
       const missing = can.filter((id) => !r.votes[id]);
       if (missing.length && !p.force) fail(`Noch nicht abgestimmt: ${missing.map((id) => teamName(db, id)).join(', ')}`);
       r.phase = 'revealed';
-      r.results = score(db, r);
+      r.results = score(db, r, game);
       for (const [id, x] of Object.entries(r.results)) bookTarget(db, ctx, `hostdu:${game.id}:${st.index}:${id}`, id, x.regular + x.deceive, `${game.title}, Frage ${st.index + 1}`);
       log(db, ctx, 'ablauf', `Host du: Frage ${st.index + 1} aufgelöst`);
       effect(db, 'reveal');

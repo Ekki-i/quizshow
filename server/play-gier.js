@@ -14,6 +14,7 @@
 // Platzpunkte, der nächste Platz wird übersprungen.
 
 const { fail, log, effect, teamName, teamIds, bookTarget } = require('./core');
+const { pv } = require('./scoring');
 
 const START = 100;
 const GRACE_MS = 10000;
@@ -44,7 +45,7 @@ function canAnswer(st, r, teamId, now) {
 
 // Endstand: verbleibende Teams nach Guthaben, dann Ausgeschiedene (später = besser,
 // in derselben Runde nach Restguthaben). Gleiches Guthaben in derselben Gruppe = gleicher Platz.
-function standings(db, st) {
+function standings(db, st, game = null) {
   const ids = teamIds(db).filter((id) => st.teams[id]);
   const key = (id) => {
     const t = st.teams[id];
@@ -62,14 +63,15 @@ function standings(db, st) {
     const place = same ? prev.place : i + 1;
     out.push({ teamId: id, place, balance: st.teams[id].balance, out: st.teams[id].outRound !== null, outRound: st.teams[id].outRound });
   });
-  return out.map((x) => ({ ...x, points: PLACE_POINTS[x.place - 1] ?? (x.place > PLACE_POINTS.length ? 1 : 0) }));
+  const placePts = (pl) => (game ? (pl <= 6 ? pv(game, `place${pl}`) : pv(game, 'place6')) : PLACE_POINTS[pl - 1] ?? 1);
+  return out.map((x) => ({ ...x, points: placePts(x.place) }));
 }
 // Showpunkte automatisch nach Reihenfolge des Ausscheidens: Wer ausscheidet, hat
 // seinen Platz sicher (hinter allen, die noch dabei sind) und bekommt die Punkte
 // sofort; ist das Spiel entschieden, bekommen auch die Übrigen ihre Platzpunkte.
 function bookPlaces(db, ctx, game, st) {
   const done = finished(db, game, st);
-  for (const s of standings(db, st)) {
+  for (const s of standings(db, st, game)) {
     if (!s.out && !done) continue;
     bookTarget(db, ctx, `gier:${game.id}:${s.teamId}`, s.teamId, s.points, `${game.title}, Platz ${s.place}`);
   }
@@ -180,7 +182,7 @@ module.exports = {
       evaluated: r.evaluated,
       solution: r.evaluated ? Number(q.answer) : null,
       result: res,
-      standings: standings(db, st).filter((s) => s.teamId === teamId && (s.out || st.awarded)),
+      standings: standings(db, st, game).filter((s) => s.teamId === teamId && (s.out || st.awarded)),
     };
   },
 
@@ -205,9 +207,9 @@ module.exports = {
       evaluated: r.evaluated,
       solution: r.evaluated ? Number(q.answer) : null,
       results: r.evaluated ? r.results : null,
-      standings: st.awarded ? standings(db, st) : null,
+      standings: st.awarded ? standings(db, st, game) : null,
       // Showpunkte der schon ausgeschiedenen Teams (stehen fest).
-      placed: standings(db, st).filter((x) => x.out || st.awarded).map((x) => ({ teamId: x.teamId, place: x.place, points: x.points })),
+      placed: standings(db, st, game).filter((x) => x.out || st.awarded).map((x) => ({ teamId: x.teamId, place: x.place, points: x.points })),
     };
   },
 };

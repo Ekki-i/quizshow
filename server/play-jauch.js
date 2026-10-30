@@ -6,6 +6,9 @@
 
 const { fail, randomInt, log, effect, teamName, teamIds, bookTarget, cleanChoice, pts } = require('./core');
 const { JAUCH_LADDER } = require('./defaults');
+const { pv } = require('./scoring');
+// Gewinnstufen (im Editor änderbar, sonst Standardleiter).
+const ladderOf = (game) => JAUCH_LADDER.map((_, i) => pv(game, `q${i + 1}`));
 
 const SAFETY_INDEX = 3; // Frage 4
 const ABCD = ['A', 'B', 'C', 'D'];
@@ -121,7 +124,7 @@ module.exports = {
       if (!activeTeams(db, st).length) fail('Kein Team spielt mehr mit.');
       st.qIndex = q;
       round(st, q).open = true;
-      log(db, ctx, 'ablauf', `Frage ${q + 1} (${pts(JAUCH_LADDER[q])}) freigegeben`);
+      log(db, ctx, 'ablauf', `Frage ${q + 1} (${pts(ladderOf(game)[q])}) freigegeben`);
     },
 
     reveal(db, ctx, game, st, p) {
@@ -137,14 +140,14 @@ module.exports = {
         const ts = teamState(st, id);
         const a = r.answers[id];
         if (a && a.choice === correct) {
-          ts.secured = JAUCH_LADDER[q];
+          ts.secured = ladderOf(game)[q];
           book(db, ctx, game, id, ts.secured, `Frage ${q + 1} richtig`);
           if (q === JAUCH_LADDER.length - 1) {
             ts.status = 'done';
             ts.outAt = q + 1;
           }
         } else {
-          ts.secured = q > SAFETY_INDEX ? JAUCH_LADDER[SAFETY_INDEX] : 0;
+          ts.secured = q > SAFETY_INDEX ? ladderOf(game)[SAFETY_INDEX] : 0;
           ts.status = 'out';
           ts.outAt = q + 1;
           book(db, ctx, game, id, ts.secured, `Frage ${q + 1} ${a ? 'falsch' : 'ohne Antwort'}, ausgeschieden`);
@@ -157,7 +160,7 @@ module.exports = {
 
   teamView(db, game, st, teamId) {
     const ts = teamState(st, teamId);
-    const base = { status: ts.status, secured: ts.secured, outAt: ts.outAt, jokers: { fifty: !ts.jokers.fifty, phone: !ts.jokers.phone }, ladder: JAUCH_LADDER };
+    const base = { status: ts.status, secured: ts.secured, outAt: ts.outAt, jokers: { fifty: !ts.jokers.fifty, phone: !ts.jokers.phone }, ladder: ladderOf(game) };
     if (st.qIndex < 0) return { ...base, qIndex: -1 };
     const r = round(st, st.qIndex);
     const q = game.content.questions[st.qIndex];
@@ -165,7 +168,7 @@ module.exports = {
     return {
       ...base,
       qIndex: st.qIndex,
-      value: JAUCH_LADDER[st.qIndex],
+      value: ladderOf(game)[st.qIndex],
       question: q.question,
       options: q.options,
       removed: r.fifty[teamId] || [],
@@ -185,7 +188,7 @@ module.exports = {
       const ts = teamState(st, id);
       return { teamId: id, status: ts.status, secured: ts.secured, outAt: ts.outAt };
     });
-    if (st.qIndex < 0) return { waiting: true, ladder: JAUCH_LADDER };
+    if (st.qIndex < 0) return { waiting: true, ladder: ladderOf(game) };
     const r = round(st, st.qIndex);
     // Eingesetzte Joker je Art (über das ganze Spiel) und die Joker der laufenden Frage
     // – sofort sichtbar, wer welchen Joker genommen hat.
@@ -195,7 +198,7 @@ module.exports = {
     const active = teams.filter((t) => t.status === 'active' || r.answers[t.teamId]);
     return {
       qIndex: st.qIndex,
-      ladder: JAUCH_LADDER,
+      ladder: ladderOf(game),
       question: q.question,
       options: q.options,
       lockedCount: Object.keys(r.answers).length,

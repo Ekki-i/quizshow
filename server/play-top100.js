@@ -9,9 +9,10 @@
 // nicht in der Liste = 0.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanText } = require('./core');
+const { pv } = require('./scoring');
 const { matchEntry } = require('./match');
 
-const pointsFor = (rank) => (rank >= 1 && rank <= 100 ? Math.ceil(rank / 20) : 0);
+const pointsFor = (rank, game = null) => (rank >= 1 && rank <= 100 ? (game ? pv(game, `group${Math.ceil(rank / 20)}`) : Math.ceil(rank / 20)) : 0);
 
 // Liste aus dem Editor: eine Zeile pro Rang (Zeile 1 = Rang 1), Varianten mit „/“.
 // Ein vorangestelltes „12.“ oder „12)“ wird ignoriert.
@@ -81,7 +82,7 @@ module.exports = {
       a.status = 'manual';
       a.suggest = null;
       log(db, ctx, 'bewertung', `Top 100: ${teamName(db, p.teamId)} → ${rank ? `Rang ${rank}` : 'nicht in der Liste'} (manuell)`);
-      if (r.evaluated) bookTarget(db, ctx, `top100:${game.id}:${st.index}:${p.teamId}`, p.teamId, pointsFor(rank), `${game.title}, Runde ${st.index + 1} (Korrektur)`);
+      if (r.evaluated) bookTarget(db, ctx, `top100:${game.id}:${st.index}:${p.teamId}`, p.teamId, pointsFor(rank, game), `${game.title}, Runde ${st.index + 1} (Korrektur)`);
     },
     evaluate(db, ctx, game, st) {
       const r = current(st);
@@ -94,7 +95,7 @@ module.exports = {
       r.closed = true;
       r.evaluated = true;
       for (const [teamId, a] of Object.entries(r.answers)) {
-        bookTarget(db, ctx, `top100:${game.id}:${st.index}:${teamId}`, teamId, pointsFor(a.rank), `${game.title}, Runde ${st.index + 1}`);
+        bookTarget(db, ctx, `top100:${game.id}:${st.index}:${teamId}`, teamId, pointsFor(a.rank, game), `${game.title}, Runde ${st.index + 1}`);
       }
       log(db, ctx, 'ablauf', `Top 100: Runde ${st.index + 1} ausgewertet`);
       effect(db, 'reveal');
@@ -117,7 +118,7 @@ module.exports = {
       text: a ? a.text : null,
       evaluated: r.evaluated,
       rank: r.evaluated && a ? a.rank : null,
-      points: r.evaluated && a ? pointsFor(a.rank) : null,
+      points: r.evaluated && a ? pointsFor(a.rank, game) : null,
       entry: r.evaluated && a && a.rank ? parseList(rd.entries)[a.rank - 1].name : null,
     };
   },
@@ -133,10 +134,11 @@ module.exports = {
       source: rd.source || '',
       period: rd.period || '',
       asOf: rd.asOf || '',
+      scale: [1, 2, 3, 4, 5].map((n) => pv(game, `group${n}`)),
       submittedCount: Object.keys(r.answers).length,
       teamCount: db.project.teams.length,
       evaluated: r.evaluated,
-      results: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, text: a.text, rank: a.rank, entry: a.rank ? list[a.rank - 1].name : null, points: pointsFor(a.rank) }))
+      results: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, text: a.text, rank: a.rank, entry: a.rank ? list[a.rank - 1].name : null, points: pointsFor(a.rank, game) }))
         .sort((x, y) => (y.rank || 0) - (x.rank || 0)) : [],
     };
   },

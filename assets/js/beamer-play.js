@@ -125,7 +125,7 @@ function trumpf5(v, teamOf) {
   // Hinweise stehen als Platzhalter da, damit nichts springt.
   const slots = Array.from({ length: 5 }, (_, i) => {
     const text = v.hints[i];
-    const value = 5 - i;
+    const value = v.values ? v.values[i] : 5 - i;
     // Nach der Auflösung nachträglich aufgedeckte Hinweise: eigene Optik, nacheinander eingeblendet.
     const late = v.resolved && text !== undefined && i >= (v.shown ?? 5);
     return h('li', { class: text === undefined ? 'empty' : late ? 'late' : '', style: late ? { animationDelay: `${0.5 + (i - v.shown) * 0.45}s` } : null },

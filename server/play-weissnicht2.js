@@ -9,6 +9,7 @@
 // Antwort. Alle anderen Teams bekommen für ihre richtige Antwort +1.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanInk, timerClosed } = require('./core');
+const { pv } = require('./scoring');
 
 function round(st, i) {
   if (!st.rounds[i]) st.rounds[i] = { open: false, answers: {}, buzz: null, guesses: null, grades: {}, closedSubmissions: false, evaluated: false };
@@ -31,7 +32,8 @@ function othersCorrect(r) {
   return Object.keys(r.answers).filter((id) => id !== r.buzz?.teamId && r.grades[id] === true);
 }
 
-function score(db, r) {
+function score(db, r, game = null) {
+  const P = (k) => (game ? pv(game, k) : 1);
   if (!r.buzz) return { buzzer: null, guessPoints: 0, ownPoint: 0, allRight: null };
   // (Punkte der übrigen Teams: siehe othersCorrect)
   const g = r.guesses || {};
@@ -40,9 +42,9 @@ function score(db, r) {
   const allRight = ids.length > 0 && ids.every((id) => r.grades[id] === g[id]);
   return {
     buzzer: r.buzz.teamId,
-    guessPoints: allRight ? ids.length : 0,
+    guessPoints: allRight ? ids.length * P('guess') : 0,
     // Eine falsche Einschätzung kostet auch den Punkt für die eigene Antwort.
-    ownPoint: allRight && r.grades[r.buzz.teamId] === true ? 1 : 0,
+    ownPoint: allRight && r.grades[r.buzz.teamId] === true ? P('own') : 0,
     allRight,
   };
 }
@@ -123,13 +125,13 @@ module.exports = {
       if (r.buzz && !r.guesses) fail('Das Buzzer-Team hat noch nicht eingeschätzt.');
       r.evaluated = true;
       r.open = false;
-      const s = score(db, r);
+      const s = score(db, r, game);
       if (s.buzzer) {
         bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:guess`, s.buzzer, s.guessPoints, `${game.title}, Runde ${st.index + 1}, Einschätzung`);
         bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:own`, s.buzzer, s.ownPoint, `${game.title}, Runde ${st.index + 1}, eigene Antwort`);
       }
       for (const id of othersCorrect(r)) {
-        bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:own:${id}`, id, 1, `${game.title}, Runde ${st.index + 1}, richtige Antwort`);
+        bookTarget(db, ctx, `weissnicht2:${game.id}:${st.index}:own:${id}`, id, pv(game, 'other'), `${game.title}, Runde ${st.index + 1}, richtige Antwort`);
       }
       log(db, ctx, 'ablauf', `Runde ${st.index + 1} ausgewertet${s.buzzer ? ` – ${teamName(db, s.buzzer)}: ${s.guessPoints + s.ownPoint} Punkte` : ''}`);
       effect(db, 'reveal');
@@ -141,7 +143,7 @@ module.exports = {
     const r = round(st, st.index);
     const isBuzzer = r.buzz?.teamId === teamId;
     const ready = allIn(db, r);
-    const s = r.evaluated ? score(db, r) : null;
+    const s = r.evaluated ? score(db, r, game) : null;
     return {
       index: st.index,
       count: game.content.rounds.length,
@@ -159,7 +161,7 @@ module.exports = {
       guessed: isBuzzer && !!r.guesses,
       evaluated: r.evaluated,
       ownCorrect: r.evaluated ? r.grades[teamId] ?? null : null,
-      ownPoints: r.evaluated && !isBuzzer && r.grades[teamId] === true ? 1 : 0,
+      ownPoints: r.evaluated && !isBuzzer && r.grades[teamId] === true ? pv(game, 'other') : 0,
       result: s && isBuzzer ? s : null,
       solution: r.evaluated ? game.content.rounds[st.index].solution : null,
     };
@@ -169,7 +171,7 @@ module.exports = {
     if (st.index < 0) return { waiting: true };
     const r = round(st, st.index);
     const item = game.content.rounds[st.index];
-    const s = r.evaluated ? score(db, r) : null;
+    const s = r.evaluated ? score(db, r, game) : null;
     return {
       index: st.index,
       image: item.image ? { id: item.image.id, type: item.image.type } : null,

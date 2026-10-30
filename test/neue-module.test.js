@@ -239,3 +239,53 @@ test('Wer nix werd, werd Nerd: Notizen nur in der Gebotsphase, danach privat und
   assert.equal(JSON.stringify(game.beamerView(db)).includes(ink), false);
   assert.throws(() => act(db, team(ids[0]), 'notes', { ink }), /Gebotsphase/);
 });
+
+test('Punkte je Spiel im Editor änderbar (Regeln bleiben gleich)', () => {
+  const { db, ids } = setup(2);
+  const g = use(db, 'sortieren', { scoring: { position: 2 } });
+  act(db, mod(), 'open', { index: 0 });
+  act(db, team(ids[0]), 'submit', { order: [0, 1, 2, 4, 3] }); // 3 richtig
+  act(db, team(ids[1]), 'submit', { order: [0, 1, 2, 3, 4] });
+  act(db, mod(), 'evaluate');
+  assert.equal(pts(db, ids[0]), 6);
+  assert.equal(pts(db, ids[1]), 10);
+  // leer = Standard
+  const d = game.createState();
+  const l5 = d.project.games[0];
+  assert.equal(require('../server/scoring').pv(l5, 'correct'), 1);
+  assert.ok(g.content.scoring);
+});
+
+test('Spieltitel-Lied: in der Show gesetzt → auch in der Datenbank, kommt in neue Shows mit; in der Datenbank setzbar', () => {
+  const { db } = setup(2);
+  const g = db.project.games[1];
+  const media = { id: 'media_abcdefabcdef12', type: 'video/mp4', name: 'titel.mp4', size: 10 };
+  game.applyAction(db, mod(), 'game.setIntro', { gameId: g.id, media });
+  const entry = db.library.find((e) => e.id === g.libraryId);
+  assert.equal(entry.intro.id, media.id);
+  game.applyAction(db, mod(), 'game.remove', { gameId: db.project.games[7].id });
+  game.applyAction(db, mod(), 'game.add', { libraryId: entry.id });
+  assert.equal(db.project.games[7].intro.id, media.id);
+  const other = db.library.find((e) => e.type === 'gier');
+  game.applyAction(db, mod(), 'library.setIntro', { libraryId: other.id, media: { ...media, id: 'media_bbbbbbbbbbbb12', type: 'audio/mpeg' } });
+  assert.ok(game.referencedMedia(db).has('media_bbbbbbbbbbbb12'));
+});
+
+test('Musikquiz: Clip läuft mit „Aufgabe starten“, pausiert beim Buzzern; Punkte je Feld änderbar', () => {
+  const { db, ids } = setup(2);
+  const g = db.project.games.find((x) => x.type === 'musik');
+  const content = structuredClone(g.content);
+  content.categories[0].fields[1].clip = { id: 'media_abcdefabcdef12', type: 'audio/mpeg', name: 'c.mp3', size: 1 };
+  content.scoring = { field1: 1, field2: 5, field3: 9 };
+  game.applyAction(db, mod(), 'game.update', { gameId: g.id, content });
+  game.applyAction(db, mod(), 'show.activate', { gameId: g.id });
+  db.live.beamer = { view: 'game', data: {} };
+  act(db, mod(), 'pick', { cat: 0, field: 1 });
+  act(db, mod(), 'start');
+  assert.equal(bv(db).current.playback.state, 'playing');
+  assert.equal(bv(db).current.clip.id, 'media_abcdefabcdef12');
+  act(db, team(ids[0]), 'buzz');
+  assert.equal(bv(db).current.playback.state, 'paused');
+  act(db, mod(), 'judge', { correct: true });
+  assert.equal(pts(db, ids[0]), 5);
+});

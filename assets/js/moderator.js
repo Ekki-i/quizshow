@@ -415,7 +415,7 @@ function buildPauseSongs(st) {
   const move = (i, d) => { const l = [...songs]; const [x] = l.splice(i, 1); l.splice(i + d, 0, x); setSongs(l); };
   const fmtSize = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
   const input = h('input', {
-    type: 'file', multiple: true, accept: 'audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/flac,.mp3,.m4a,.wav,.ogg,.flac',
+    type: 'file', multiple: true, accept: 'audio/*,video/mp4,video/quicktime,video/x-m4v,.mp3,.m4a,.mp4,.m4v,.mov,.wav,.ogg,.flac,.aac',
     class: 'visually-hidden', 'aria-label': 'Lieder hinzufügen',
     onchange: async (ev) => {
       const files = [...(ev.target.files || [])];
@@ -429,7 +429,7 @@ function buildPauseSongs(st) {
           songUpload.name = file.name;
           const label = document.getElementById('song-progress');
           if (label) label.textContent = `Lied ${songUpload.done + 1} von ${songUpload.total}: „${file.name}“ wird hochgeladen …`;
-          const type = file.type || (/\.mp3$/i.test(file.name) ? 'audio/mpeg' : /\.m4a$/i.test(file.name) ? 'audio/mp4' : '');
+          const type = file.type || (/\.mp3$/i.test(file.name) ? 'audio/mpeg' : /\.m4a$/i.test(file.name) ? 'audio/mp4' : /\.(mp4|m4v)$/i.test(file.name) ? 'video/mp4' : /\.mov$/i.test(file.name) ? 'video/quicktime' : '');
           const blob = type && type !== file.type ? new File([file], file.name, { type }) : file;
           const m = await uploadMedia(blob, token);
           added.push({ id: m.id, type: m.type, size: m.size, name: file.name });
@@ -458,7 +458,7 @@ function buildPauseSongs(st) {
       : h('div', { class: 'row' },
         h('label', { class: 'btn small' }, input, '+ Lieder hinzufügen'),
         songs.length ? h('button', { class: 'btn small ghost', onclick: () => confirmAct('Alle eigenen Lieder dieser Pause entfernen? Dann läuft wieder der eingebaute Pausensong.', 'rundown.setSongs', { stepId: st.id, songs: [] }) }, 'Alle entfernen') : null),
-    h('p', { class: 'muted', style: { fontSize: '0.85rem', margin: '6px 0 0' } }, 'Formate: MP3, M4A, WAV, OGG, FLAC. Mehrere Dateien auf einmal möglich.'));
+    h('p', { class: 'muted', style: { fontSize: '0.85rem', margin: '6px 0 0' } }, 'Formate: MP3, M4A, MP4, MOV, WAV, OGG, FLAC (bei Videos wird nur der Ton gespielt). Mehrere Dateien auf einmal möglich.'));
 }
 
 // Bearbeiten im Show-Editor: Schritte verschieben, löschen, Pausen einfügen.
@@ -1156,10 +1156,10 @@ function buildGameEditor(kind, item) {
       : 'Änderungen gelten für künftige Shows. Spiele, die schon in einer Show sind, bleiben unverändert.'),
     running ? h('p', { class: 'notice warn' }, 'Dieses Spiel läuft gerade. Inhalte erst nach dem Beenden ändern.') : null,
     kind === 'game' ? titleColorPicker(`Farbe der Spieltitel-Folie für Spiel ${pos}`, item.color, GAME_COLORS[(pos - 1) % GAME_COLORS.length], String(pos), (color) => act('game.setColor', { gameId: item.id, color })) : null,
-    kind === 'game' ? buildGameIntro(item, pos) : null,
+    kind === 'game' ? buildGameIntro(item, pos) : buildGameIntro(item, `„${item.title}“`, (media) => act('library.setIntro', { libraryId: item.id, media })),
     item.type === 'zuweit' ? buildDatasetInfo() : null,
     h('fieldset', { disabled: running, class: 'plain' },
-      h('label', { for: `${key}-title` }, 'Name in der Show (erscheint im Spieltitel auf dem Beamer)'),
+      h('label', { for: `${key}-title` }, kind === 'game' ? 'Name des Spiels in dieser Show (erscheint im Spieltitel auf dem Beamer)' : 'Name des Spiels (wird beim Einsetzen in eine Show übernommen)'),
       h('input', { id: `${key}-title`, value: d.title, maxlength: '80', oninput: (ev) => { d.title = ev.target.value; save(); } }),
       (previewTarget = { key, type: item.type, d }, formFields(type.schema, d.content, save, rerender, key))));
 }
@@ -1256,7 +1256,7 @@ function formField(f, holder, k, save, rerender, id) {
     case 'textarea':
       return h('div', { class: 'field' }, h('label', { for: id }, f.label), h('textarea', { id, rows: String(f.rows || 2), maxlength: String(f.max), oninput: (ev) => set(ev.target.value) }, holder[k] ?? ''));
     case 'number':
-      return h('div', { class: 'field' }, h('label', { for: id }, f.label), h('input', { id, type: 'number', min: String(f.min), max: String(f.max), step: String(f.step || 1), value: holder[k] ?? '', oninput: (ev) => set(ev.target.value === '' ? null : Number(ev.target.value)) }));
+      return h('div', { class: 'field' }, h('label', { for: id }, f.label), h('input', { id, type: 'number', min: String(f.min), max: String(f.max), step: String(f.step || 1), value: holder[k] ?? '', placeholder: f.placeholder ?? '', oninput: (ev) => set(ev.target.value === '' ? null : Number(ev.target.value)) }));
     case 'select': {
       const sel = h('select', { id, onchange: (ev) => set(ev.target.value) }, f.options.map((o) => h('option', { value: o }, o)));
       sel.value = holder[k] ?? f.options[0];
@@ -1334,7 +1334,7 @@ function formField(f, holder, k, save, rerender, id) {
 // Die Datei liegt im Medienspeicher der Anwendung, im Spiel steht nur der Verweis.
 const MEDIA_ACCEPT = {
   video: 'video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.mov,.webm,.m4v',
-  audio: 'audio/*,video/mp4,.mp3,.m4a,.wav,.ogg,.mp4',
+  audio: 'audio/*,video/mp4,video/quicktime,video/x-m4v,.mp3,.m4a,.wav,.ogg,.aac,.flac,.mp4,.m4v,.mov',
   image: 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp',
 };
 const mediaUploads = new Map(); // Feld-ID -> { name, progress }

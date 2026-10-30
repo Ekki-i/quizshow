@@ -4,6 +4,7 @@
 // Ein Feld wird gewählt, die Moderation startet den Clip, alle Teams buzzern.
 
 const { fail, log, effect, teamName, bookTarget, buzzIn, currentBuzz, buzzTeamView } = require('./core');
+const { pv } = require('./scoring');
 
 const key = (c, f) => `${c}-${f}`;
 const SONG_SONG_SONG = /^Song Song Song/;
@@ -21,7 +22,7 @@ function active(st) {
 function field(game, k) {
   const [c, f] = k.split('-').map(Number);
   const cat = game.content.categories[c];
-  return { c, f, cat, field: cat.fields[f], value: f + 1, mashup: SONG_SONG_SONG.test(cat.mode) };
+  return { c, f, cat, field: cat.fields[f], value: pv(game, `field${f + 1}`), mashup: SONG_SONG_SONG.test(cat.mode) };
 }
 
 function board(game, st) {
@@ -30,7 +31,7 @@ function board(game, st) {
     mashup: SONG_SONG_SONG.test(cat.mode),
     fields: cat.fields.map((_, f) => {
       const p = st.played[key(c, f)];
-      return { value: f + 1, played: !!p, winner: p ? p.winner : null };
+      return { value: pv(game, `field${f + 1}`), played: !!p, winner: p ? p.winner : null };
     }),
   }));
 }
@@ -49,6 +50,8 @@ module.exports = {
       const r = active(st);
       if (!r.started) fail('Die Aufgabe läuft noch nicht.');
       buzzIn(db, ctx, r);
+      // Musik pausiert, sobald gebuzzert wird.
+      if (r.playback && r.playback.state === 'playing') r.playback = { state: 'paused', seq: r.playback.seq + 1, restart: false };
     },
   },
 
@@ -68,7 +71,18 @@ module.exports = {
       const r = active(st);
       if (r.resolved) fail('Dieses Feld ist bereits beendet.');
       r.started = true;
+      r.playback = { state: 'playing', seq: (r.playback?.seq || 0) + 1, restart: true };
       log(db, ctx, 'ablauf', 'Aufgabe gestartet, Buzzer frei');
+    },
+    // Clip steuern: { restart } spielt (von vorn), sonst Pause.
+    playAudio(db, ctx, game, st, p) {
+      const r = active(st);
+      if (r.resolved) fail('Dieses Feld ist bereits beendet.');
+      r.playback = { state: 'playing', seq: (r.playback?.seq || 0) + 1, restart: !!p.restart };
+    },
+    pauseAudio(db, ctx, game, st) {
+      const r = active(st);
+      r.playback = { state: 'paused', seq: (r.playback?.seq || 0) + 1, restart: false };
     },
     judge(db, ctx, game, st, p) {
       const r = active(st);
@@ -122,6 +136,9 @@ module.exports = {
       buzzOrder: r.buzzes.map((x) => ({ teamId: x.teamId, status: x.status })),
       answering: current ? current.teamId : null,
       answer: r.resolved ? info.field.answer : null,
+      key: st.current,
+      clip: info.field.clip ? { id: info.field.clip.id, type: info.field.clip.type } : null,
+      playback: r.resolved ? { state: 'stopped', seq: (r.playback?.seq || 0) + 1 } : r.playback || { state: 'stopped', seq: 0 },
       winner: st.played[st.current]?.winner || null,
     };
     return out;

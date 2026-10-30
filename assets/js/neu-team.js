@@ -5,6 +5,11 @@
 import { h, run, mediaUrl } from './client.js';
 import { hpBar } from './neu-beamer.js';
 
+// Punktwerte aus dem Editor (über den Server), sonst Standard.
+const pv = (g, k, d = 1) => (g && g.scoring && typeof g.scoring[k] === 'number' ? g.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 function stateBox(kind, sym, text) {
   return h('div', { class: `state ${kind}`, role: 'status' }, h('span', { class: 'sym', 'aria-hidden': 'true' }, sym), text);
@@ -72,7 +77,7 @@ function sortieren(g, ui) {
   const cardEl = (c, extra = '') => h('div', { class: `sort-card ${extra}` }, c.image ? img(c.image, 'sort-img') : null, c.label ? h('span', {}, c.label) : null);
   const byK = Object.fromEntries(g.cards.map((c) => [c.k, c]));
   if (g.evaluated) {
-    out.push(stateBox(g.points === 5 ? 'ok' : g.points ? '' : 'bad', '★', g.points === null ? 'Keine Abgabe' : `${pts(g.points)} – ${g.points} von 5 an der richtigen Stelle`));
+    out.push(stateBox(g.hits === 5 ? 'ok' : g.points ? '' : 'bad', '★', g.points === null ? 'Keine Abgabe' : `${pts(g.points)} – ${g.hits ?? g.points} von 5 an der richtigen Stelle`));
     out.push(h('ol', { class: 'sort-solution' }, g.solution.map((c, pos) => h('li', { class: g.order && g.order[pos] === pos ? 'ok' : 'bad' },
       h('b', {}, `${pos + 1}.`), cardEl(c), c.info ? h('small', {}, c.info) : null,
       g.order ? h('span', { class: 'mine' }, g.order[pos] === pos ? '✓' : `ihr: ${byK[g.order[pos]].label || 'Bild'}`) : null))));
@@ -170,7 +175,7 @@ function gier(g, ui) {
 const t100Draft = {};
 function top100(g, ui) {
   const out = [muted(`Runde ${g.index + 1} von ${g.count}${g.period ? ` · ${g.period}` : ''}`), question(g.category),
-    muted('Nennt einen Eintrag aus der Top-100-Liste. Rang 1–20 = 1 Punkt … Rang 81–100 = 5 Punkte – je weiter hinten, desto mehr!')];
+    muted(`Nennt einen Eintrag aus der Top-100-Liste. Rang 1–20 = ${pts(pv(g, 'group1', 1))} … Rang 81–100 = ${pts(pv(g, 'group5', 5))} – je weiter hinten, desto mehr!`)];
   if (g.evaluated) {
     out.push(g.rank ? stateBox('ok', '✓', `„${g.text}“ = Rang ${g.rank} (${g.entry}) – ${pts(g.points)}`) : stateBox('bad', '✗', `„${g.text || '–'}“ ist nicht in der Top 100 – 0 Punkte`));
     return out;
@@ -202,7 +207,7 @@ function star(g, ui) {
   });
   out.push(grid);
   if (g.resolved) {
-    out.push(g.won ? stateBox('ok', '✓', 'Ihr wart die Schnellsten mit der richtigen Antwort: +1 Punkt!')
+    out.push(g.won ? stateBox('ok', '✓', `Ihr wart die Schnellsten mit der richtigen Antwort: ${plus(pv(g, 'correct'))}!`)
       : g.pick === g.wrong ? stateBox('', '✓', 'Richtig – aber ein anderes Team war schneller.')
         : g.buzzed ? stateBox('bad', '✗', 'Leider daneben.') : stateBox('', '■', 'Rätsel aufgelöst'));
   } else if (g.buzzed) out.push(stateBox('', '🔔', `Gebuzzert als Nr. ${g.place} – eure Wahl: „${g.terms[g.pick]}“`));
@@ -250,7 +255,7 @@ function chat(g, ui) {
   const out = [muted(`Chat ${g.index + 1} von ${g.count} · ${g.shown} von 8 Nachrichten`),
     h('div', { class: 'phone-chat small' }, h('div', { class: 'pc-head' }, g.person || 'Unbekannt'),
       h('div', { class: 'pc-body' }, g.messages.map((m) => h('div', { class: `pc-msg ${m.right ? 'right' : 'left'}` }, m.text))))];
-  if (g.ownStatus === 'correct') return [...out, stateBox('ok', '✓', 'Richtig! +1 Punkt')];
+  if (g.ownStatus === 'correct') return [...out, stateBox('ok', '✓', `Richtig! ${plus(pv(g, 'correct'))}`)];
   if (g.resolved) return [...out, stateBox('', '■', g.person ? `Gesucht war: ${g.person}` : 'Chat beendet')];
   if (g.locked) return [...out, stateBox('bad', '✗', 'Falsch – für diesen Chat gesperrt')];
   if (g.answering) return [...out, stateBox('', '🎤', 'Ihr seid dran – antwortet laut!')];
@@ -281,7 +286,7 @@ function hostdu(g, ui) {
   }, h('b', {}, o.letter), h('span', {}, o.text), o.own ? h('small', {}, 'eure Antwort – nicht wählbar') : null))));
   if (revealed) {
     const r = g.result || { regular: 0, deceive: 0 };
-    out.push(stateBox(r.regular + r.deceive ? 'ok' : '', '★', `${g.voted === g.correct ? 'Richtig gewählt: +1' : 'Nicht die richtige Antwort'} · Getäuscht: +${r.deceive} · zusammen ${pts(r.regular + r.deceive)}`));
+    out.push(stateBox(r.regular + r.deceive ? 'ok' : '', '★', `${g.voted === g.correct ? `Richtig gewählt: ${plus(r.regular)}` : 'Nicht die richtige Antwort'} · Getäuscht: +${r.deceive} · zusammen ${pts(r.regular + r.deceive)}`));
   } else if (g.voted) out.push(stateBox('', '🔒', `Gewählt: ${g.voted} – gesperrt`));
   else out.push(muted('Wählt die Antwort, die ihr für richtig haltet. Eure eigene ist gesperrt.'));
   return out;

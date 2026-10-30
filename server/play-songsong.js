@@ -6,6 +6,7 @@
 // Buzzer-Reihenfolge: das erste Team mit beiden Titeln richtig bekommt 1 Punkt.
 
 const { fail, log, effect, teamName, bookTarget, cleanInk } = require('./core');
+const { pv } = require('./scoring');
 
 function round(st, i) {
   if (!st.rounds[i]) st.rounds[i] = { started: false, playback: { state: 'stopped', seq: 0 }, subs: [], grades: {}, winner: null, done: false };
@@ -77,7 +78,7 @@ module.exports = {
         r.winner = s.teamId;
         r.done = true;
         r.playback = { state: 'stopped', seq: r.playback.seq + 1 };
-        bookTarget(db, ctx, `songsong:${game.id}:${st.index}`, s.teamId, 1, `${game.title}, Rätsel ${st.index + 1}`);
+        bookTarget(db, ctx, `songsong:${game.id}:${st.index}`, s.teamId, pv(game, 'correct'), `${game.title}, Rätsel ${st.index + 1}`);
         log(db, ctx, 'bewertung', `${teamName(db, s.teamId)}: beide Titel richtig`);
         effect(db, 'correct');
       } else {

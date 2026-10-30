@@ -7,6 +7,7 @@
 // gewählte Team.
 
 const { fail, log, effect, teamName, teamIds, bookTarget } = require('./core');
+const { pv } = require('./scoring');
 
 const ANSWER_MS = 10000;
 
@@ -35,9 +36,9 @@ function book(db, ctx, game, st, r, correct) {
   r.result = correct ? 'right' : 'wrong';
   const winner = correct ? r.target : r.buzz.teamId;
   const loser = correct ? r.buzz.teamId : r.target;
-  bookTarget(db, ctx, `weissnicht:${game.id}:${st.index}:${winner}`, winner, 1, `${game.title}, Runde ${st.index + 1}`);
+  bookTarget(db, ctx, `weissnicht:${game.id}:${st.index}:${winner}`, winner, pv(game, 'winner'), `${game.title}, Runde ${st.index + 1}`);
   bookTarget(db, ctx, `weissnicht:${game.id}:${st.index}:${loser}`, loser, 0, `${game.title}, Runde ${st.index + 1}`);
-  log(db, ctx, 'bewertung', `${teamName(db, r.target)} ${correct ? 'wusste es' : 'wusste es nicht'} – +1 für ${teamName(db, winner)}`);
+  log(db, ctx, 'bewertung', `${teamName(db, r.target)} ${correct ? 'wusste es' : 'wusste es nicht'} – +${pv(game, 'winner')} für ${teamName(db, winner)}`);
 }
 
 module.exports = {

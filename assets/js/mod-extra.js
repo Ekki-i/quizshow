@@ -6,6 +6,11 @@ import { h } from './client.js';
 import { answerContent } from './ink.js';
 import { MOD_NEU } from './neu-mod.js';
 
+// Punktwerte aus dem Editor, sonst Standard.
+const pvc = (g, k, d = 1) => (g && g.content && g.content.scoring && typeof g.content.scoring[k] === 'number' ? g.content.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 const badge = (kind, text) => h('span', { class: `badge ${kind}` }, text);
@@ -80,7 +85,7 @@ function filmab(ui, g, st) {
   out.push(h('ol', { class: 'list' }, r.buzzes.length ? r.buzzes.map((b) => h('li', { class: b === pending ? 'active' : '' }, ui.dot(ui.teamColor(b.teamId)), h('span', { class: 'grow' }, h('b', {}, ui.teamName(b.teamId))),
     b.status === 'correct' ? badge('ok', '✓ richtig') : b.status === 'wrong' ? badge('bad', '✗ falsch') : null,
     b === pending ? gradeBtns(ui, (c) => ui.act('play.judge', { correct: c })) : null)) : h('li', { class: 'muted' }, 'Noch kein Buzzer.')));
-  if (r.resolved) out.push(row(badge('ok', r.winner ? `${ui.teamName(r.winner)} +1` : 'Kein Punkt'), badge('', 'Film beendet')));
+  if (r.resolved) out.push(row(badge('ok', r.winner ? `${ui.teamName(r.winner)} ${plus(pvc(g, 'correct'))}` : 'Kein Punkt'), badge('', 'Film beendet')));
   return out;
 }
 
@@ -97,7 +102,7 @@ function weissnicht(ui, g, st) {
   else out.push(h('p', {}, '🔔 ', h('b', {}, ui.teamName(r.buzz.teamId)), ' war am schnellsten', r.target ? [' und wählt ', h('b', {}, ui.teamName(r.target)), r.deadline && !r.result ? [' · ', h('b', { 'data-deadline': r.deadline }, '')] : ''] : ' – wählt gerade …'));
   if (r.buzz && !r.target) out.push(row(h('span', { class: 'muted' }, 'Für das Team wählen:'), ui.S.project.teams.filter((t) => t.id !== r.buzz.teamId).map((t) => btn('small ghost', t.name, () => ui.act('play.pick', { teamId: t.id })))));
   if (r.target && !r.result) out.push(row(h('span', {}, `Antwort von ${ui.teamName(r.target)}:`), ...gradeBtns(ui, (c) => ui.act('play.judge', { correct: c }))));
-  if (r.result) out.push(row(badge('ok', r.result === 'right' ? `${ui.teamName(r.target)} wusste es: +1` : `${ui.teamName(r.buzz.teamId)} lag richtig: +1`),
+  if (r.result) out.push(row(badge('ok', r.result === 'right' ? `${ui.teamName(r.target)} wusste es: ${plus(pvc(g, 'winner'))}` : `${ui.teamName(r.buzz.teamId)} lag richtig: ${plus(pvc(g, 'winner'))}`),
     btn('small ghost', 'Bewertung umdrehen', () => ui.confirmAct('Bewertung umdrehen?', 'play.regrade', { correct: r.result !== 'right' }))));
   if (!r.closed) out.push(row(btn('ghost', 'Frage beenden', () => ui.act('play.close'), !!r.target && !r.result)));
   return out;
@@ -125,7 +130,7 @@ function weissnicht2(ui, g, st) {
   })));
   if (!r.evaluated) out.push(row(
     !allIn ? btn('ghost', 'Abgabe schließen (fehlende Teams auslassen)', () => ui.confirmAct('Abgabe schließen? Teams ohne Antwort werden ausgelassen.', 'play.closeSubmissions')) : null,
-    btn('pink', 'Auswerten', () => ui.confirmAct('Runde auswerten? Buzzer-Team: alles oder nichts (bei einer falschen Einschätzung auch kein Punkt für die eigene Antwort). Alle anderen richtigen Teams +1.', 'play.evaluate'))));
+    btn('pink', 'Auswerten', () => ui.confirmAct(`Runde auswerten? Buzzer-Team: alles oder nichts (bei einer falschen Einschätzung auch kein Punkt für die eigene Antwort). Alle anderen richtigen Teams ${plus(pvc(g, 'other'))}.`, 'play.evaluate'))));
   else out.push(row(badge('ok', 'Ausgewertet')));
   return out;
 }
@@ -173,7 +178,7 @@ function songsong(ui, g, st) {
     r.grades[s.teamId] === true ? badge('ok', '✓ beide richtig') : r.grades[s.teamId] === false ? badge('bad', '✗') : null,
     s === next && !r.done ? [btn('small ok', '✓ Beide richtig', () => ui.act('play.judge', { correct: true })), btn('small bad', '✗ Nicht beide', () => ui.act('play.judge', { correct: false }))] : null))
     : h('li', { class: 'muted' }, 'Noch keine Abgabe.')));
-  if (r.done) out.push(row(badge('ok', r.winner ? `${ui.teamName(r.winner)} +1` : 'Kein Punkt')));
+  if (r.done) out.push(row(badge('ok', r.winner ? `${ui.teamName(r.winner)} ${plus(pvc(g, 'correct'))}` : 'Kein Punkt')));
   return out;
 }
 
@@ -253,12 +258,12 @@ function fragen(ui, g, st) {
     const a = r.answers[t.id];
     return teamLi(ui, t.id, a ? [': ', answerContent(a, 'mod')] : h('span', { class: 'muted' }, ' – keine Antwort'),
       a && !r.evaluated ? gradeBtns(ui, (ok) => ui.act('play.grade', { teamId: t.id, correct: ok }), r.grades[t.id]) : null,
-      r.evaluated && a ? badge(r.grades[t.id] ? 'ok' : 'bad', r.grades[t.id] ? '+1' : '0') : null);
+      r.evaluated && a ? badge(r.grades[t.id] ? 'ok' : 'bad', r.grades[t.id] ? plus(pvc(g, 'correct')) : '0') : null);
   })));
   out.push(row(
     btn(`small ${r.showAnswers ? 'cyan' : 'ghost'}`, r.showAnswers ? 'Antworten auf Beamer ✓' : 'Antworten auf Beamer', () => ui.act('play.show', { what: 'answers', on: !r.showAnswers })),
     btn(`small ${r.showSolution ? 'cyan' : 'ghost'}`, r.showSolution ? 'Lösung auf Beamer ✓' : 'Lösung auf Beamer', () => ui.act('play.show', { what: 'solution', on: !r.showSolution })),
-    r.evaluated ? badge('ok', 'Ausgewertet') : btn('pink', 'Auswerten', () => ui.confirmAct('Auswerten? Richtig: +1 je Team und −1 für das fragende Team; niemand richtig: +2 für das fragende Team.', 'play.evaluate'))));
+    r.evaluated ? badge('ok', 'Ausgewertet') : btn('pink', 'Auswerten', () => ui.confirmAct(`Auswerten? Richtig: ${plus(pvc(g, 'correct'))} je Team und ${plus(pvc(g, 'askerSomeone', -1))} für das fragende Team; niemand richtig: ${plus(pvc(g, 'askerNobody', 2))} für das fragende Team.`, 'play.evaluate'))));
   return out;
 }
 
@@ -268,7 +273,7 @@ function zuweit(ui, g, st) {
   const r = (st.rounds || {})[i];
   const ds = ui.S.datasets || [];
   const out = [tabs(g.content.rounds.map((_, k) => `Runde ${k + 1}`), i, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.evaluated && !st.rounds?.[k]?.tie)];
-  if (i < 0 || !r) return [...out, muted('Runde öffnen: Teams wählen zwei Einträge über ein Suchfeld. Bestes Ergebnis +2, schlechtestes −1.')];
+  if (i < 0 || !r) return [...out, muted(`Runde öffnen: Teams wählen zwei Einträge über ein Suchfeld. Bestes Ergebnis ${plus(pvc(g, 'best', 2))}, schlechtestes ${plus(pvc(g, 'worst', -1))}.`)];
   const rd = g.content.rounds[i];
   const meta = ds.find((d) => d.name === rd.dataset);
   out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, rd.task), h('p', {}, `${rd.dataset} · ${rd.mode} gewinnt`,
@@ -279,7 +284,7 @@ function zuweit(ui, g, st) {
     const res = r.results && !r.tie ? r.results.rows.find((x) => x.teamId === t.id) : r.results ? r.results.rows.find((x) => x.teamId === t.id) : null;
     return teamLi(ui, t.id, p ? `: ${p.a} & ${p.b}` : h('span', { class: 'muted' }, ' – noch nicht abgegeben'),
       res ? badge(res.valid ? '' : 'bad', res.valid ? `Δ ${String(res.diff).replace('.', ',')}` : 'ungültig') : null,
-      r.best?.includes(t.id) ? badge('ok', '+2') : null, r.worst?.includes(t.id) ? badge('bad', '−1') : null);
+      r.best?.includes(t.id) ? badge('ok', plus(pvc(g, 'best', 2))) : null, r.worst?.includes(t.id) ? badge('bad', plus(pvc(g, 'worst', -1))) : null);
   })));
   if (r.tie) {
     const sel = { best: [], worst: [] };

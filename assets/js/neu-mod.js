@@ -3,6 +3,11 @@
 
 import { h } from './client.js';
 
+// Punktwerte aus dem Editor, sonst Standard.
+const pvc = (g, k, d = 1) => (g && g.content && g.content.scoring && typeof g.content.scoring[k] === 'number' ? g.content.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 const badge = (kind, text) => h('span', { class: `badge ${kind}` }, text);
 const row = (...c) => h('div', { class: 'row', style: { marginTop: '12px' } }, ...c);
@@ -64,7 +69,7 @@ function gier(ui, g, st) {
   } else {
     out.push(h('ul', { class: 'list' }, r.results.map((x) => teamLi(ui, x.teamId, ` – ${fmtNum(x.value)} (−${fmtNum(x.diff)}) · ${fmtNum(x.before)} → ${fmtNum(x.after)}`, x.out ? badge('bad', 'raus') : null))));
   }
-  out.push(row(st.awarded ? badge('ok', 'Spiel entschieden – Showpunkte 10/6/4/3/2/1 automatisch vergeben')
+  out.push(row(st.awarded ? badge('ok', `Spiel entschieden – Showpunkte ${[1, 2, 3, 4, 5, 6].map((n) => pvc(g, `place${n}`, [10, 6, 4, 3, 2, 1][n - 1])).join('/')} automatisch vergeben`)
     : badge('', 'Showpunkte werden automatisch vergeben: wer ausscheidet, sofort – das letzte Team am Ende')));
   return out;
 }
@@ -74,7 +79,7 @@ function parseList(text) {
   return String(text || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 100)
     .map((l, i) => { const name = l.replace(/^\d{1,3}\s*[.):-]\s*/, ''); return { rank: i + 1, name: name.split('/')[0].trim() }; });
 }
-const t100Points = (rank) => (rank >= 1 && rank <= 100 ? Math.ceil(rank / 20) : 0);
+const t100Points = (rank, g) => (rank >= 1 && rank <= 100 ? pvc(g, `group${Math.ceil(rank / 20)}`, Math.ceil(rank / 20)) : 0);
 function top100(ui, g, st) {
   const i = st.index ?? -1;
   const r = (st.rounds || {})[i];
@@ -94,7 +99,7 @@ function top100(ui, g, st) {
     if (!a) return teamLi(ui, id, h('span', { class: 'muted' }, ' – noch keine Abgabe'));
     const sug = a.status === 'pending' && a.suggest ? list[a.suggest - 1] : null;
     return teamLi(ui, id, [' – „', h('b', {}, a.text), '“ '],
-      a.status === 'pending' ? badge('warn', sug ? `unsicher: ${sug.rank}. ${sug.name}?` : 'unsicher') : a.rank ? badge('ok', `Rang ${a.rank} · ${pts(t100Points(a.rank))}`) : badge('bad', 'nicht gefunden · 0'),
+      a.status === 'pending' ? badge('warn', sug ? `unsicher: ${sug.rank}. ${sug.name}?` : 'unsicher') : a.rank ? badge('ok', `Rang ${a.rank} · ${pts(t100Points(a.rank, g))}`) : badge('bad', 'nicht gefunden · 0'),
       a.status === 'manual' ? badge('', 'manuell') : null,
       sug ? btn('small ok', '✓ Vorschlag übernehmen', () => ui.act('play.setRank', { teamId: id, rank: sug.rank })) : null,
       sug ? btn('small ghost', '✗ kein Treffer', () => ui.act('play.setRank', { teamId: id, rank: null })) : null,
@@ -113,14 +118,14 @@ function star(ui, g, st) {
   const i = st.index ?? -1;
   const r = (st.rounds || {})[i];
   const out = [tabs(g.content.puzzles.map((p, k) => p.center ? p.center.slice(0, 20) : `Rätsel ${k + 1}`), i, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.resolved)];
-  if (i < 0 || !r) return [...out, muted('Rätsel öffnen: Teams wählen den falschen Begriff und buzzern. Schnellstes Team mit richtiger Wahl +1.')];
+  if (i < 0 || !r) return [...out, muted(`Rätsel öffnen: Teams wählen den falschen Begriff und buzzern. Schnellstes Team mit richtiger Wahl ${plus(pvc(g, 'correct'))}.`)];
   const pz = g.content.puzzles[i];
   const w = Number(String(pz.wrong).replace(/\D/g, '')) - 1;
   out.push(h('p', {}, h('b', {}, pz.center), ' · falsch ist: ', h('b', {}, pz.terms[w] || '–')));
   const ordered = r.buzzes.slice().sort((a, b) => a.at - b.at);
   out.push(ordered.length ? h('ol', { class: 'list' }, ordered.map((b) => h('li', {}, ui.dot(ui.teamColor(b.teamId)), h('span', { class: 'grow' }, h('b', {}, ui.teamName(b.teamId)), ` – „${pz.terms[b.pick]}“`), badge(b.pick === w ? 'ok' : 'bad', b.pick === w ? 'richtig' : 'falsch'))))
     : muted('Noch kein Buzzer.'));
-  out.push(row(r.resolved ? badge('ok', r.winner ? `${ui.teamName(r.winner)} +1` : 'Kein Team richtig') : btn('pink', 'Auflösen (in Buzzer-Reihenfolge prüfen)', () => ui.act('play.resolve'))));
+  out.push(row(r.resolved ? badge('ok', r.winner ? `${ui.teamName(r.winner)} ${plus(pvc(g, 'correct'))}` : 'Kein Team richtig') : btn('pink', 'Auflösen (in Buzzer-Reihenfolge prüfen)', () => ui.act('play.resolve'))));
   return out;
 }
 
@@ -129,7 +134,7 @@ function timeline(ui, g, st) {
   const i = st.index ?? -1;
   const r = (st.rounds || {})[i];
   const out = [tabs(g.content.rounds.map((rd, k) => rd.category ? rd.category.slice(0, 24) : `Durchgang ${k + 1}`), i, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.done)];
-  if (i < 0 || !r) return [...out, muted('Durchgang starten: Startteam wird ausgelost, dann reihum. Richtig +1, falsch = Durchgangspunkte weg und raus, Aussteigen behält die Punkte.')];
+  if (i < 0 || !r) return [...out, muted(`Durchgang starten: Startteam wird ausgelost, dann reihum. Richtig ${plus(pvc(g, 'correct'))}, falsch = Durchgangspunkte weg und raus, Aussteigen behält die Punkte.`)];
   const rd = g.content.rounds[i];
   out.push(h('p', {}, h('b', {}, rd.category), ` · Startteam (ausgelost): ${ui.teamName(r.startTeam)}`));
   out.push(h('ul', { class: 'list' }, r.order.map((id) => teamLi(ui, id, ` – ${pts(r.teams[id].points)}`,
@@ -157,7 +162,7 @@ function chat(ui, g, st) {
     cur ? btn('ok', `✓ ${ui.teamName(cur.teamId)} richtig`, () => ui.act('play.judge', { correct: true })) : null,
     cur ? btn('bad', '✗ falsch', () => ui.act('play.judge', { correct: false })) : null,
     !cur ? btn('ghost', 'Chat ohne Punkte beenden', () => ui.confirmAct('Chat ohne Punkte beenden und auflösen?', 'play.close')) : null));
-  else out.push(row(badge('ok', r.winner ? `${ui.teamName(r.winner)} +1` : 'Aufgelöst')));
+  else out.push(row(badge('ok', r.winner ? `${ui.teamName(r.winner)} ${plus(pvc(g, 'correct'))}` : 'Aufgelöst')));
   return out;
 }
 

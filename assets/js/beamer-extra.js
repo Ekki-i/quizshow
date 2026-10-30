@@ -7,6 +7,11 @@ import { pooled, playWithSound } from './media-pool.js';
 import { h, mediaUrl } from './client.js';
 import { BEAMER_NEU } from './neu-beamer.js';
 
+// Punktwerte aus dem Editor (über den Server), sonst Standard.
+const pv = (g, k, d = 1) => (g && g.scoring && typeof g.scoring[k] === 'number' ? g.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const ABCD = ['A', 'B', 'C', 'D'];
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 const sub = (text, style = {}) => h('div', { class: 'sub', style: { marginTop: 0, ...style } }, text);
@@ -124,7 +129,8 @@ export function syncMedia(s) {
   }
   const song = v && v.type === 'songsong' && !v.waiting ? v : null;
   const kon = v && v.type === 'konsequenz' && !v.waiting ? v : null;
-  const au = media.audio || (song || kon ? audioEl() : null);
+  const mus = v && v.type === 'musik' && v.current && v.current.clip ? v.current : null;
+  const au = media.audio || (song || kon || mus ? audioEl() : null);
   if (!au) return;
   au.muted = !env.soundOn();
   if (!kon) konStop();
@@ -181,6 +187,17 @@ export function syncMedia(s) {
       last.stageTimer = setTimeout(() => au.pause(), len * 1000 + 4000);
       (au.muted ? au.play().catch(() => {}) : playWithSound(au));
     });
+  } else if (mus) {
+    // Musikquiz (Jeopardy): Clip startet mit „Aufgabe starten“, pausiert beim Buzzern.
+    konStop();
+    setSrc(au, mus.clip.id, 'audioId').then(() => {
+      const k = `m${mus.key}:${mus.playback.seq}`;
+      if (last.audioSeq === k) return;
+      last.audioSeq = k;
+      const pb = mus.playback;
+      if (pb.state === 'playing') { if (pb.restart) au.currentTime = 0; (au.muted ? au.play().catch(() => {}) : playWithSound(au)); }
+      else { au.pause(); if (pb.state === 'stopped') au.currentTime = 0; }
+    });
   } else if (!au.paused) {
     konStop();
     clearTimeout(last.stageTimer);
@@ -209,7 +226,7 @@ function dumm3(v, teamOf) {
 function filmab(v, teamOf) {
   if (v.waiting) return waitTitle('🎬 Film ab – Buzzer an!', 'Wer den Film erkennt, buzzert!');
   if (v.resolved) {
-    return [banner(`🎬 ${v.title}`), v.winner ? h('div', { class: 'solution' }, `${teamOf(v.winner).name} +1`) : h('div', { class: 'solution' }, 'Niemand hat es erraten'),
+    return [banner(`🎬 ${v.title}`), v.winner ? h('div', { class: 'solution' }, `${teamOf(v.winner).name} ${plus(pv(v, 'correct'))}`) : h('div', { class: 'solution' }, 'Niemand hat es erraten'),
       buzzOrder(v, teamOf)];
   }
   if (!v.clip) return waitTitle('🎬', 'Kein Filmausschnitt hinterlegt');
@@ -237,7 +254,7 @@ function weissnicht(v, teamOf) {
   const foot = [];
   if (v.result) {
     const winner = v.result === 'right' ? v.target : v.buzzer;
-    foot.push(h('div', { class: 'solution' }, `${v.solution ? `${v.solution} – ` : ''}+1 für ${teamOf(winner).name}`));
+    foot.push(h('div', { class: 'solution' }, `${v.solution ? `${v.solution} – ` : ''}${plus(pv(v, 'winner'))} für ${teamOf(winner).name}`));
   } else if (v.target) {
     foot.push(chip(teamOf(v.buzzer), '', ' wählt '), chip(teamOf(v.target), 'answering', ' antwortet'), h('span', { class: 'big-count' }, countdown(v.deadline)));
   } else if (v.buzzer) {
@@ -270,7 +287,7 @@ function weissnicht2(v, teamOf) {
     const own = (a) => (a.correct ? 1 : 0);
     let groups;
     if (!buzzer) {
-      groups = [group('rest', 'Alle Antworten', 'kein Buzzer – jede richtige Antwort +1', v.answers.map((a) => card(a, null, own(a))))];
+      groups = [group('rest', 'Alle Antworten', `kein Buzzer – jede richtige Antwort ${plus(pv(v, 'other'))}`, v.answers.map((a) => card(a, null, own(a))))];
     } else {
       const b = v.answers.find((a) => a.teamId === buzzer);
       const rated = v.answers.filter((a) => a.teamId !== buzzer && a.guess !== null);
@@ -325,7 +342,7 @@ function songsong(v, teamOf) {
   if (v.waiting) return waitTitle('Song Song Song', 'Melodie des einen, Text des anderen Songs – schreibt beide Titel!');
   const playing = v.playback.state === 'playing' && !v.done;
   const out = [h('div', { class: `vinyl${playing ? ' spin' : ''}`, 'aria-hidden': 'true' }, h('div', { class: 'vinyl-label' }, '♪'))];
-  if (v.done) out.push(h('div', { class: 'solution' }, v.solution.filter(Boolean).join('  +  ') || 'Aufgelöst'), v.winner ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1vh' } }, chip(teamOf(v.winner), '', ' +1')) : null);
+  if (v.done) out.push(h('div', { class: 'solution' }, v.solution.filter(Boolean).join('  +  ') || 'Aufgelöst'), v.winner ? h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1vh' } }, chip(teamOf(v.winner), '', ` ${plus(pv(v, 'correct'))}`)) : null);
   else if (!v.started) out.push(sub('Gleich läuft das Mash-up …', { marginTop: '2vh' }));
   if (v.order.length) {
     out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '2vh' } }, v.order.map((o, i) => chip(teamOf(o.teamId), o.grade === false ? 'wrong' : '', h('b', {}, ` ${i + 1}.`), o.grade === true ? ' ✓' : o.grade === false ? ' ✗' : ''))));
@@ -419,7 +436,7 @@ function fragen(v, teamOf) {
   })));
   // Erst die Antworten der anderen Teams, danach die Antwort des fragenden Teams.
   if (v.solution) out.push(h('div', { class: 'fragen-sol', style: { animationDelay: `${0.4 + v.answers.length * 0.35}s` } }, h('span', {}, `Antwort von ${teamOf(v.asker).name}`), h('img', { class: 'ink-board small', src: v.solution, alt: 'Lösung' })));
-  if (v.evaluated && v.result) out.push(h('div', { class: 'solution' }, v.result.right.length ? `${v.result.right.map((id) => teamOf(id).name).join(', ')} +1 · ${teamOf(v.asker).name} −1` : `Niemand wusste es: ${teamOf(v.asker).name} +2`));
+  if (v.evaluated && v.result) out.push(h('div', { class: 'solution' }, v.result.right.length ? `${v.result.right.map((id) => teamOf(id).name).join(', ')} ${plus(pv(v, 'correct'))} · ${teamOf(v.asker).name} ${plus(pv(v, 'askerSomeone', -1))}` : `Niemand wusste es: ${teamOf(v.asker).name} ${plus(pv(v, 'askerNobody', 2))}`));
   return out;
 }
 
@@ -437,7 +454,7 @@ function zuweit(v, teamOf) {
       return h('li', { '--team': t.color, style: { animationDelay: `${(v.rows.length - 1 - i) * 0.35}s` } },
         h('span', { class: 'pos' }, String(i + 1)),
         h('span', { class: 'nm' }, h('b', {}, t.name), h('small', {}, `${r.a}${v.kind === 'geo' ? '' : val(r.va)} & ${r.b}${v.kind === 'geo' ? '' : val(r.vb)}`)),
-        h('span', { class: 'pts' }, r.valid ? `${fmt(r.diff)} ${unit === 'Platz' ? 'Plätze' : unit}` : 'ungültig', r.best ? h('em', { class: 'plus' }, ' +2') : r.worst ? h('em', { class: 'minus' }, ' −1') : null));
+        h('span', { class: 'pts' }, r.valid ? `${fmt(r.diff)} ${unit === 'Platz' ? 'Plätze' : unit}` : 'ungültig', r.best ? h('em', { class: 'plus' }, ` ${plus(pv(v, 'best', 2))}`) : r.worst ? h('em', { class: 'minus' }, ` ${plus(pv(v, 'worst', -1))}`) : null));
     })));
     out.push(h('div', { class: 'source-line' }, `Quelle: ${v.source} · Datenstand ${v.asOfData}${v.asOf && v.kind === 'birth' ? ` · Alter am ${v.asOf.split('-').reverse().join('.')}` : ''} · ${v.method}`));
   }

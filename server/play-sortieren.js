@@ -9,6 +9,7 @@
 // abgegeben haben oder die Moderation die Runde schließt.
 
 const { fail, log, effect, teamName, teamIds, bookTarget } = require('./core');
+const { pv } = require('./scoring');
 const { shuffled } = require('./match');
 
 const N = 5;
@@ -28,7 +29,7 @@ const card = (task, k) => {
   return { k, label: it.label || '', image: it.image ? { id: it.image.id, type: it.image.type } : null };
 };
 const allIn = (db, r) => teamIds(db).every((id) => r.answers[id]);
-const score = (order) => order.reduce((s, k, pos) => s + (k === pos ? 1 : 0), 0);
+const score = (order, game = null) => order.reduce((s, k, pos) => s + (k === pos ? (game ? pv(game, 'position') : 1) : 0), 0);
 
 module.exports = {
   init: () => ({ index: -1, rounds: {} }),
@@ -72,7 +73,7 @@ module.exports = {
       r.closed = true;
       r.evaluated = true;
       for (const [teamId, a] of Object.entries(r.answers)) {
-        bookTarget(db, ctx, `sortieren:${game.id}:${st.index}:${teamId}`, teamId, score(a.order), `${game.title}, Aufgabe ${st.index + 1}`);
+        bookTarget(db, ctx, `sortieren:${game.id}:${st.index}:${teamId}`, teamId, score(a.order, game), `${game.title}, Aufgabe ${st.index + 1}`);
       }
       log(db, ctx, 'ablauf', `Sortieren: Aufgabe ${st.index + 1} aufgelöst`);
       effect(db, 'reveal');
@@ -93,7 +94,8 @@ module.exports = {
       submitted: !!own,
       order: own ? own.order : null,
       evaluated: r.evaluated,
-      points: r.evaluated && own ? score(own.order) : null,
+      points: r.evaluated && own ? score(own.order, game) : null,
+      hits: r.evaluated && own ? score(own.order) : null,
       solution: r.evaluated ? task.items.map((it, k) => ({ ...card(task, k), info: it.info || '' })) : null,
     };
   },
@@ -110,7 +112,7 @@ module.exports = {
       teamCount: db.project.teams.length,
       evaluated: r.evaluated,
       solution: r.evaluated ? task.items.map((it, k) => ({ ...card(task, k), info: it.info || '' })) : null,
-      results: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, order: a.order, points: score(a.order) })) : [],
+      results: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, order: a.order, points: score(a.order, game) })) : [],
     };
   },
 };

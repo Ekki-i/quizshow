@@ -6,6 +6,7 @@
 // gesperrt, der Clip läuft noch einmal von vorn und die übrigen dürfen erneut buzzern.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, buzzIn, currentBuzz, buzzTeamView } = require('./core');
+const { pv } = require('./scoring');
 
 function round(st, i) {
   if (!st.rounds[i]) st.rounds[i] = { started: false, playback: { state: 'stopped', seq: 0, restart: true }, buzzes: [], locked: [], resolved: false, winner: null };
@@ -74,7 +75,7 @@ module.exports = {
         r.resolved = true;
         r.winner = b.teamId;
         setPlayback(r, 'stopped');
-        bookTarget(db, ctx, `filmab:${game.id}:${st.index}`, b.teamId, 1, `${game.title}, Film ${st.index + 1}`);
+        bookTarget(db, ctx, `filmab:${game.id}:${st.index}`, b.teamId, pv(game, 'correct'), `${game.title}, Film ${st.index + 1}`);
         log(db, ctx, 'bewertung', `${teamName(db, b.teamId)}: „${film.title}“ richtig`);
         effect(db, 'correct');
       } else {
