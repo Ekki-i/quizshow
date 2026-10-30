@@ -38,7 +38,7 @@ const WHEEL = [
   { n: 19, key: 'wette', good: true, icon: '🎯', name: 'Wette', text: 'Ihr setzt 1 bis 3 Spielpunkte. Richtig: Ihr bekommt den Einsatz doppelt dazu. Falsch: Der Einsatz ist weg.' },
   { n: 20, key: 'sauger', good: true, icon: '🧲', name: 'Punktesauger', text: 'Liegt ihr richtig, bekommt ihr zusätzlich 1 Punkt für jedes Team, das falsch liegt.' },
   { n: 21, key: 'vorfahrt', good: true, icon: '🎡', name: 'Vorfahrt', text: 'Liegt ihr bei dieser Frage richtig, dreht ihr das Glücksrad – ohne Buzzer-Rennen.' },
-  { n: 22, key: 'schild', good: true, icon: '🛡️', name: 'Schutzschild', text: 'Schützt euch einmal vor Punkteräuber, Joker-Dieb oder Team-Blockade. Wirkt von selbst aus dem Vorrat.' },
+  { n: 22, key: 'schild', good: true, icon: '🛡️', name: 'Schutzschild', text: 'Schützt euch einmal vor einem negativen Joker – auch vor Punkteräuber, Joker-Dieb oder Team-Blockade eines anderen Teams. Wirkt von selbst aus dem Vorrat.' },
   { n: 23, key: 'umleitung', good: true, icon: '↪️', name: 'Umleitung', text: 'Das nächste fiese Feld, das ihr erdreht, schickt ihr an ein Team eurer Wahl weiter. Wirkt von selbst aus dem Vorrat.' },
   { n: 24, key: 'halbiert', good: false, icon: '✂️', name: 'Halbiert', text: 'Eure Spielpunkte werden halbiert (abgerundet).' },
   { n: 25, key: 'platztausch', good: false, icon: '🔄', name: 'Platztausch', text: 'Ihr tauscht eure Spielpunkte mit dem Team, das die wenigsten hat.' },

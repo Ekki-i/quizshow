@@ -476,6 +476,23 @@ test('Brain or Dreh’n: Schutzschild und Umleitung wirken von selbst', () => {
   assert.equal(st.t[B].points, 5);
   assert.equal(st.t[A].points, 0);
   assert.equal(st.t[B].jokers.length, 0);
+  // Schutzschild wehrt auch ein erdrehtes fieses Feld ab.
+  g.content.bad.slots[0] = { joker: 'reset' };
+  give(C, 'schild');
+  st.t[C].points = 6;
+  toWheel(C);
+  spinAs(C, 1);
+  assert.equal(st.t[C].points, 6);
+  assert.match(st.r.spin.text, /wehrt/);
+  assert.equal(st.t[C].jokers.length, 0);
+  // Umleitung auf ein Team mit Schutzschild: abgewehrt.
+  give(B, 'schild');
+  give(A, 'umleitung');
+  toWheel(A);
+  spinAs(A, 1);
+  act(db, team(A), 'redirect', { target: B });
+  assert.equal(st.t[B].points, 5);
+  assert.match(st.r.spin.text, /wehrt/);
   // Umleitung: fieses Feld (Reset) trifft ein Team nach Wahl.
   g.content.bad.slots[0] = { joker: 'reset' };
   st.t[A].points = 4;

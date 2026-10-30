@@ -250,6 +250,18 @@ function applyNegative(db, ctx, game, st, teamId, f) {
   return res;
 }
 
+// Fieses Feld trifft ein Team – außer es hat einen Schutzschild im Vorrat (der ist dann verbraucht).
+function hitNegative(db, ctx, game, st, teamId, f) {
+  const t = teamState(st, teamId);
+  const k = t.jokers.findIndex((j) => j.key === 'schild');
+  if (k >= 0) {
+    t.jokers.splice(k, 1);
+    return { res: { key: f.key, shielded: true }, text: `${teamName(db, teamId)} wehrt „${f.name}“ mit „${fieldByKey(game, 'schild').name}“ ab` };
+  }
+  const res = applyNegative(db, ctx, game, st, teamId, f);
+  return { res, text: negText(db, teamId, f, res) };
+}
+
 const pkt = (n) => `${n} ${n === 1 ? 'Punkt' : 'Punkte'}`;
 function negText(db, teamId, f, res) {
   const n = teamName(db, teamId);
@@ -278,12 +290,12 @@ function doRedirect(db, ctx, game, st, target) {
   if (!r.redirect || !r.redirect.pending) fail('Gerade gibt es nichts umzuleiten.');
   if (!teamIds(db).includes(target) || target === r.redirect.from) fail('Bitte ein anderes Team wählen.');
   const f = fieldByKey(game, r.redirect.key);
-  const res = applyNegative(db, ctx, game, st, target, f);
+  const { res, text } = hitNegative(db, ctx, game, st, target, f);
   r.redirect.pending = false;
   r.redirect.to = target;
   r.spin.res = res;
   r.spin.target = target;
-  r.spin.text = `${teamName(db, r.redirect.from)} leitet „${f.name}“ um: ${negText(db, target, f, res)}`;
+  r.spin.text = `${teamName(db, r.redirect.from)} leitet „${f.name}“ um: ${text}`;
   note(st, r.spin.text);
   log(db, ctx, 'joker', r.spin.text);
   effect(db, 'reveal');
@@ -401,7 +413,7 @@ module.exports = {
         note(st, `${teamName(db, ctx.teamId)} erdreht einen Joker`);
         log(db, ctx, 'joker', `${teamName(db, ctx.teamId)} erdreht „${f.name}“ (Vorrat)`);
       } else if (t.jokers.some((j) => j.key === 'umleitung')) {
-        // Umleitung aus dem Vorrat: Das Team wählt, wen das fiese Feld trifft.
+        // Umleitung aus dem Vorrat (geht vor dem Schutzschild): Das Team wählt, wen das fiese Feld trifft.
         t.jokers.splice(t.jokers.findIndex((j) => j.key === 'umleitung'), 1);
         r.redirect = { from: ctx.teamId, key: f.key, pending: true, to: null };
         r.spin.redirect = true;
@@ -409,11 +421,11 @@ module.exports = {
         note(st, r.spin.text);
         log(db, ctx, 'joker', `${teamName(db, ctx.teamId)} erdreht „${f.name}“ – Umleitung aus dem Vorrat`);
       } else {
-        const res = applyNegative(db, ctx, game, st, ctx.teamId, f);
+        const { res, text } = hitNegative(db, ctx, game, st, ctx.teamId, f);
         r.spin.res = res;
-        r.spin.text = negText(db, ctx.teamId, f, res);
-        note(st, negText(db, ctx.teamId, f, res));
-        log(db, ctx, 'joker', `${teamName(db, ctx.teamId)} erdreht „${f.name}“: ${negText(db, ctx.teamId, f, res)}`);
+        r.spin.text = text;
+        note(st, text);
+        log(db, ctx, 'joker', `${teamName(db, ctx.teamId)} erdreht „${f.name}“: ${text}`);
       }
       effect(db, 'reveal');
     },
