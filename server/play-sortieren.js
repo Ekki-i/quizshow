@@ -110,6 +110,9 @@ module.exports = {
       cards: deck(game, st.index).map((k) => card(task, k)),
       submittedCount: Object.keys(r.answers).length,
       teamCount: db.project.teams.length,
+      // Wer schon abgegeben hat (nur ob, nicht was) – für die Statusleiste auf dem Beamer.
+      teamIds: db.project.teams.map((t) => t.id),
+      submitted: Object.keys(r.answers),
       evaluated: r.evaluated,
       solution: r.evaluated ? task.items.map((it, k) => ({ ...card(task, k), info: it.info || '' })) : null,
       results: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, order: a.order, points: score(a.order, game) })) : [],

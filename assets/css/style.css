@@ -1754,3 +1754,136 @@ details.item.drop-here { outline: 2px dashed var(--accent-2, #ffc23d); outline-o
 .gier-balance .hp { grid-template-columns: 1fr auto auto auto; }
 .gier-balance .hp-num { font-size: 1.8rem; color: var(--accent-2, #ffc23d); }
 .notes-view .ink-answer { max-height: 30vh; width: auto; max-width: 100%; margin: 0 auto; }
+
+/* ===== Design-Update: Sortieren, Top 100, Star, Timeline (Beamer) ===== */
+.beamer .nb-status { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8vw; width: min(94vw, 170vh); margin: 3.2vh auto 0; }
+.beamer .nb-st { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 1vw; align-items: center; min-width: 13vw; padding: 1vh 1vw 1vh 1.3vw; background: var(--box); color: #fff; box-shadow: inset 0.5vh 0 0 color-mix(in srgb, var(--team) 35%, #333), 0 0.8vh 2vh rgba(0, 0, 0, 0.45); opacity: 0.6; transition: opacity 0.4s, box-shadow 0.4s; animation: rise 0.45s ease-out both; }
+.beamer .nb-st .nm { font-weight: 800; font-size: 2.4vh; text-transform: uppercase; white-space: nowrap; }
+.beamer .nb-st .ic { grid-row: span 2; font-size: 3.6vh; color: #777; }
+.beamer .nb-st small { font-size: 1.7vh; opacity: 0.75; }
+.beamer .nb-st.done { opacity: 1; box-shadow: inset 0.8vh 0 0 var(--team), 0 0 2.6vh color-mix(in srgb, var(--team) 40%, transparent), 0 0.8vh 2vh rgba(0, 0, 0, 0.45); }
+.beamer .nb-st.done .ic { color: var(--ok); animation: pop 0.45s cubic-bezier(.2,1.5,.4,1) both; }
+
+/* Sortieren */
+.beamer .nb-sort-row { gap: 1.2vw; margin-top: 3vh; }
+.beamer .nb-sort-card { box-shadow: inset 0 0.7vh 0 var(--accent), 0 1.2vh 3vh rgba(0, 0, 0, 0.55); }
+.beamer .nb-sort-row.open .nb-sort-card { min-height: 34vh; animation: rise 0.55s ease-out both; }
+.beamer .nb-sort-card .qm { position: absolute; top: 1.4vh; right: 1vw; font-size: 2.4vh; color: rgba(255, 255, 255, 0.35); }
+.beamer .nb-sort-row.solved .nb-sort-card { box-shadow: inset 0 0.7vh 0 var(--accent-2), 0 1.2vh 3vh rgba(0, 0, 0, 0.55); animation: flipIn 0.6s ease-out both; }
+.beamer .nb-sort-row.solved .nb-sort-card:nth-child(n) { animation-delay: inherit; }
+.beamer .nb-sort-card .info { font-size: 3vh; padding: 0.3vh 0.8vw; background: rgba(255, 194, 61, 0.12); }
+.beamer .nb-sort-card .pos { border-radius: 0; box-shadow: 0 0.6vh 1.4vh rgba(0, 0, 0, 0.5); }
+@keyframes flipIn { from { transform: perspective(60vw) rotateY(80deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.beamer .nb-sort-res { padding: 0.9vh 1vw 0.9vh 1.4vw; background: var(--box); box-shadow: inset 0.6vh 0 0 var(--team), 0 0.8vh 2vh rgba(0, 0, 0, 0.45); color: #fff; animation: rise 0.45s ease-out both; }
+.beamer .nb-sort-res .nm { flex: 0 0 34%; font-weight: 800; font-size: 2.5vh; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.beamer .nb-sort-res .marks i { animation: pop 0.35s ease-out both; }
+.beamer .nb-sort-res.perfect { box-shadow: inset 0.6vh 0 0 var(--team), 0 0 3vh rgba(255, 194, 61, 0.45); }
+.beamer .nb-sort-res.perfect .p::after { content: " ★"; }
+
+/* Top 100: Punkteleiter */
+.beamer .nb-t100-scale { display: none; }
+.beamer .nb-t100-ladder { display: flex; align-items: flex-end; justify-content: center; gap: 0.8vw; height: 24vh; width: min(80vw, 120vh); margin: 2.4vh auto 0; }
+.beamer .nb-t100-ladder.small { height: 12vh; margin-top: 1.4vh; }
+.beamer .nb-t100-ladder .step { flex: 1; height: var(--h); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.4vh; padding-top: 1vh; background: linear-gradient(180deg, color-mix(in srgb, var(--accent-2) calc(var(--h) * 0.9), var(--box)) 0, var(--box) 100%); color: #fff; box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.5); animation: rise 0.5s ease-out both; }
+.beamer .nb-t100-ladder .step b { font-size: 4vh; font-weight: 900; color: #fff; text-shadow: 0 0.3vh 1vh rgba(0, 0, 0, 0.6); }
+.beamer .nb-t100-ladder .step small { font-size: 1.9vh; font-weight: 700; }
+.beamer .nb-t100-ladder.small .step b { font-size: 2.6vh; }
+.beamer .nb-t100-ladder.small .step small { font-size: 1.5vh; }
+.beamer .nb-t100-row { grid-template-columns: 20% 1fr 22% 13% 6%; padding: 1.2vh 1vw; }
+.beamer .nb-t100-row .ans { display: flex; flex-direction: column; min-width: 0; }
+.beamer .nb-t100-row .ans span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.beamer .nb-t100-row .ans small { font-size: 1.8vh; opacity: 0.7; }
+.beamer .nb-t100-row .trk { position: relative; height: 1.2vh; background: linear-gradient(90deg, #3a3a3e, color-mix(in srgb, var(--accent-2) 70%, #3a3a3e)); }
+.beamer .nb-t100-row .trk i { position: absolute; left: var(--x); top: 50%; width: 2.4vh; height: 2.4vh; translate: -50% -50%; background: var(--team); box-shadow: 0 0 0 0.35vh #fff, 0 0 1.6vh var(--team); animation: slideX 0.9s ease-out both; }
+@keyframes slideX { from { left: 0; opacity: 0; } }
+.beamer .nb-t100-row .p { font-size: 3.6vh; }
+
+/* Star: Strahlen, Nummern, Stempel */
+.beamer .nb-star-spokes { position: absolute; inset: 0; pointer-events: none; }
+.beamer .nb-star-spokes svg { width: 100%; height: 100%; }
+.beamer .nb-star-spokes line { stroke: rgba(255, 194, 61, 0.28); stroke-width: 0.35; stroke-dasharray: 1.2 1.2; vector-effect: non-scaling-stroke; stroke-width: 2px; }
+.beamer .nb-star-spokes line.hot { stroke: var(--bad); stroke-dasharray: none; stroke-width: 4px; }
+.beamer .nb-star-center { z-index: 1; animation: pop 0.6s cubic-bezier(.2,1.5,.4,1) both; }
+.beamer .nb-star-term { z-index: 1; display: flex; align-items: center; justify-content: center; gap: 0.7vw; box-shadow: inset 0 0.5vh 0 var(--accent), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); animation: pop 0.45s ease-out both; }
+.beamer .nb-star-term .n { flex: none; display: grid; place-items: center; width: 3.2vh; height: 3.2vh; background: var(--accent-2); color: #111; font-size: 1.9vh; font-weight: 900; }
+.beamer .nb-star-term.right { opacity: 0.45; box-shadow: inset 0 0.5vh 0 var(--ok), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-star-term.wrong { opacity: 1; background: var(--bad); box-shadow: 0 0 4vh rgba(255, 74, 74, 0.7); scale: 1.12; z-index: 2; }
+.beamer .nb-star-term .stamp { position: absolute; top: -2.6vh; right: -1.2vw; padding: 0.3vh 0.6vw; background: #fff; color: var(--bad); font-style: normal; font-weight: 900; font-size: 2vh; letter-spacing: 0.06em; rotate: 8deg; animation: pop 0.5s 0.4s cubic-bezier(.2,1.5,.4,1) both; }
+.beamer .nb-buzzline { display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 0.7vw; margin-top: 1.6vh; }
+.beamer .nb-buzzline .lbl { align-self: center; color: #fff; font-weight: 800; font-size: 2.2vh; opacity: 0.8; margin-right: 0.4vw; }
+.beamer .nb-bz { display: flex; align-items: center; gap: 0.7vw; padding: 0.9vh 1.2vw 0.9vh 1.4vw; background: var(--box); color: #fff; box-shadow: inset 0.6vh 0 0 var(--team), 0 0.8vh 2vh rgba(0, 0, 0, 0.45); animation: rise 0.4s ease-out both; }
+.beamer .nb-bz .k { color: var(--accent-2); font-size: 2.8vh; }
+.beamer .nb-bz span { font-weight: 800; font-size: 2.4vh; text-transform: uppercase; }
+.beamer .nb-bz small { font-size: 1.8vh; opacity: 0.85; }
+.beamer .nb-bz.bad { opacity: 0.5; }
+.beamer .nb-bz.ok small { color: var(--ok); }
+.beamer .nb-bz.win { box-shadow: inset 0.6vh 0 0 var(--team), 0 0 3vh rgba(43, 217, 107, 0.6); }
+
+/* Timeline: Zeitachse */
+.beamer .nb-tl-line { display: none; }
+.beamer .nb-tl-axis { position: relative; display: flex; justify-content: center; align-items: stretch; gap: 0.8vw; width: min(96vw, 175vh); margin: 3vh auto 0; padding: 0 2vw; }
+.beamer .nb-tl-axis .bar { position: absolute; left: 0; right: 0; top: calc(100% - 4.6vh); height: 0.6vh; background: linear-gradient(90deg, transparent, var(--accent) 6%, var(--accent-2) 94%, transparent); box-shadow: 0 0 2vh rgba(255, 45, 138, 0.5); }
+.beamer .nb-tl-axis .bar::after { content: ""; position: absolute; right: 1%; top: 50%; translate: 0 -50%; border: 1.2vh solid transparent; border-left: 1.8vh solid var(--accent-2); border-right: 0; }
+.beamer .nb-tl-col { position: relative; flex: 0 1 13vw; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0.9vh; animation: rise 0.45s ease-out both; }
+.beamer .nb-tl-col .tlc { flex: 1; width: 100%; display: grid; place-items: center; min-height: 11vh; padding: 1.2vh 0.6vw; background: var(--box); color: #fff; text-align: center; font-weight: 800; font-size: 2.4vh; line-height: 1.15; box-shadow: inset 0 0.6vh 0 var(--accent), 0 1vh 2.4vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-tl-col .dot { width: 2.2vh; height: 2.2vh; background: #fff; rotate: 45deg; box-shadow: 0 0 1.4vh rgba(255, 255, 255, 0.7); margin-top: 0.4vh; }
+.beamer .nb-tl-col .val { font-size: 3.2vh; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.beamer .nb-tl-col.ref .card { box-shadow: inset 0 0.6vh 0 var(--accent-2), 0 1vh 2.4vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-tl-col.last { animation: dropIn 0.7s cubic-bezier(.2,1.4,.4,1) both; }
+.beamer .nb-tl-col.last.ok .card { box-shadow: inset 0 0.6vh 0 var(--ok), 0 0 3.4vh rgba(43, 217, 107, 0.6); }
+.beamer .nb-tl-col.last.ok .dot { background: var(--ok); }
+.beamer .nb-tl-col.last.bad .card { background: #3a1c22; box-shadow: inset 0 0.6vh 0 var(--bad), 0 0 3.4vh rgba(255, 74, 74, 0.6); }
+.beamer .nb-tl-col.last.bad .dot { background: var(--bad); }
+@keyframes dropIn { from { transform: translateY(-8vh) scale(1.1); opacity: 0; } }
+.beamer .nb-tl-axis.dense .nb-tl-col .tlc { font-size: 1.9vh; min-height: 9vh; }
+.beamer .nb-tl-axis.dense .nb-tl-col .val { font-size: 2.5vh; }
+.beamer .nb-tl-info { display: flex; justify-content: center; align-items: stretch; gap: 1vw; margin-top: 2.6vh; flex-wrap: wrap; }
+.beamer .nb-tl-last, .beamer .nb-tl-turn, .beamer .nb-tl-pool { display: flex; align-items: center; gap: 0.8vw; padding: 1.2vh 1.4vw; background: var(--box); color: #fff; box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.45); font-size: 2.4vh; animation: rise 0.4s ease-out both; }
+.beamer .nb-tl-last { box-shadow: inset 0.6vh 0 0 var(--team), 0 0.8vh 2vh rgba(0, 0, 0, 0.45); font-weight: 700; }
+.beamer .nb-tl-last.ok b { color: var(--ok); }
+.beamer .nb-tl-last.bad b { color: var(--bad); }
+.beamer .nb-tl-turn { flex-direction: column; align-items: flex-start; gap: 0.2vh; box-shadow: inset 0.8vh 0 0 var(--team), 0 0 2.6vh color-mix(in srgb, var(--team) 45%, transparent); }
+.beamer .nb-tl-turn small { font-size: 1.7vh; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; }
+.beamer .nb-tl-turn b { font-size: 3.2vh; text-transform: uppercase; }
+.beamer .nb-tl-pool { flex-direction: column; gap: 0; margin: 0; opacity: 1; }
+.beamer .nb-tl-pool b { font-size: 3.4vh; color: var(--accent-2); }
+.beamer .nb-tl-pool small { font-size: 1.6vh; }
+.beamer .nb-tl-teams { gap: 0.7vw; margin-top: 2.2vh; }
+.beamer .nb-tl-team { display: grid; grid-template-columns: auto auto; column-gap: 0.8vw; align-items: baseline; padding: 0.8vh 1.1vw 0.8vh 1.3vw; background: var(--box); color: #fff; box-shadow: inset 0.5vh 0 0 var(--team), 0 0.6vh 1.6vh rgba(0, 0, 0, 0.45); }
+.beamer .nb-tl-team .nm { font-weight: 800; font-size: 2.2vh; text-transform: uppercase; }
+.beamer .nb-tl-team b { font-size: 3vh; color: var(--accent-2); }
+.beamer .nb-tl-team small { grid-column: span 2; font-size: 1.5vh; opacity: 0.8; min-height: 1.5vh; }
+.beamer .nb-tl-team.turn { box-shadow: inset 0.5vh 0 0 var(--team), 0 0 0 0.3vh var(--team), 0 0 2.6vh color-mix(in srgb, var(--team) 50%, transparent); }
+.beamer .nb-tl-team.out { opacity: 0.45; }
+.beamer .nb-tl-team.out b { text-decoration: line-through; color: var(--bad); }
+.beamer .nb-tl-team.quit { opacity: 0.75; }
+.reduced-motion .beamer .nb-sort-card, .reduced-motion .beamer .nb-st, .reduced-motion .beamer .nb-tl-col, .reduced-motion .beamer .nb-star-term, .reduced-motion .beamer .nb-t100-row, .reduced-motion .beamer .nb-sort-res { animation: none; }
+
+/* ===== Design-Update: iPads ===== */
+.sort-slots li { border-radius: 12px; border: 2px dashed rgba(255, 255, 255, 0.16); background: #1b1b24; padding: 6px 10px 6px 6px; min-height: 78px; transition: border-color 0.2s, background 0.2s; }
+.sort-slots li > b { display: grid; place-items: center; flex: none; width: 56px; height: 64px; border-radius: 9px; background: #2a2a33; font-size: 1.9rem; }
+.sort-slots li:not(.empty) > b { background: var(--accent-2, #ffc23d); color: #111; }
+.sort-slots li:not(.empty) { border: 2px solid var(--team, var(--accent)); background: #22222c; }
+.sort-slots li .sort-card { flex: 1; background: transparent; padding: 6px 4px; min-height: 0; font-size: 1.25rem; }
+.sort-pool { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); }
+.sort-pool .sort-card { justify-content: center; text-align: center; min-height: 72px; background: #2d2d38; border-top: 4px solid var(--accent, #ff2d8a); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35); }
+.sort-card.sel { outline: 3px solid var(--accent-2, #ffc23d); outline-offset: 2px; transform: translateY(-2px); }
+.sort-solution li { border-radius: 10px; background: #1f1f28; }
+.t100-ladder { display: flex; align-items: flex-end; gap: 6px; height: 86px; margin: 6px 0 14px; }
+.t100-ladder span { flex: 1; height: var(--h); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 6px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, color-mix(in srgb, var(--accent-2, #ffc23d) calc(var(--h) * 0.85), #2a2a33), #2a2a33); }
+.t100-ladder b { font-size: 1.15rem; }
+.t100-ladder small { font-size: 0.72rem; opacity: 0.85; }
+.star-center { display: grid; place-items: center; width: 190px; height: 190px; margin: 6px auto 12px; padding: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #3a3a52, #121220); box-shadow: 0 0 0 5px var(--accent-2, #ffc23d), 0 0 26px rgba(255, 194, 61, 0.35); font-size: 1.35rem; line-height: 1.15; }
+.star-term { border-top: 4px solid var(--accent, #ff2d8a); }
+.star-term small { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 6px; background: var(--accent-2, #ffc23d); color: #111; opacity: 1; font-weight: 900; }
+.star-term.selected { border-color: var(--accent-2, #ffc23d); background: #3b3420; box-shadow: 0 0 18px rgba(255, 194, 61, 0.35); }
+.tl-line { position: relative; padding-left: 26px; gap: 6px; }
+.tl-line::before { content: ""; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 4px; border-radius: 2px; background: linear-gradient(180deg, var(--accent, #ff2d8a), var(--accent-2, #ffc23d)); }
+.tl-item { position: relative; border-left: 0; border-radius: 10px; background: #22222c; padding: 12px 14px; }
+.tl-item::before { content: ""; position: absolute; left: -22px; top: 50%; width: 12px; height: 12px; translate: 0 -50%; rotate: 45deg; background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
+.tl-item.ref::before { background: var(--accent-2, #ffc23d); }
+.tl-item span { color: var(--accent-2, #ffc23d); font-weight: 800; opacity: 1; }
+.tl-gap.ready { background: rgba(255, 194, 61, 0.08); }
+.tl-pool { display: grid; grid-template-columns: 1fr 1fr; }
+.tl-card { text-align: center; border-top: 4px solid var(--accent, #ff2d8a); background: #2d2d38; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35); }
+.tl-me { border-left: 6px solid var(--team, var(--accent)); }

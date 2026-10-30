@@ -175,7 +175,8 @@ function gier(g, ui) {
 const t100Draft = {};
 function top100(g, ui) {
   const out = [muted(`Runde ${g.index + 1} von ${g.count}${g.period ? ` · ${g.period}` : ''}`), question(g.category),
-    muted(`Nennt einen Eintrag aus der Top-100-Liste. Rang 1–20 = ${pts(pv(g, 'group1', 1))} … Rang 81–100 = ${pts(pv(g, 'group5', 5))} – je weiter hinten, desto mehr!`)];
+    muted('Nennt einen Eintrag aus der Top-100-Liste – je weiter hinten er steht, desto mehr Punkte.'),
+    h('div', { class: 't100-ladder' }, ['1–20', '21–40', '41–60', '61–80', '81–100'].map((r, i) => h('span', { '--h': `${55 + i * 11}%` }, h('b', {}, plus(pv(g, `group${i + 1}`, i + 1))), h('small', {}, r))))];
   if (g.evaluated) {
     out.push(g.rank ? stateBox('ok', '✓', `„${g.text}“ = Rang ${g.rank} (${g.entry}) – ${pts(g.points)}`) : stateBox('bad', '✗', `„${g.text || '–'}“ ist nicht in der Top 100 – 0 Punkte`));
     return out;
