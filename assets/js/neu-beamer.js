@@ -30,13 +30,14 @@ function sortieren(v, teamOf) {
 // ---------- Riskier die Gier ----------
 // Gier-Punkte als Lebensenergie wie im Videospiel: Nach der Auswertung schrumpft
 // der Balken (weißer „Schaden“ läuft hinterher), Schadenszahl fliegt hoch, der
-// Balken wackelt und wechselt von Grün über Gelb zu Rot; bei 0 kommt „K.O.“.
+// Balken wackelt und wechselt von Grün über Gelb und Orange zu Rot; bei 0 kommt „K.O.“.
 const hpPct = (val, start) => Math.max(0, Math.min(100, (val / (start || 100)) * 100));
-const hpColor = (pct) => (pct > 60 ? 'var(--ok, #2bd96b)' : pct > 30 ? '#ffd23f' : 'var(--bad, #ff4a4a)');
+// Vier Stufen in 25er-Schritten: über 75 grün, 51–75 gelb, 26–50 orange, bis 25 rot.
+const hpColor = (pct) => (pct > 75 ? 'var(--ok, #2bd96b)' : pct > 50 ? '#ffd23f' : pct > 25 ? '#ff8a1f' : 'var(--bad, #ff4a4a)');
 export function hpBar({ name = null, color = '#888', before, after, start = 100, diff = null, out = false, delay = 0, points = null, animate = true }) {
   const from = hpPct(before, start), to = hpPct(after, start);
   const num = h('b', { class: 'hp-num' }, fmtNum(animate ? before : after));
-  // Farbe wechselt mit dem Treffer (Grün → Gelb → Rot).
+  // Farbe wechselt mit dem Treffer (Grün → Gelb → Orange → Rot).
   const fill = h('i', { class: 'hp-fill', style: { backgroundColor: animate ? hpColor(from) : hpColor(to) } });
   const bar = h('div', { class: `hp${animate && diff ? ' hit' : ''}${out ? ' ko' : ''}`, '--team': color, '--from': `${from}%`, '--to': `${to}%`, '--hpc': hpColor(to), '--hpc0': hpColor(from), '--d': `${delay}s` },
     name ? h('span', { class: 'hp-name' }, name) : null,
