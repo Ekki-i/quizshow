@@ -504,7 +504,7 @@ function brainBody(v, teamOf) {
   const events = v.events.length ? h('div', { class: 'brain-events' }, v.events.map((e) => h('span', {}, e.text))) : null;
   if (v.phase === 'category') {
     return [h('div', { class: 'level-tag' }, `Kategorie ${v.round + 1} von ${v.count}`), h('div', { class: 'brain-cat' }, v.category),
-      v.joker ? h('div', { class: 'row', style: { justifyContent: 'center' } }, chip(teamOf(v.joker.teamId), 'answering', v.joker.secret ? ' 🃏 setzt einen geheimen Joker ein' : ` ${v.joker.field.icon} ${v.joker.field.name}${v.joker.target ? ` → ${teamOf(v.joker.target).name}` : ''}`)) : sub('Jetzt Joker einsetzen – nach dem Vorlesen ist es zu spät!', { marginTop: '2vh' }),
+      v.joker ? h('div', { class: 'row', style: { justifyContent: 'center' } }, chip(teamOf(v.joker.teamId), 'answering', v.joker.secret ? ' 🃏 setzt einen geheimen Joker ein' : ` ${v.joker.field.icon} ${v.joker.field.name}${v.joker.stake ? ` (Einsatz ${v.joker.stake})` : ''}${v.joker.target ? ` → ${teamOf(v.joker.target).name}` : ''}${v.joker.shielded ? ' – 🛡️ abgewehrt!' : ''}`)) : sub('Jetzt Joker einsetzen – nach dem Vorlesen ist es zu spät!', { marginTop: '2vh' }),
       events];
   }
   if (v.phase === 'wheel' || (v.phase === 'evaluated' && v.wheel.spin)) {
@@ -515,7 +515,8 @@ function brainBody(v, teamOf) {
   const out = [h('div', { class: 'level-tag' }, v.category), banner(v.question, 'compact'), options(v, { correct: v.correct, marks })];
   if (v.phase === 'question') {
     out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1.5vh' } }, sub(`${v.answeredCount} Antworten eingeloggt`),
-      v.blocked.map((id) => chip(teamOf(id), 'wrong', ' ⛔ gesperrt'))));
+      v.blocked.map((id) => chip(teamOf(id), 'wrong', ' ⛔ gesperrt')),
+      (v.rush || []).filter((x) => !x.answered).map((x) => chip(teamOf(x.teamId), 'wrong', ' ⏱ ', countdown(x.deadline)))));
   } else {
     out.push(h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '1.5vh' } }, v.results.filter((r) => r.answered).map((r) => chip(teamOf(r.teamId), r.ok ? '' : 'wrong-soft', r.ok ? ' ✓' : ' ✗'))));
   }

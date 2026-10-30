@@ -290,12 +290,12 @@ test('Musikquiz: Clip läuft mit „Aufgabe starten“, pausiert beim Buzzern; P
   assert.equal(pts(db, ids[0]), 5);
 });
 
-test('Brain or Dreh’n: Joker getrennt in 8 positive und 8 negative, alte Inhalte werden umgebaut', () => {
+test('Brain or Dreh’n: Joker getrennt in 15 positive und 15 negative, alte Inhalte werden umgebaut', () => {
   const { db } = setup(2);
   const brain = require('../server/play-brain');
   const g = use(db, 'brain');
-  assert.equal(g.content.good.jokers.length, 8);
-  assert.equal(g.content.bad.jokers.length, 8);
+  assert.equal(g.content.good.jokers.length, 15);
+  assert.equal(g.content.bad.jokers.length, 15);
   assert.equal(g.content.good.slots.length, 6);
   // Alter Stand: eine gemischte Liste mit 16 Jokern (Reihenfolge des Rads) und goodSlots/badSlots.
   const lib = db.library.find((e) => e.type === 'brain');
@@ -309,6 +309,16 @@ test('Brain or Dreh’n: Joker getrennt in 8 positive und 8 negative, alte Inhal
   assert.equal(c.jokers, undefined);
   assert.equal(c.bad.jokers[0].name, 'Großer Abzug');
   assert.equal(c.bad.slots[5].joker, 'reset');
+  assert.equal(c.bad.jokers.length, 15); // neue Joker ergänzt
+  // Stand mit 8 Jokern je Seite wird auf 15 aufgefüllt, eigene Namen bleiben.
+  const eight = structuredClone(c);
+  eight.good.jokers = eight.good.jokers.slice(0, 8);
+  eight.good.jokers[0].name = 'Mein Doppel';
+  game.applyAction(db, mod(), 'library.update', { libraryId: lib.id, content: eight });
+  const c8 = db.library.find((e) => e.type === 'brain').content;
+  assert.equal(c8.good.jokers.length, 15);
+  assert.equal(c8.good.jokers[0].name, 'Mein Doppel');
+  assert.equal(c8.good.jokers[14].name, 'Umleitung');
   const w = brain.wheelOf({ type: 'brain', content: c });
   assert.equal(w.find((f) => f.key === 'minus2').name, 'Großer Abzug'); // Wirkung bleibt
   assert.equal(w.find((f) => f.key === 'minus2').value, 5);
@@ -370,4 +380,177 @@ test('Brain or Dreh’n: jedes der 12 Felder hat dieselbe Chance', () => {
   const e = N / 12;
   const chi = Object.values(counts).reduce((sum, c) => sum + ((c - e) ** 2) / e, 0);
   assert.ok(chi < 35, `Verteilung ungleich (Chi² ${chi.toFixed(1)}): ${JSON.stringify(counts)}`);
+});
+
+// Hilfen für die neuen Joker: Runde bis zur Frage, Antworten, Auflösen.
+function brainSetup(n = 3) {
+  const { db, ids } = setup(n);
+  const g = use(db, 'brain');
+  act(db, mod(), 'start');
+  const st = db.live.games[g.id];
+  const q = (i) => g.content.rounds[i].correct;
+  const wrong = (i) => ['A', 'B', 'C', 'D'].find((l) => l !== q(i));
+  const give = (id, key) => { st.t[id].jokers.push({ id: `x_${key}_${st.t[id].jokers.length}`, key }); return st.t[id].jokers.at(-1).id; };
+  const spinAs = (id, index) => {
+    const core = require('../server/core');
+    const real = core.randomInt;
+    let first = true;
+    core.randomInt = (k) => { if (first) { first = false; return index; } return 0; };
+    try { act(db, team(id), 'spin'); } finally { core.randomInt = real; }
+  };
+  const toWheel = (id) => { st.r.phase = 'wheel'; st.r.correct = [id]; st.r.buzz = id; st.r.spin = null; };
+  return { db, ids, g, st, q, wrong, give, spinAs, toWheel };
+}
+
+test('Brain or Dreh’n: neue positive Joker (Rettungsring, Zwei Kreuze, Wette, Punktesauger, Vorfahrt)', () => {
+  const { db, ids, st, q, wrong, give } = brainSetup(4);
+  const [A, B, C, D] = ids;
+  // Rettungsring: falsch und trotzdem +1, Streak bleibt.
+  st.t[A].streak = 3;
+  act(db, team(A), 'useJoker', { jokerId: give(A, 'rettung') });
+  act(db, mod(), 'showQuestion');
+  act(db, team(A), 'answer', { choice: wrong(0) });
+  act(db, mod(), 'evaluate');
+  assert.equal(st.t[A].points, 1);
+  assert.equal(st.t[A].streak, 3);
+  assert.ok(!st.r.correct.includes(A)); // kein Platz am Rad
+  // Zwei Kreuze: zweite Antwort zählt.
+  act(db, mod(), 'next');
+  act(db, team(B), 'useJoker', { jokerId: give(B, 'zweikreuze') });
+  act(db, mod(), 'showQuestion');
+  act(db, team(B), 'answer', { choice: wrong(1) });
+  assert.throws(() => act(db, team(B), 'answer', { choice: wrong(1) }), /andere zweite/);
+  act(db, team(B), 'answer', { choice: q(1) });
+  assert.throws(() => act(db, team(B), 'answer', { choice: 'A' }), /schon eingeloggt/);
+  assert.throws(() => { act(db, team(C), 'answer', { choice: wrong(1) }); act(db, team(C), 'answer', { choice: q(1) }); }, /schon eingeloggt/);
+  act(db, mod(), 'evaluate');
+  assert.equal(st.t[B].points, 1);
+  assert.ok(!st.r.correct.includes(C));
+  // Wette: Einsatz höchstens 3 und nicht mehr als vorhanden; richtig = doppelt dazu.
+  act(db, mod(), 'next');
+  st.t[C].points = 2;
+  const w = give(C, 'wette');
+  assert.throws(() => act(db, team(C), 'useJoker', { jokerId: w, stake: 3 }), /zwischen 1 und 2/);
+  act(db, team(C), 'useJoker', { jokerId: w, stake: 2 });
+  act(db, mod(), 'showQuestion');
+  act(db, team(C), 'answer', { choice: q(2) });
+  act(db, mod(), 'evaluate');
+  assert.equal(st.t[C].points, 2 + 1 + 4);
+  // Wette verloren: Einsatz weg.
+  act(db, mod(), 'next');
+  act(db, team(C), 'useJoker', { jokerId: give(C, 'wette'), stake: 3 });
+  act(db, mod(), 'showQuestion');
+  act(db, team(C), 'answer', { choice: wrong(3) });
+  act(db, mod(), 'evaluate');
+  assert.equal(st.t[C].points, 4);
+  // Punktesauger: +1 je Team, das falsch oder gar nicht antwortet (ohne Obergrenze).
+  act(db, mod(), 'next');
+  const before = st.t[D].points;
+  act(db, team(D), 'useJoker', { jokerId: give(D, 'sauger') });
+  act(db, mod(), 'showQuestion');
+  act(db, team(D), 'answer', { choice: q(4) });
+  act(db, team(A), 'answer', { choice: wrong(4) });
+  act(db, team(B), 'answer', { choice: wrong(4) });
+  act(db, mod(), 'evaluate');
+  assert.equal(st.t[D].points, before + 1 + 3);
+  // Vorfahrt: richtig → dreht ohne Buzzer-Rennen.
+  act(db, mod(), 'next');
+  act(db, team(A), 'useJoker', { jokerId: give(A, 'vorfahrt') });
+  act(db, mod(), 'showQuestion');
+  act(db, team(A), 'answer', { choice: q(5) });
+  act(db, team(B), 'answer', { choice: q(5) });
+  act(db, mod(), 'evaluate');
+  act(db, mod(), 'openWheel');
+  assert.equal(st.r.buzz, A);
+  assert.throws(() => act(db, team(B), 'wheelBuzz'), /schneller/);
+});
+
+test('Brain or Dreh’n: Schutzschild und Umleitung wirken von selbst', () => {
+  const { db, ids, st, give, spinAs, toWheel, g } = brainSetup(3);
+  const [A, B, C] = ids;
+  // Schutzschild fängt den Punkteräuber ab und ist danach weg; nicht selbst einsetzbar.
+  st.t[B].points = 5;
+  const sh = give(B, 'schild');
+  assert.throws(() => act(db, team(B), 'useJoker', { jokerId: sh }), /von selbst/);
+  act(db, team(A), 'useJoker', { jokerId: give(A, 'raeuber'), target: B });
+  assert.equal(st.t[B].points, 5);
+  assert.equal(st.t[A].points, 0);
+  assert.equal(st.t[B].jokers.length, 0);
+  // Umleitung: fieses Feld (Reset) trifft ein Team nach Wahl.
+  g.content.bad.slots[0] = { joker: 'reset' };
+  st.t[A].points = 4;
+  give(A, 'umleitung');
+  toWheel(A);
+  spinAs(A, 1);
+  assert.equal(st.r.redirect.pending, true);
+  assert.equal(game.teamView(db, A).play.redirect.field.key, 'reset');
+  assert.throws(() => act(db, mod(), 'next'), /Umleitung/);
+  assert.throws(() => act(db, team(A), 'redirect', { target: A }), /anderes Team/);
+  act(db, team(A), 'redirect', { target: B });
+  assert.equal(st.t[A].points, 4);
+  assert.equal(st.t[B].points, 0);
+  assert.match(bv(db).wheel.spin.text, /leitet/);
+  assert.equal(st.t[A].jokers.length, 0);
+  void C;
+});
+
+test('Brain or Dreh’n: neue negative Joker und Punktabzug 1 geht an ein anderes Team', () => {
+  const { db, ids, st, give, spinAs, toWheel, g, q, wrong } = brainSetup(3);
+  const [A, B, C] = ids;
+  const bad = (key) => { g.content.bad.slots[0] = { joker: key }; };
+  // Punktabzug 1: geht an ein zufälliges anderes Team.
+  st.t[A].points = 3; st.t[B].points = 0; st.t[C].points = 0;
+  bad('minus1'); toWheel(A); spinAs(A, 1);
+  assert.equal(st.t[A].points, 2);
+  assert.equal(st.t[B].points + st.t[C].points, 1);
+  // Halbiert (abgerundet).
+  st.t[A].points = 7; bad('halbiert'); toWheel(A); spinAs(A, 1);
+  assert.equal(st.t[A].points, 3);
+  // Platztausch mit dem Team mit den wenigsten Punkten; wer schon Letzter ist, tauscht nicht.
+  st.t[A].points = 9; st.t[B].points = 2; st.t[C].points = 5;
+  bad('platztausch'); toWheel(A); spinAs(A, 1);
+  assert.deepEqual([st.t[A].points, st.t[B].points], [2, 9]);
+  toWheel(A); spinAs(A, 1);
+  assert.equal(st.t[A].points, 2);
+  assert.match(st.r.spin.text, /kein Tausch/);
+  // Joker-Geschenk: Joker wandert zu einem anderen Team.
+  st.t[A].jokers = []; give(A, 'fifty'); st.t[B].jokers = []; st.t[C].jokers = [];
+  bad('geschenk'); toWheel(A); spinAs(A, 1);
+  assert.equal(st.t[A].jokers.length, 0);
+  assert.equal(st.t[B].jokers.length + st.t[C].jokers.length, 1);
+  // Pechsträhne: 1 Punkt und ein Joker weg.
+  st.t[A].points = 3; give(A, 'doppel'); bad('pech'); toWheel(A); spinAs(A, 1);
+  assert.equal(st.t[A].points, 2);
+  assert.equal(st.t[A].jokers.length, 0);
+  // Nullrunde, Rad-Sperre (2 Runden) und Zeitdruck (10 Sekunden) für die nächste Frage.
+  bad('nullrunde'); toWheel(A); spinAs(A, 1);
+  bad('radsperre'); toWheel(A); spinAs(A, 1);
+  bad('zeitdruck'); toWheel(A); spinAs(A, 1);
+  act(db, mod(), 'next');
+  const t0 = 10_000_000;
+  act(db, mod(), 'showQuestion');
+  const dl = st.r.rush[A];
+  assert.ok(dl > 0);
+  assert.equal(game.teamView(db, A, dl - 5000).play.rush.over, false);
+  assert.throws(() => act(db, team(A, dl + 5000), 'answer', { choice: q(1) }), /abgelaufen/);
+  act(db, team(B), 'answer', { choice: q(1) });
+  act(db, mod(), 'evaluate');
+  // Runde 2: Nullrunde greift bei der nächsten richtigen Antwort.
+  act(db, mod(), 'next');
+  act(db, mod(), 'showQuestion');
+  const pa = st.t[A].points;
+  act(db, team(A), 'answer', { choice: q(2) });
+  act(db, mod(), 'evaluate');
+  assert.equal(st.t[A].points, pa);
+  assert.equal(st.t[A].zero, false);
+  assert.ok(st.r.correct.includes(A));
+  // Rad-Sperre gilt noch (2. Runde nach dem Dreh): Buzzer verboten, ohne andere Teams bleibt das Rad zu.
+  assert.throws(() => act(db, mod(), 'openWheel'), /Rad-Sperre/);
+  act(db, mod(), 'next');
+  act(db, mod(), 'showQuestion');
+  act(db, team(A), 'answer', { choice: q(3) });
+  act(db, mod(), 'evaluate');
+  act(db, mod(), 'openWheel'); // dritte Runde: Sperre vorbei
+  act(db, team(A), 'wheelBuzz');
+  void t0; void wrong;
 });
