@@ -28,24 +28,45 @@ function sortieren(v, teamOf) {
 }
 
 // ---------- Riskier die Gier ----------
+// Gier-Punkte als Lebensenergie wie im Videospiel: Nach der Auswertung schrumpft
+// der Balken (weißer „Schaden“ läuft hinterher), Schadenszahl fliegt hoch, der
+// Balken wackelt und wechselt von Grün über Gelb zu Rot; bei 0 kommt „K.O.“.
+const hpPct = (val, start) => Math.max(0, Math.min(100, (val / (start || 100)) * 100));
+const hpColor = (pct) => (pct > 60 ? 'var(--ok, #2bd96b)' : pct > 30 ? '#ffd23f' : 'var(--bad, #ff4a4a)');
+export function hpBar({ name = null, color = '#888', before, after, start = 100, diff = null, out = false, delay = 0, points = null, animate = true }) {
+  const from = hpPct(before, start), to = hpPct(after, start);
+  const num = h('b', { class: 'hp-num' }, fmtNum(animate ? before : after));
+  // Farbe wechselt mit dem Treffer (Grün → Gelb → Rot).
+  const fill = h('i', { class: 'hp-fill', style: { backgroundColor: animate ? hpColor(from) : hpColor(to) } });
+  const bar = h('div', { class: `hp${animate && diff ? ' hit' : ''}${out ? ' ko' : ''}`, '--team': color, '--from': `${from}%`, '--to': `${to}%`, '--hpc': hpColor(to), '--hpc0': hpColor(from), '--d': `${delay}s` },
+    name ? h('span', { class: 'hp-name' }, name) : null,
+    h('span', { class: 'hp-track' },
+      h('i', { class: 'hp-ghost' }), fill, h('i', { class: 'hp-ticks' }),
+      animate && diff ? h('em', { class: 'hp-dmg' }, `−${fmtNum(diff)}`) : null),
+    num,
+    out ? h('span', { class: 'hp-ko' }, 'K.O.') : null,
+    points !== null ? h('span', { class: 'hp-pts' }, `+${points}`) : null);
+  if (animate && before !== after && !document.documentElement.classList.contains('reduced-motion')) {
+    setTimeout(() => {
+      fill.style.backgroundColor = hpColor(to);
+      const t0 = performance.now(), dur = 1100;
+      const step = (t) => { const k = Math.min(1, (t - t0) / dur); num.textContent = fmtNum(Math.round((before + (after - before) * (1 - (1 - k) ** 3)) * 100) / 100); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }, (delay + 0.25) * 1000);
+  } else num.textContent = fmtNum(after);
+  return bar;
+}
+
 function gier(v, teamOf) {
-  const bars = h('div', { class: 'nb-gier-bars' }, v.teams.map((t) => {
+  const placed = Object.fromEntries((v.placed || []).map((p) => [p.teamId, p]));
+  const bars = h('div', { class: 'nb-gier-bars' }, v.teams.map((t, i) => {
     const team = teamOf(t.teamId);
     const res = v.results ? v.results.find((x) => x.teamId === t.teamId) : null;
-    return h('div', { class: `nb-gier-bar${t.out ? ' out' : ''}`, '--team': team.color },
-      h('span', { class: 'nm' }, team.name),
-      h('span', { class: 'track' }, h('i', { style: { width: `${Math.max(0, Math.min(100, (t.balance / (v.start || 100)) * 100))}%` } })),
-      h('b', {}, fmtNum(t.balance)),
-      res ? h('small', {}, res.missing ? 'keine Antwort' : `${fmtNum(res.value)} (−${fmtNum(res.diff)})`) : null,
-      t.out ? h('em', {}, 'raus') : null);
+    return hpBar({ name: team.name, color: team.color, before: res ? res.before : t.balance, after: t.balance, start: v.start, diff: res ? res.diff : null,
+      out: t.out, delay: 0.8 + i * 0.7, points: placed[t.teamId] ? placed[t.teamId].points : null, animate: !!res });
   }));
-  if (v.waiting) return [...waitTitle('Riskier die Gier', 'Jedes Team startet mit 100 Gier-Punkten – jede Abweichung wird abgezogen.'), bars];
+  if (v.waiting) return [...waitTitle('Riskier die Gier', 'Jedes Team startet mit 100 Lebenspunkten – jede Abweichung kostet Energie.'), bars];
   const out = [banner(v.question, 'compact slim')];
-  if (v.standings) {
-    out.push(h('div', { class: 'nb-gier-final' }, v.standings.map((s) => h('div', { class: 'nb-gier-place', '--team': teamOf(s.teamId).color },
-      h('b', { class: 'pl' }, `${s.place}.`), h('span', { class: 'nm' }, teamOf(s.teamId).name), h('b', { class: 'p' }, `+${s.points}`)))));
-    return out;
-  }
   if (v.evaluated) out.push(h('div', { class: 'solution', style: { marginTop: 0 } }, `Lösung: ${fmtNum(v.solution)} ${v.unit}`.trim()));
   else if (v.open) {
     const grace = v.graceEndsAt && Date.now() > v.endsAt;
@@ -53,6 +74,13 @@ function gier(v, teamOf) {
       sub(`${v.answeredCount} Teams haben geschätzt`));
   }
   out.push(bars);
+  // Spiel entschieden: Endstand erscheint, nachdem alle Balken gelaufen sind.
+  if (v.standings) {
+    const delay = 1.2 + v.teams.length * 0.7 + 1.4;
+    out.push(h('div', { class: 'nb-gier-final', style: { animationDelay: `${delay}s` } }, h('div', { class: 'nb-gier-final-title' }, 'Endstand'),
+      v.standings.map((s, k) => h('div', { class: 'nb-gier-place', '--team': teamOf(s.teamId).color, style: { animationDelay: `${delay + 0.3 + k * 0.25}s` } },
+        h('b', { class: 'pl' }, `${s.place}.`), h('span', { class: 'nm' }, teamOf(s.teamId).name), h('b', { class: 'p' }, `+${s.points}`)))));
+  }
   return out;
 }
 

@@ -6,9 +6,10 @@
 // Danach kann die Moderation eine Nachfrist von 10 Sekunden freigeben – nur für
 // Teams, die noch nicht abgegeben haben. Abgerechnet wird die Abweichung
 // |Schätzung − Lösung|, sie wird vom Guthaben abgezogen. Bei 0 oder darunter
-// scheidet das Team aus; wer gar nicht antwortet, scheidet ebenfalls aus.
+// scheidet das Team aus. Jedes Team muss antworten (ausgewertet wird erst, wenn
+// alle abgegeben haben; die Nachfrist kann dafür erneut freigegeben werden).
 // Platzierung → Showpunkte 10 / 6 / 4 / 3 / 2 / 1 (letztes verbleibendes Team
-// zuerst). Mehrere Ausscheidungen in derselben Runde: das Restguthaben
+// zuerst), automatisch in der Reihenfolge des Ausscheidens gebucht. Mehrere Ausscheidungen in derselben Runde: das Restguthaben
 // entscheidet (stärker negativ = schlechter); gleiches Guthaben teilt sich die
 // Platzpunkte, der nächste Platz wird übersprungen.
 
@@ -47,7 +48,7 @@ function standings(db, st) {
   const ids = teamIds(db).filter((id) => st.teams[id]);
   const key = (id) => {
     const t = st.teams[id];
-    return t.outRound === null ? [1, Infinity, 1, t.balance] : [0, t.outRound, t.missing ? 0 : 1, t.balance];
+    return t.outRound === null ? [1, Infinity, 1, t.balance] : [0, t.outRound, 1, t.balance];
   };
   const sorted = ids.slice().sort((a, b) => {
     const ka = key(a), kb = key(b);
@@ -62,6 +63,17 @@ function standings(db, st) {
     out.push({ teamId: id, place, balance: st.teams[id].balance, out: st.teams[id].outRound !== null, outRound: st.teams[id].outRound });
   });
   return out.map((x) => ({ ...x, points: PLACE_POINTS[x.place - 1] ?? (x.place > PLACE_POINTS.length ? 1 : 0) }));
+}
+// Showpunkte automatisch nach Reihenfolge des Ausscheidens: Wer ausscheidet, hat
+// seinen Platz sicher (hinter allen, die noch dabei sind) und bekommt die Punkte
+// sofort; ist das Spiel entschieden, bekommen auch die Übrigen ihre Platzpunkte.
+function bookPlaces(db, ctx, game, st) {
+  const done = finished(db, game, st);
+  for (const s of standings(db, st)) {
+    if (!s.out && !done) continue;
+    bookTarget(db, ctx, `gier:${game.id}:${s.teamId}`, s.teamId, s.points, `${game.title}, Platz ${s.place}`);
+  }
+  if (done && !st.awarded) { st.awarded = true; log(db, ctx, 'ablauf', 'Gier: Spiel entschieden – Platzierungspunkte vergeben'); }
 }
 const finished = (db, game, st) => active(db, st).length <= 1 || game.content.questions.every((_, i) => st.rounds[i] && st.rounds[i].evaluated);
 
@@ -106,7 +118,8 @@ module.exports = {
       const r = current(st);
       if (r.evaluated) fail('Schon ausgewertet.');
       if (ctx.now <= r.endsAt) fail('Die Antwortzeit läuft noch.');
-      if (r.graceEndsAt !== null) fail('Die Nachfrist wurde schon freigegeben.');
+      if (r.graceEndsAt !== null && ctx.now <= r.graceEndsAt) fail('Die Nachfrist läuft noch.');
+      // Jedes Team muss antworten: die Nachfrist darf bei Bedarf erneut freigegeben werden.
       r.graceEndsAt = ctx.now + GRACE_MS;
       log(db, ctx, 'ablauf', 'Gier: 10 Sekunden Nachfrist freigegeben');
     },
@@ -115,41 +128,25 @@ module.exports = {
       if (r.evaluated) fail('Schon ausgewertet.');
       const act = active(db, st);
       const missing = act.filter((id) => r.answers[id] === undefined);
-      const timeOver = ctx.now > (r.graceEndsAt ?? r.endsAt);
-      if (missing.length && !timeOver) fail('Die Antwortzeit läuft noch.');
+      if (missing.length) fail(`Jedes Team muss antworten – es fehlt noch: ${missing.map((id) => teamName(db, id)).join(', ')}${ctx.now > (r.graceEndsAt ?? r.endsAt) ? ' (Nachfrist freigeben)' : ''}`);
       const answer = Number(game.content.questions[st.index].answer);
       const results = [];
       for (const id of act) {
         const t = st.teams[id];
         const a = r.answers[id];
         const before = t.balance;
-        if (a === undefined) {
-          t.outRound = st.index;
-          results.push({ teamId: id, value: null, diff: null, before, after: before, out: true, missing: true });
-          continue;
-        }
         const diff = Math.abs(a.value - answer);
         t.balance = Math.round((before - diff) * 100) / 100;
         const out = t.balance <= 0;
         if (out) t.outRound = st.index;
         results.push({ teamId: id, value: a.value, diff, before, after: t.balance, out, missing: false });
       }
-      // Wer gar nicht geantwortet hat, landet in dieser Runde hinter allen anderen.
-      for (const x of results) if (x.missing) st.teams[x.teamId].missing = true;
       r.results = results;
       r.open = false;
       r.evaluated = true;
       log(db, ctx, 'ablauf', `Gier: Frage ${st.index + 1} ausgewertet (Lösung ${answer})`);
+      bookPlaces(db, ctx, game, st);
       effect(db, 'reveal');
-    },
-    // Platzierungspunkte buchen (erneut aufrufbar: korrigiert statt doppelt zu buchen).
-    award(db, ctx, game, st) {
-      ensureTeams(db, st);
-      if (!finished(db, game, st)) fail('Das Spiel läuft noch: es sind mehr als ein Team dabei und noch Fragen offen.');
-      for (const s of standings(db, st)) bookTarget(db, ctx, `gier:${game.id}:${s.teamId}`, s.teamId, s.points, `${game.title}, Platz ${s.place}`);
-      st.awarded = true;
-      log(db, ctx, 'ablauf', 'Gier: Platzierungspunkte vergeben');
-      effect(db, 'coin');
     },
   },
 
@@ -183,7 +180,7 @@ module.exports = {
       evaluated: r.evaluated,
       solution: r.evaluated ? Number(q.answer) : null,
       result: res,
-      standings: st.awarded ? standings(db, st).filter((s) => s.teamId === teamId) : null,
+      standings: standings(db, st).filter((s) => s.teamId === teamId && (s.out || st.awarded)),
     };
   },
 
@@ -209,6 +206,8 @@ module.exports = {
       solution: r.evaluated ? Number(q.answer) : null,
       results: r.evaluated ? r.results : null,
       standings: st.awarded ? standings(db, st) : null,
+      // Showpunkte der schon ausgeschiedenen Teams (stehen fest).
+      placed: standings(db, st).filter((x) => x.out || st.awarded).map((x) => ({ teamId: x.teamId, place: x.place, points: x.points })),
     };
   },
 };
