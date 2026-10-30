@@ -2,8 +2,10 @@
 
 // Spiel „Brain or Dreh'n“: 12 Kategorien mit je einer A–D-Frage. Alle Teams
 // antworten (kein Buzzer). Richtige Antwort = Spielpunkt(e). Danach dürfen die
-// richtigen Teams buzzern; das schnellste dreht das Glücksrad (16 Felder:
-// 8 positive Joker für den Vorrat, 8 negative, die sofort wirken).
+// richtigen Teams buzzern; das schnellste dreht das Glücksrad (12 Felder:
+// 6 positive Joker für den Vorrat, 6 negative, die sofort wirken – im Editor
+// per Dropdown aus der Joker-Datenbank mit 16 Jokern gewählt). Jedes Feld
+// hat dieselbe Wahrscheinlichkeit (gleichverteilter Zufall über alle Felder).
 // Spielpunkte laufen getrennt (nie unter 0) und gehen erst mit „Spiel beenden“
 // in den Show-Gesamtstand. Joker gelten nur für das eigene Team, außer der
 // Joker nennt ausdrücklich ein anderes Team.
@@ -16,7 +18,7 @@ const core = require('./core');
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanChoice } = core;
 // Zufall über core.randomInt (im Test austauschbar).
 const randomInt = (n) => core.randomInt(n);
-const { WHEEL } = require('./defaults-extra');
+const { WHEEL, WHEEL_SLOTS } = require('./defaults-extra');
 
 const NEEDS_TARGET = ['raeuber', 'dieb', 'blockade', 'detektiv', 'tausch'];
 const SECRET = ['detektiv', 'tausch']; // Auswahl bleibt geheim
@@ -32,8 +34,35 @@ function wheelOf(game) {
     return { ...w, name: (o.name || '').trim() || w.name, icon: (o.icon || '').trim() || w.icon, text: (o.text || '').trim() || w.text, value: val ?? null };
   });
 }
-const field = (game, n) => wheelOf(game).find((f) => f.n === n);
 const fieldByKey = (game, k) => wheelOf(game).find((f) => f.key === k);
+const GOOD_KEYS = WHEEL.filter((w) => w.good).map((w) => w.key);
+const BAD_KEYS = WHEEL.filter((w) => !w.good).map((w) => w.key);
+
+// Gewählte Joker fürs Rad (6 gute, 6 fiese). Ältere Inhalte ohne Auswahl: die ersten sechs.
+function slotKeys(game) {
+  const c = (game && game.content) || {};
+  const pick = (arr, keys) => Array.from({ length: WHEEL_SLOTS }, (_, i) => {
+    const k = Array.isArray(arr) && arr[i] ? arr[i].joker : null;
+    return keys.includes(k) ? k : keys[i];
+  });
+  return { good: pick(c.goodSlots, GOOD_KEYS), bad: pick(c.badSlots, BAD_KEYS) };
+}
+// Fehlermeldung, wenn ein Joker doppelt aufs Rad gelegt wurde (sonst null).
+function slotProblem(game) {
+  const { good, bad } = slotKeys(game);
+  const dup = (keys) => [...new Set(keys.filter((k, i) => keys.indexOf(k) !== i))].map((k) => `„${fieldByKey(game, k).name}“`);
+  const d = [...dup(good), ...dup(bad)];
+  return d.length ? `Auf dem Glücksrad ist ${d.join(', ')} doppelt gewählt – jeder Joker darf nur einmal aufs Rad.` : null;
+}
+// Die 12 Felder des Rads in Reihenfolge (abwechselnd gut/fies), Index = Position auf dem Rad.
+function wheelFields(game) {
+  const { good, bad } = slotKeys(game);
+  const out = [];
+  for (let i = 0; i < WHEEL_SLOTS; i += 1) out.push(fieldByKey(game, good[i]), fieldByKey(game, bad[i]));
+  return out;
+}
+// Ergebnis eines Drehs (ältere Spielstände kannten nur die Feldnummer n).
+const spunField = (game, spin) => (spin.key ? fieldByKey(game, spin.key) : wheelOf(game).find((f) => f.n === spin.n));
 const val = (game, k) => fieldByKey(game, k).value ?? JOKER_VALUES[k];
 
 function teamState(st, id) {
@@ -177,6 +206,8 @@ function effective(r, id) {
 module.exports = {
   WHEEL,
   wheelOf,
+  wheelFields,
+  slotProblem,
   init: () => ({ round: -1, r: null, t: {}, events: [], finished: false }),
 
   team: {
@@ -245,9 +276,11 @@ module.exports = {
       const r = cur(st);
       if (r.phase !== 'wheel' || r.buzz !== ctx.teamId) fail('Ihr dürft gerade nicht drehen.');
       if (r.spin) fail('Das Rad hat sich schon gedreht.');
-      const idx = randomInt(WHEEL.length);
-      const f = wheelOf(game)[idx];
-      r.spin = { index: idx, n: f.n, teamId: ctx.teamId, at: ctx.now, name: f.name, good: f.good };
+      // Gleichverteilt: jedes der Felder hat dieselbe Chance (1 von 12).
+      const fields = wheelFields(game);
+      const idx = randomInt(fields.length);
+      const f = fields[idx];
+      r.spin = { index: idx, key: f.key, n: f.n, teamId: ctx.teamId, at: ctx.now, name: f.name, good: f.good };
       const t = teamState(st, ctx.teamId);
       if (f.good) {
         t.jokers.push({ id: `j${st.events.length}_${idx}_${ctx.now % 100000}`, key: f.key });
@@ -267,6 +300,8 @@ module.exports = {
   mod: {
     start(db, ctx, game, st) {
       if (st.round >= 0) fail('Das Spiel läuft schon.');
+      const dup = slotProblem(game);
+      if (dup) fail(dup);
       for (const id of teamIds(db)) teamState(st, id);
       newRound(db, st, 0);
       log(db, ctx, 'ablauf', `Runde 1: Kategorie „${game.content.rounds[0].category}“`);
@@ -392,7 +427,7 @@ module.exports = {
       // Detektiv: Antwort des beobachteten Teams nur für das Joker-Team, erst nach dessen Abgabe.
       detective: det ? { target: r.joker.target, answer: r.answers[r.joker.target]?.choice ?? null, waiting: !r.answers[r.joker.target] } : null,
       swap: tau && r.phase === 'question' ? { target: r.joker.target, ready: !!r.answers[teamId] && !!r.answers[r.joker.target], decided: !!r.swapDecided, theirs: r.answers[teamId] && r.answers[r.joker.target] ? r.answers[r.joker.target].choice : null } : null,
-      wheel: r.phase === 'wheel' ? { canBuzz: r.correct.includes(teamId) && !r.buzz, mine: r.buzz === teamId, taken: r.buzz, spin: r.spin ? { index: r.spin.index, field: field(game, r.spin.n) } : null } : null,
+      wheel: r.phase === 'wheel' ? { canBuzz: r.correct.includes(teamId) && !r.buzz, mine: r.buzz === teamId, taken: r.buzz, spin: r.spin ? { index: r.spin.index, field: spunField(game, r.spin) } : null } : null,
       targets: teamIds(db).filter((id) => id !== teamId),
       finished: st.finished,
     };
@@ -418,7 +453,7 @@ module.exports = {
       // Nach der Auflösung: gewertete Antworten (ein Tausch bleibt geheim, nur das Ergebnis zählt).
       results: ['evaluated', 'wheel'].includes(r.phase) ? teamIds(db).map((id) => ({ teamId: id, ok: r.correct.includes(id), answered: effective(r, id) !== null })) : [],
       joker: publicJoker,
-      wheel: { fields: wheelOf(game).map((f) => ({ n: f.n, icon: f.icon, good: f.good })), buzz: r.phase === 'wheel' ? r.buzz : null, spin: r.spin ? { index: r.spin.index, field: field(game, r.spin.n), teamId: r.spin.teamId, text: r.spin.res ? negText(db, r.spin.teamId, field(game, r.spin.n), r.spin.res) : null } : null, open: r.phase === 'wheel' },
+      wheel: { fields: wheelFields(game).map((f) => ({ n: f.n, icon: f.icon, good: f.good, name: f.name })), buzz: r.phase === 'wheel' ? r.buzz : null, spin: r.spin ? { index: r.spin.index, field: spunField(game, r.spin), teamId: r.spin.teamId, text: r.spin.res ? negText(db, r.spin.teamId, spunField(game, r.spin), r.spin.res) : null } : null, open: r.phase === 'wheel' },
       // Spielpunkte dieses Spiels (nicht der Show-Gesamtstand) dauerhaft auf dem Beamer.
       points: teamIds(db).map((id) => ({ teamId: id, points: teamState(st, id).points })),
       events: st.events.filter((e) => e.pub).slice(-4),

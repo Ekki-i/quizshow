@@ -310,3 +310,56 @@ test('Brain or Dreh’n: Joker im Editor änderbar (Name, Symbol, Text, Wert), �
   assert.equal(brain.wheelOf({ type: 'brain', content: {} })[0].name, 'Doppelpunkt');
   assert.equal(require('../server/scoring').pv({ type: 'nerd', content: { scoring: { maxPenalty: 5 } } }, 'maxPenalty'), 5);
 });
+
+test('Brain or Dreh’n: 6 gute + 6 fiese Joker per Auswahl aufs Rad, keine Doppelten', () => {
+  const { db } = setup(2);
+  const brain = require('../server/play-brain');
+  const g = use(db, 'brain');
+  const keys = () => brain.wheelFields(g).map((f) => f.key);
+  // Standard: die ersten sechs guten und fiesen, abwechselnd.
+  assert.deepEqual(keys(), ['doppel', 'minus2', 'streak', 'raub', 'fifty', 'verlust', 'raeuber', 'sperre', 'dieb', 'minus1', 'blockade', 'verbot']);
+  g.content.goodSlots = ['tausch', 'detektiv', 'doppel', 'streak', 'fifty', 'dieb'].map((joker) => ({ joker }));
+  g.content.badSlots = ['reset', 'enteignung', 'verbot', 'minus1', 'raub', 'minus2'].map((joker) => ({ joker }));
+  assert.deepEqual(keys(), ['tausch', 'reset', 'detektiv', 'enteignung', 'doppel', 'verbot', 'streak', 'minus1', 'fifty', 'raub', 'dieb', 'minus2']);
+  // Umbenannte Joker aus der Datenbank erscheinen so auf dem Rad.
+  g.content.jokers[15] = { ...g.content.jokers[15], name: 'Alles weg' };
+  assert.equal(brain.wheelFields(g)[1].name, 'Alles weg');
+  // Doppelt gewählt: Start verweigert, Generalprobe-Check meldet es.
+  g.content.badSlots[2] = { joker: 'reset' };
+  assert.match(brain.slotProblem(g), /„Alles weg“ doppelt/);
+  assert.throws(() => act(db, mod(), 'start'), /doppelt gewählt/);
+  const report = require('../server/check').checkShow(db, require('../server/defaults').TYPES);
+  assert.ok(JSON.stringify(report).includes('doppelt gewählt'));
+  g.content.badSlots[2] = { joker: 'verbot' };
+  act(db, mod(), 'start');
+  assert.equal(bv(db).wheel.fields.length, 12);
+});
+
+test('Brain or Dreh’n: jedes der 12 Felder hat dieselbe Chance', () => {
+  const { db, ids } = setup(2);
+  const [A] = ids;
+  const core = require('../server/core');
+  const g = use(db, 'brain');
+  act(db, mod(), 'start');
+  const st = db.live.games[g.id];
+  const real = core.randomInt;
+  const asked = new Set();
+  core.randomInt = (n) => { asked.add(n); return real(n); };
+  const counts = {};
+  const N = 12000;
+  try {
+    for (let i = 0; i < N; i += 1) {
+      st.r.phase = 'wheel'; st.r.correct = [A]; st.r.buzz = A; st.r.spin = null;
+      st.t[A].jokers = [];
+      act(db, team(A), 'spin');
+      const s = st.r.spin;
+      assert.equal(bv(db).wheel.fields[s.index].icon, bv(db).wheel.spin.field.icon); // Feld unter dem Zeiger = Ergebnis
+      counts[s.index] = (counts[s.index] || 0) + 1;
+    }
+  } finally { core.randomInt = real; }
+  assert.ok(asked.has(12)); // gezogen wird über alle 12 Felder
+  assert.equal(Object.keys(counts).length, 12);
+  const e = N / 12;
+  const chi = Object.values(counts).reduce((sum, c) => sum + ((c - e) ** 2) / e, 0);
+  assert.ok(chi < 35, `Verteilung ungleich (Chi² ${chi.toFixed(1)}): ${JSON.stringify(counts)}`);
+});
