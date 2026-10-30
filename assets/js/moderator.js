@@ -1248,6 +1248,23 @@ function geoPicker(item, save, idBase) {
   return h('div', { class: 'field geo-field' }, h('label', {}, 'Ort auf der Karte'), box, note);
 }
 
+// Beschriftung einer Auswahl-Option. Mit optionSource kommt sie aus einer Liste
+// desselben Spiels (z. B. umbenannte Joker aus der Joker-Datenbank).
+function optionLabel(f, j) {
+  const src = f.optionSource;
+  const item = src && previewTarget?.d?.content?.[src.list]?.[src.index[j]];
+  if (item && (item.name || '').trim()) return `${(item.icon || '').trim()} ${item.name.trim()}`.trim();
+  return f.optionLabels ? f.optionLabels[j] : f.options[j];
+}
+function itemPreview(fields, item) {
+  for (const sf of fields || []) {
+    const v = item[sf.key];
+    if (sf.type === 'select' && sf.optionLabels && sf.options.includes(v)) return optionLabel(sf, sf.options.indexOf(v));
+    if (typeof v === 'string' && v.trim()) return v;
+  }
+  return 'noch leer';
+}
+
 function formField(f, holder, k, save, rerender, id) {
   const set = (v) => { holder[k] = v; save(); };
   switch (f.type) {
@@ -1258,7 +1275,7 @@ function formField(f, holder, k, save, rerender, id) {
     case 'number':
       return h('div', { class: 'field' }, h('label', { for: id }, f.label), h('input', { id, type: 'number', min: String(f.min), max: String(f.max), step: String(f.step || 1), value: holder[k] ?? '', placeholder: f.placeholder ?? '', oninput: (ev) => set(ev.target.value === '' ? null : Number(ev.target.value)) }));
     case 'select': {
-      const sel = h('select', { id, onchange: (ev) => set(ev.target.value) }, f.options.map((o) => h('option', { value: o }, o)));
+      const sel = h('select', { id, onchange: (ev) => { set(ev.target.value); if (f.optionLabels) rerender(); } }, f.options.map((o, j) => h('option', { value: o }, optionLabel(f, j))));
       sel.value = holder[k] ?? f.options[0];
       return h('div', { class: 'field' }, h('label', { for: id }, f.label), sel);
     }
@@ -1308,7 +1325,7 @@ function formField(f, holder, k, save, rerender, id) {
           return h('div', { class: 'field list-text' }, h('label', { for: `${id}-${i}` }, label),
             h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, h('input', { id: `${id}-${i}`, value: item ?? '', maxlength: String(f.maxLength || 300), oninput: (ev) => { arr[i] = ev.target.value; save(); } }), remove));
         }
-        const preview = Object.values(item).find((v) => typeof v === 'string' && v.trim()) || 'noch leer';
+        const preview = itemPreview(f.fields, item);
         // Auf-/Zugeklappt bleibt erhalten, auch wenn der Editor neu gezeichnet wird.
         const openKey = `${id}-${i}`;
         const isOpen = ITEM_OPEN.has(openKey) ? ITEM_OPEN.get(openKey) : arr.length <= 3;

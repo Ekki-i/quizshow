@@ -37,6 +37,20 @@ const WHEEL = [
 // Standardwerte der Glücksrad-Felder mit Zahl.
 const JOKER_DEFAULT_VALUES = { doppel: 2, streak: 2, raeuber: 2, minus2: 2, minus1: 1, raub: 2 };
 
+// Auswahl fürs Glücksrad: 6 gute und 6 fiese Joker aus der Joker-Datenbank (Dropdown im Editor).
+const WHEEL_SLOTS = 6;
+const slotList = (good) => {
+  const pool = WHEEL.filter((w) => w.good === good);
+  return { key: good ? 'goodSlots' : 'badSlots', label: good ? 'Glücksrad: 6 gute Joker (Auswahl aus der Joker-Datenbank)' : 'Glücksrad: 6 fiese Felder (Auswahl aus der Joker-Datenbank)',
+    type: 'list', min: WHEEL_SLOTS, max: WHEEL_SLOTS, fixedOrder: true, noPreview: true,
+    itemLabel: (i) => `${good ? 'Guter Joker' : 'Fieses Feld'} ${i + 1}`,
+    defaultItems: pool.slice(0, WHEEL_SLOTS).map((w) => ({ joker: w.key })),
+    fields: [{ key: 'joker', label: good ? 'Guter Joker' : 'Fieses Feld', type: 'select', options: pool.map((w) => w.key),
+      optionLabels: pool.map((w) => `${w.icon} ${w.name}`),
+      // Im Editor werden die (evtl. umbenannten) Namen aus der Joker-Datenbank angezeigt.
+      optionSource: { list: 'jokers', index: pool.map((w) => WHEEL.indexOf(w)) } }] };
+};
+
 const DATASET_NAMES = DATASETS.map((d) => d.name);
 
 const EXTRA_TYPES = {
@@ -163,12 +177,14 @@ const EXTRA_TYPES = {
   brain: {
     title: 'Brain or Dreh\'n',
     playable: true,
-    summary: '12 Kategorien mit A–D-Fragen. Wer richtig liegt, kann ans Glücksrad: 8 gute Joker, 8 fiese Felder.',
+    summary: '12 Kategorien mit A–D-Fragen. Wer richtig liegt, kann ans Glücksrad: 6 gute Joker, 6 fiese Felder – frei gewählt aus der Joker-Datenbank.',
     schema: [
       { key: 'rounds', label: 'Runden', type: 'list', min: 12, max: 12, itemLabel: (i) => `Runde ${i + 1}`,
         fields: [text('category', 'Kategorie (wird groß vorgestellt)', 80), area('question', 'Frage', 300), optionsField, correctField] },
-      // Die 16 Felder des Glücksrads: Name, Symbol, Text und Wert änderbar – die Wirkung jedes Feldes bleibt gleich.
-      { key: 'jokers', label: 'Joker und Felder des Glücksrads (Name, Symbol, Text und Wert änderbar – die Wirkung bleibt)', type: 'list', min: 16, max: 16, fixedOrder: true, noPreview: true,
+      slotList(true),
+      slotList(false),
+      // Joker-Datenbank: 16 Joker (8 gut, 8 fies). Name, Symbol, Text und Wert änderbar – die Wirkung bleibt gleich.
+      { key: 'jokers', label: 'Joker-Datenbank (Name, Symbol, Text und Wert änderbar – die Wirkung bleibt)', type: 'list', min: 16, max: 16, fixedOrder: true, noPreview: true,
         itemLabel: (i) => `${WHEEL[i].good ? 'Guter Joker' : 'Fieses Feld'} ${WHEEL[i].n} – Wirkung: ${WHEEL[i].name}`,
         defaultItems: WHEEL.map((w) => ({ name: w.name, icon: w.icon, text: w.text, value: JOKER_DEFAULT_VALUES[w.key] ?? null })),
         fields: [text('name', 'Name', 40), text('icon', 'Symbol (Emoji)', 8), area('text', 'Text für Teams und Beamer', 200, { rows: 2 }),
@@ -189,6 +205,8 @@ const EXTRA_TYPES = {
         ['Kunst', 'Wer malte die „Mona Lisa“?', ['Michelangelo', 'Raffael', 'Leonardo da Vinci', 'Botticelli'], 'C'],
         ['Allerlei', 'Wie viele Felder hat ein Schachbrett?', ['36', '49', '64', '81'], 'C'],
       ].map(([category, question, o, correct]) => ({ category, ...abcd(question, o, correct) })),
+      goodSlots: slotList(true).defaultItems,
+      badSlots: slotList(false).defaultItems,
       jokers: WHEEL.map((w) => ({ name: w.name, icon: w.icon, text: w.text, value: JOKER_DEFAULT_VALUES[w.key] ?? null })),
     },
   },
@@ -386,4 +404,4 @@ const EXTRA_TYPES = {
 // Reihenfolge in der Spiele-Datenbank.
 const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain', 'sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu'];
 
-module.exports = { EXTRA_TYPES, EXTRA_ORDER, WHEEL };
+module.exports = { EXTRA_TYPES, EXTRA_ORDER, WHEEL, WHEEL_SLOTS };
