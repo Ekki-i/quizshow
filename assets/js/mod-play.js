@@ -270,7 +270,7 @@ function musik(ui, g, st) {
   const [c, f] = cur.split('-').map(Number);
   const cat = g.content.categories[c];
   const field = cat.fields[f];
-  out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, `${cat.name} · ${pts(f + 1)}`));
+  out.push(h('p', { class: 'question', style: { fontSize: '1.2rem' } }, `${cat.name} · ${pts(g.content.scoring && typeof g.content.scoring[`field${f + 1}`] === 'number' ? g.content.scoring[`field${f + 1}`] : f + 1)}`));
   if (/^Song Song Song/.test(cat.mode)) out.push(h('p', {}, badge('warn', 'Song Song Song: beide Titel nötig, keine Teilpunkte')));
   out.push(h('p', {}, field.task || h('span', { class: 'muted' }, '(keine Aufgabe eingetragen)')));
   out.push(h('p', {}, h('span', { class: 'muted' }, 'Lösung: '), h('b', {}, field.answer || '–'), field.audio ? h('span', { class: 'muted' }, ` · Clip: ${field.audio}`) : null));
@@ -278,6 +278,13 @@ function musik(ui, g, st) {
     round.started ? badge('ok', '● Buzzer frei') : btn('pink', '▶ Aufgabe starten, Buzzer frei', () => ui.act('play.start'), round.resolved),
     btn('small ghost', 'Ohne Punkte beenden', () => ui.confirmAct('Feld ohne Punkte beenden?', 'play.close'), round.resolved || round.buzzes.some((b) => b.status === 'pending')),
     round.resolved ? badge('ok', 'Feld beendet') : null));
+  // Musik-Clip: startet mit „Aufgabe starten“, pausiert beim Buzzern.
+  if (field.clip && !round.resolved) {
+    const pb = round.playback || { state: 'stopped' };
+    out.push(row(badge(pb.state === 'playing' ? 'ok' : '', pb.state === 'playing' ? '♪ Clip läuft' : pb.state === 'paused' ? '⏸ Clip pausiert' : `♪ Clip: ${field.clip.name || 'Musik'}`),
+      round.started ? btn('small', pb.state === 'playing' ? '⏸ Pause' : '▶ Weiter', () => ui.act(pb.state === 'playing' ? 'play.pauseAudio' : 'play.playAudio', {})) : null,
+      round.started ? btn('small ghost', '⟲ Von vorn', () => ui.act('play.playAudio', { restart: true })) : null));
+  } else if (!field.clip && !round.resolved) out.push(h('p', { class: 'muted' }, 'Kein Musik-Clip hinterlegt – im Editor beim Feld „Musik-Clip (MP3 oder MP4)“ hochladen.'));
   out.push(h('h4', {}, 'Buzzer-Reihenfolge (Server-Zeit)'));
   out.push(buzzList(ui, round, () => `✓ Richtig (+${f + 1})`, (correct) => ui.act('play.judge', { correct })));
   return out;

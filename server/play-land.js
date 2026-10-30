@@ -6,6 +6,7 @@
 // Gesuchtes Land (Welt-/Europakarte): jedes Team, das im Land tippt, bekommt 1 Punkt.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, distanceKm } = require('./core');
+const { pv } = require('./scoring');
 const COUNTRIES = require('./countries');
 
 const MODE_COUNTRY = 'Ganzes Land (nur Welt- und Europakarte)';
@@ -89,7 +90,7 @@ function bookWinners(db, ctx, game, st, r, winners, why) {
   const before = r.winners || [];
   r.winners = winners;
   for (const id of new Set([...Object.keys(r.guesses), ...before, ...winners])) {
-    bookTarget(db, ctx, `land:${game.id}:${st.taskIndex}:${id}`, id, winners.includes(id) ? 1 : 0, `${game.title}, Aufgabe ${st.taskIndex + 1}${why}`);
+    bookTarget(db, ctx, `land:${game.id}:${st.taskIndex}:${id}`, id, winners.includes(id) ? pv(game, 'winner') : 0, `${game.title}, Aufgabe ${st.taskIndex + 1}${why}`);
   }
 }
 

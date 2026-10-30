@@ -5,6 +5,7 @@
 // Antwort mit einem anderen Team tauschen. Richtige finale Antwort: 1 Punkt.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanChoice } = require('./core');
+const { pv } = require('./scoring');
 
 const WINDOW_MS = 10000;
 
@@ -105,7 +106,7 @@ module.exports = {
       r.open = false;
       r.evaluated = true;
       for (const id of Object.keys(finals)) {
-        bookTarget(db, ctx, `dummes:${game.id}:${st.qIndex}:${id}`, id, finals[id] === correct ? 1 : 0, `${game.title}, Frage ${st.qIndex + 1}`);
+        bookTarget(db, ctx, `dummes:${game.id}:${st.qIndex}:${id}`, id, finals[id] === correct ? pv(game, 'correct') : 0, `${game.title}, Frage ${st.qIndex + 1}`);
       }
       log(db, ctx, 'ablauf', `Frage ${st.qIndex + 1} ausgewertet (richtig: ${correct})${r.buzz && !r.swap ? ', kein Tausch' : ''}`);
       effect(db, 'reveal');
@@ -115,7 +116,7 @@ module.exports = {
     grade(db, ctx, game, st, p) {
       const r = current(st);
       if (!r.evaluated) fail('Erst auswerten, dann korrigieren.');
-      bookTarget(db, ctx, `dummes:${game.id}:${st.qIndex}:${p.teamId}`, p.teamId, p.correct ? 1 : 0, `${game.title}, Frage ${st.qIndex + 1}, Bewertung korrigiert`);
+      bookTarget(db, ctx, `dummes:${game.id}:${st.qIndex}:${p.teamId}`, p.teamId, p.correct ? pv(game, 'correct') : 0, `${game.title}, Frage ${st.qIndex + 1}, Bewertung korrigiert`);
     },
   },
 

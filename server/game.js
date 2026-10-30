@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { DATASETS } = require('./datasets');
 const { TYPES, DEFAULT_ORDER, LIBRARY_ORDER, EXTRA_ORDER, COIN_POSITIONS, SHOW_SIZE, TEAM_COLORS, publicTypes } = require('./defaults');
 const { checkShow } = require('./check');
+const { scoringOf } = require('./scoring');
 const { QuizError, fail, newId, log, effect, teamName, totals, cleanText, cleanImage, TIMER } = require('./core');
 
 // Ablauf der einzelnen Spiele. Jedes Modul liefert init, Team- und
@@ -91,7 +92,10 @@ function libraryEntry(type, now) {
 
 // Eine Spielinstanz in der Show ist eine unabhängige Kopie eines Datenbank-Eintrags.
 function instanceFrom(entry) {
-  return { id: newId('game'), type: entry.type, title: entry.title, content: clone(entry.content), libraryId: entry.id, libraryVersion: entry.version, locked: false };
+  const game = { id: newId('game'), type: entry.type, title: entry.title, content: clone(entry.content), libraryId: entry.id, libraryVersion: entry.version, locked: false };
+  // Spieltitel-Lied aus der Datenbank übernehmen.
+  if (entry.intro) game.intro = clone(entry.intro);
+  return game;
 }
 
 const DEFAULT_TEAM_COUNT = 6;
@@ -426,7 +430,7 @@ function cleanSongs(songs) {
   if (songs.length > SONGS_MAX) fail(`Höchstens ${SONGS_MAX} Lieder pro Pause.`);
   return songs.map((m) => {
     if (!m || typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültiges Lied.');
-    if (typeof m.type !== 'string' || !/^audio\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte nur Audiodateien als Lieder.');
+    if (typeof m.type !== 'string' || !/^(audio|video)\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte MP3-, M4A- oder MP4-Dateien als Lieder wählen.');
     return { id: m.id, type: m.type, name: cleanText(String(m.name || 'Lied'), 100) || 'Lied', size: Number(m.size) || 0 };
   });
 }
@@ -633,7 +637,11 @@ const moderatorActions = {
     if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültige Datei.');
     if (typeof m.type !== 'string' || !/^(audio|video)\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine MP3- oder MP4-Datei wählen.');
     game.intro = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro'), 100) || 'Intro', size: Number(m.size) || 0 };
-    log(db, ctx, 'editor', `Intro-Lied „${game.intro.name}“ für „${game.title}“ gesetzt`);
+    // Auch beim zugehörigen Eintrag in der Spiele-Datenbank speichern: so ist das Lied
+    // diesem Spiel zugeordnet und kommt in jeder künftigen Show automatisch mit.
+    const entry = (db.library || []).find((e) => e.id === game.libraryId);
+    if (entry) entry.intro = clone(game.intro);
+    log(db, ctx, 'editor', `Intro-Lied „${game.intro.name}“ für „${game.title}“ gesetzt${entry ? ' (auch in der Datenbank)' : ''}`);
   },
 
   // Farbe der Spieltitel-Folie dieses Spiels (null = Standardfarbe der Position).
@@ -774,9 +782,20 @@ const moderatorActions = {
   },
 
   // Ein in der Show bearbeitetes Spiel als neuen Eintrag in die Datenbank übernehmen.
+  // Spieltitel-Lied direkt in der Spiele-Datenbank setzen/entfernen.
+  'library.setIntro'(db, ctx, p) {
+    const entry = findEntry(db, p.libraryId);
+    if (p.media === null) { delete entry.intro; log(db, ctx, 'datenbank', `Intro-Lied von „${entry.title}“ entfernt`); return; }
+    const m = p.media || {};
+    if (typeof m.id !== 'string' || !/^media_[a-f0-9]{12,40}$/.test(m.id)) fail('Ungültige Datei.');
+    if (typeof m.type !== 'string' || !/^(audio|video)\/[\w.+-]{1,40}$/.test(m.type)) fail('Bitte eine MP3- oder MP4-Datei wählen.');
+    entry.intro = { id: m.id, type: m.type, name: cleanText(String(m.name || 'Intro'), 100) || 'Intro', size: Number(m.size) || 0 };
+    log(db, ctx, 'datenbank', `Intro-Lied „${entry.intro.name}“ für „${entry.title}“ gesetzt`);
+  },
   'library.saveFromShow'(db, ctx, p) {
     const game = findGame(db, p.gameId);
     const entry = { id: newId('lib'), type: game.type, title: game.title, content: clone(game.content), version: 1, updatedAt: ctx.now };
+    if (game.intro) entry.intro = clone(game.intro);
     db.library.push(entry);
     log(db, ctx, 'datenbank', `„${game.title}“ aus der Show in die Datenbank übernommen`);
     return { created: entry.id };
@@ -1186,7 +1205,7 @@ function collectMedia(v, ids) {
 
 function referencedMedia(db) {
   const ids = new Set();
-  for (const e of db.library || []) collectMedia(e.content, ids);
+  for (const e of db.library || []) { collectMedia(e.content, ids); if (e.intro) ids.add(e.intro.id); }
   for (const pr of [db.project, ...db.shows.map((x) => x.project)]) {
     if (pr.introVideo) ids.add(pr.introVideo.id);
     for (const g of pr.games) { if (g.intro) ids.add(g.intro.id); collectMedia(g.content, ids); }
@@ -1253,7 +1272,7 @@ function teamView(db, teamId, now = Date.now()) {
   const g = activeGame(db);
   if (g) {
     const play = PLAY[g.type].teamView(db, g, gameState(db, g), teamId, now);
-    if (play) view.play = { type: g.type, ...play };
+    if (play) view.play = { type: g.type, ...play, scoring: scoringOf(g) };
     if (play) view.timer = timerInfo(db, now);
   } else if (db.live.finale) {
     view.finale = FINALE.teamView(db, teamId);
@@ -1277,7 +1296,7 @@ function nextWake(db, now = Date.now()) {
 function beamerGameView(db) {
   const g = activeGame(db);
   if (!g) return null;
-  return { type: g.type, ...PLAY[g.type].beamerView(db, g, gameState(db, g)) };
+  return { type: g.type, ...PLAY[g.type].beamerView(db, g, gameState(db, g)), scoring: scoringOf(g) };
 }
 
 // Der Beamer bekommt ausschließlich öffentliche, freigegebene Daten.

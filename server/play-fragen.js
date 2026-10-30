@@ -9,6 +9,7 @@
 // Niemand richtig: fragendes Team +2.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanInk } = require('./core');
+const { pv } = require('./scoring');
 
 function secondsOf(game) {
   const n = Number(game.content.seconds);
@@ -27,9 +28,9 @@ function current(st) {
 
 const GRACE_MS = 1500; // Netzwerk-Puffer für Abgaben in der letzten Sekunde
 
-function result(r) {
+function result(r, game) {
   const right = Object.keys(r.answers).filter((id) => r.grades[id] === true);
-  return { right, askerPoints: right.length ? -1 : 2 };
+  return { right, askerPoints: right.length ? pv(game, 'askerSomeone') : pv(game, 'askerNobody') };
 }
 
 module.exports = {
@@ -134,9 +135,9 @@ module.exports = {
       // Auflösung: erst die Antworten der anderen Teams, danach die Antwort des fragenden Teams.
       r.showAnswers = true;
       r.showSolution = true;
-      const res = result(r);
+      const res = result(r, game);
       for (const id of Object.keys(r.answers)) {
-        bookTarget(db, ctx, `fragen:${game.id}:${st.catIndex}:${id}`, id, r.grades[id] ? 1 : 0, `${game.title}, Frage von ${teamName(db, r.accepted)}`);
+        bookTarget(db, ctx, `fragen:${game.id}:${st.catIndex}:${id}`, id, r.grades[id] ? pv(game, 'correct') : 0, `${game.title}, Frage von ${teamName(db, r.accepted)}`);
       }
       bookTarget(db, ctx, `fragen:${game.id}:${st.catIndex}:asker`, r.accepted, res.askerPoints, `${game.title}, eigene Frage`);
       log(db, ctx, 'ablauf', res.right.length ? `${res.right.length} Team(s) richtig – ${teamName(db, r.accepted)} −1` : `Niemand richtig – ${teamName(db, r.accepted)} +2`);
@@ -156,7 +157,7 @@ module.exports = {
     const cat = game.content.categories[st.catIndex];
     const own = r.subs.find((s) => s.teamId === teamId);
     const asker = r.accepted === teamId;
-    const res = r.evaluated ? result(r) : null;
+    const res = r.evaluated ? result(r, game) : null;
     return {
       catIndex: st.catIndex,
       name: cat.name,
@@ -173,7 +174,7 @@ module.exports = {
       answered: !!r.answers[teamId],
       tooLate: r.published && !asker && !r.answers[teamId] && r.deadline && now > r.deadline,
       evaluated: r.evaluated,
-      gained: res ? (asker ? res.askerPoints : r.grades[teamId] ? 1 : 0) : null,
+      gained: res ? (asker ? res.askerPoints : r.grades[teamId] ? pv(game, 'correct') : 0) : null,
     };
   },
 
@@ -182,7 +183,7 @@ module.exports = {
     const r = round(st, st.catIndex);
     const cat = game.content.categories[st.catIndex];
     const acc = r.accepted ? r.subs.find((s) => s.teamId === r.accepted) : null;
-    const res = r.evaluated ? result(r) : null;
+    const res = r.evaluated ? result(r, game) : null;
     return {
       catIndex: st.catIndex,
       name: cat.name,

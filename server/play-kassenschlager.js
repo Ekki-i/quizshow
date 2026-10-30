@@ -5,6 +5,7 @@
 // Team einen Hinweis und rät; richtig gibt 5 $. Am Ende: Punkte = ⌈Guthaben ÷ 2⌉.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, cleanText, cleanInk } = require('./core');
+const { pv } = require('./scoring');
 const { MOVIE_HINTS } = require('./defaults');
 
 const START_MONEY = 20;
@@ -169,7 +170,8 @@ module.exports = {
       st.converted = {};
       for (const id of teamIds(db)) {
         const money = wallet(db, st, id);
-        const points = Math.ceil(money / 2);
+        const div = pv(game, 'divisor') > 0 ? pv(game, 'divisor') : 2;
+        const points = Math.ceil(money / div);
         st.converted[id] = { money, points };
         bookTarget(db, ctx, `kassen:${game.id}:${id}`, id, points, `${game.title}, ${money} $ umgerechnet`);
       }

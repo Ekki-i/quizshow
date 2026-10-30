@@ -650,7 +650,7 @@ test('Pausen: eigene Lieder je Pause, Beamer bekommt die Playlist der laufenden 
   const pauseIdx = steps.findIndex((x) => x.kind === 'pause');
   const pause = steps[pauseIdx];
   const song = { id: 'media_aaaaaaaaaaaa11', type: 'audio/mpeg', name: 'Pausenhit.mp3', size: 1234 };
-  assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [{ ...song, type: 'video/mp4' }] }), /Audiodateien/);
+  assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [{ ...song, type: 'image/png' }] }), /MP3/);
   assert.throws(() => game.applyAction(db, mod(), 'rundown.setSongs', { stepId: steps[0].id, songs: [song] }), /Pause nicht gefunden/);
   game.applyAction(db, mod(), 'rundown.setSongs', { stepId: pause.id, songs: [song, { ...song, id: 'media_bbbbbbbbbbbb22', name: 'Zwei.mp3' }] });
   const view = game.moderatorView(db);
@@ -748,7 +748,8 @@ test('Intro-Lied je Spiel: setzen, an Beamer im Spieltitel, entfernen', () => {
   assert.deepEqual(game.beamerView(db).game.intro, { id: 'media_aaaaaaaaaaaa11', type: 'audio/mpeg' });
   game.applyAction(db, mod(), 'game.setIntro', { gameId: g.id, media: null });
   assert.equal(game.beamerView(db).game.intro, null);
-  assert.ok(!game.referencedMedia(db).has('media_aaaaaaaaaaaa11'));
+  // Bleibt dem Spiel in der Datenbank zugeordnet (Datei wird nicht gelöscht).
+  assert.ok(game.referencedMedia(db).has('media_aaaaaaaaaaaa11'));
 });
 
 test('Intro-Lied zu Ende: Beamer schaltet vom Spieltitel automatisch ins Spiel', () => {

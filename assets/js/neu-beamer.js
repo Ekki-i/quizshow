@@ -3,6 +3,11 @@
 
 import { h, mediaUrl } from './client.js';
 
+// Punktwerte aus dem Editor (über den Server), sonst Standard.
+const pv = (g, k, d = 1) => (g && g.scoring && typeof g.scoring[k] === 'number' ? g.scoring[k] : d);
+const plus = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+
+
 const pts = (n) => `${n} ${Math.abs(n) === 1 ? 'Punkt' : 'Punkte'}`;
 const sub = (text, style = {}) => h('div', { class: 'sub', style: { marginTop: 0, ...style } }, text);
 const chip = (t, extra = '', ...rest) => h('span', { class: `chip team-chip ${extra}`, '--chip': t.color }, t.name, ...rest);
@@ -90,7 +95,7 @@ function top100(v, teamOf) {
   if (v.waiting) return waitTitle('Quizzen, wo man steht', 'Top-100-Listen: je weiter hinten euer Eintrag steht, desto mehr Punkte.');
   const src = [v.source && `Quelle: ${v.source}`, v.period, v.asOf].filter(Boolean).join(' · ');
   const out = [banner(v.category, 'compact slim'), src ? sub(src, { fontSize: '2vh', opacity: 0.8 }) : null,
-    h('div', { class: 'nb-t100-scale' }, [['1–20', 1], ['21–40', 2], ['41–60', 3], ['61–80', 4], ['81–100', 5]].map(([r, p]) => h('span', {}, h('small', {}, `Rang ${r}`), h('b', {}, pts(p)))))];
+    h('div', { class: 'nb-t100-scale' }, [['1–20', 1], ['21–40', 2], ['41–60', 3], ['61–80', 4], ['81–100', 5]].map(([r, d], i) => [r, v.scale ? v.scale[i] : d]).map(([r, p]) => h('span', {}, h('small', {}, `Rang ${r}`), h('b', {}, pts(p)))))];
   if (!v.evaluated) { out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '3vh' })); return out; }
   out.push(h('div', { class: 'nb-t100-res' }, v.results.map((r) => h('div', { class: `nb-t100-row${r.rank ? '' : ' miss'}`, '--team': teamOf(r.teamId).color },
     h('span', { class: 'nm' }, teamOf(r.teamId).name), h('span', { class: 'ans' }, `„${r.text}“`),
@@ -108,7 +113,7 @@ function star(v, teamOf) {
       return h('div', { class: `nb-star-term${v.resolved ? (i === v.wrong ? ' wrong' : ' right') : ''}`, style: { left: `${50 + 40 * Math.cos(a)}%`, top: `${50 + 40 * Math.sin(a)}%` } }, t);
     }));
   const order = v.buzzOrder.length ? row(...v.buzzOrder.map((b, k) => chip(teamOf(b.teamId), b.correct === false ? 'wrong' : '', ` ${k + 1}.${b.correct === undefined ? '' : b.correct ? ' ✓' : ' ✗'}`))) : null;
-  return [ring, order, v.resolved ? h('div', { class: 'solution', style: { marginTop: '1.5vh' } }, v.winner ? `${teamOf(v.winner).name} +1` : 'Kein Team lag richtig') : null];
+  return [ring, order, v.resolved ? h('div', { class: 'solution', style: { marginTop: '1.5vh' } }, v.winner ? `${teamOf(v.winner).name} ${plus(pv(v, 'correct'))}` : 'Kein Team lag richtig') : null];
 }
 
 // ---------- Remember the Timeline ----------
@@ -134,7 +139,7 @@ function chat(v, teamOf) {
     h('div', { class: 'pc-body' }, v.messages.map((m, i) => h('div', { class: `pc-msg ${m.right ? 'right' : 'left'}${i === v.messages.length - 1 && !v.resolved ? ' new' : ''}` }, m.text))));
   const buzz = v.buzzOrder.length ? row(...v.buzzOrder.map((b) => chip(teamOf(b.teamId), `${b.teamId === v.answering ? 'answering' : ''} ${b.status === 'wrong' ? 'wrong' : ''}`, b.status === 'correct' ? ' ✓' : b.status === 'wrong' ? ' ✗' : ''))) : null;
   return [h('div', { class: 'nb-chat' }, phone, h('div', { class: 'nb-chat-side' }, h('div', { class: 'nb-chat-count' }, `${v.shown} / ${v.total}`), buzz,
-    v.resolved ? h('div', { class: 'solution' }, v.winner ? `${teamOf(v.winner).name} +1` : v.person) : null))];
+    v.resolved ? h('div', { class: 'solution' }, v.winner ? `${teamOf(v.winner).name} ${plus(pv(v, 'correct'))}` : v.person) : null))];
 }
 
 // ---------- Host du das Zeug dafür? ----------

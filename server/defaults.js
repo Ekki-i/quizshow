@@ -143,7 +143,7 @@ const TYPES = {
           text('name', 'Name der Kategorie', 80),
           { key: 'mode', label: 'Wertung', type: 'select', options: ['Normal', 'Song Song Song (beide Titel nötig, keine Teilpunkte)'] },
           { key: 'fields', label: 'Felder', type: 'list', min: 3, max: 3, itemLabel: (i) => `${i + 1} ${i === 0 ? 'Punkt' : 'Punkte'}`,
-            fields: [area('task', 'Aufgabe', 300), text('answer', 'Lösung'), text('audio', 'Audiodatei oder Notiz zum Clip', 200)] },
+            fields: [area('task', 'Aufgabe', 300), text('answer', 'Lösung'), { key: 'clip', label: 'Musik-Clip (MP3 oder MP4) – läuft auf dem Beamer mit „Aufgabe starten“', type: 'media', accept: 'audio' }, text('audio', 'Notiz zum Clip (optional)', 200)] },
         ] },
     ],
     example: {
@@ -209,6 +209,13 @@ const DEFAULT_ORDER = ['leichte5', 'dummes', 'land', 'kassenschlager', 'trumpf5'
 // Weitere Spiele nur für die Spiele-Datenbank (nie automatisch in einer Show).
 const { EXTRA_TYPES, EXTRA_ORDER, WHEEL } = require('./defaults-extra');
 Object.assign(TYPES, EXTRA_TYPES);
+
+// Bei jedem Spiel mit festen Punktwerten: Block „Punkte – wie viele wofür“ im Editor.
+const { scoringField } = require('./scoring');
+for (const [type, t] of Object.entries(TYPES)) {
+  const f = scoringField(type);
+  if (f && !t.schema.some((x) => x.key === 'scoring')) t.schema.push(f);
+}
 const LIBRARY_ORDER = [...DEFAULT_ORDER, ...EXTRA_ORDER];
 
 // Münzzeremonien nach den aktiven Positionen 4, 6 und 8 (Preisstufen 4–2–2).

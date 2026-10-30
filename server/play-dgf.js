@@ -12,6 +12,7 @@
 // oder kein Team mehr im Spiel ist.
 
 const { fail, log, effect, teamName, teamIds, bookTarget, randomInt } = require('./core');
+const { pv } = require('./scoring');
 
 const lines = (t) => String(t || '').split('\n').map((x) => x.trim()).filter(Boolean);
 
@@ -99,7 +100,7 @@ module.exports = {
       } else {
         term.gone = true;
         term.by = id;
-        r.teams[id].points += 1;
+        r.teams[id].points += pv(game, 'term');
         r.flash = { teamId: id, kind: 'right', term: term.text, seq: (r.flash?.seq || 0) + 1 };
         log(db, ctx, 'bewertung', `${teamName(db, id)}: „${term.text}“ richtig (${r.teams[id].points} ungesichert)`);
         effect(db, 'correct');

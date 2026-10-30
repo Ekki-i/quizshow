@@ -8,6 +8,7 @@
 // entscheidet die Moderation (oder alle bekommen die Punkte, je nach Einstellung).
 
 const { fail, log, effect, teamName, teamIds, bookTarget } = require('./core');
+const { pv } = require('./scoring');
 const { datasetByName, entriesFor, valueOf, difference } = require('./datasets');
 
 const today = (now) => new Date(now).toISOString().slice(0, 10);
@@ -87,8 +88,8 @@ function compute(game, st, r, now) {
 function book(db, ctx, game, st, r) {
   const rows = r.results.rows;
   const pts = Object.fromEntries(rows.map((x) => [x.teamId, 0]));
-  for (const id of r.best) pts[id] += 2;
-  for (const id of r.worst) pts[id] -= 1;
+  for (const id of r.best) pts[id] += pv(game, 'best');
+  for (const id of r.worst) pts[id] += pv(game, 'worst');
   for (const [teamId, p] of Object.entries(pts)) {
     bookTarget(db, ctx, `zuweit:${game.id}:${st.index}:${teamId}`, teamId, p, `${game.title}, Runde ${st.index + 1}`);
   }

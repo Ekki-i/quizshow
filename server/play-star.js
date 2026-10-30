@@ -8,6 +8,7 @@
 // das schnellste Team mit richtiger Wahl bekommt 1 Punkt, höchstens einer je Rätsel.
 
 const { fail, log, effect, teamName, bookTarget } = require('./core');
+const { pv } = require('./scoring');
 
 const N = 8;
 const wrongIndex = (pz) => Number(String(pz.wrong || '').replace(/\D/g, '')) - 1;
@@ -71,7 +72,7 @@ module.exports = {
       r.open = false;
       r.resolved = true;
       r.winner = win ? win.teamId : null;
-      if (win) bookTarget(db, ctx, `star:${game.id}:${st.index}`, win.teamId, 1, `${game.title}, Rätsel ${st.index + 1}`);
+      if (win) bookTarget(db, ctx, `star:${game.id}:${st.index}`, win.teamId, pv(game, 'correct'), `${game.title}, Rätsel ${st.index + 1}`);
       log(db, ctx, 'ablauf', `Star: Rätsel ${st.index + 1} aufgelöst${win ? ` – ${teamName(db, win.teamId)} +1` : ' – kein Team richtig'}`);
       effect(db, win ? 'correct' : 'reveal');
     },
