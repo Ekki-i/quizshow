@@ -289,7 +289,9 @@ function sanitizeField(f, v) {
       return { id: v.id, type: v.type, name: String(v.name || 'Datei').slice(0, 100), size: Number(v.size) || 0 };
     }
     case 'list': {
-      const arr = Array.isArray(v) ? v : [];
+      let arr = Array.isArray(v) ? v : [];
+      // Ältere Inhalte ohne diese Liste (z. B. Glücksrad-Felder) bekommen die Standardeinträge.
+      if (!arr.length && Array.isArray(f.defaultItems)) arr = clone(f.defaultItems);
       if (arr.length < f.min || arr.length > f.max) {
         fail(f.min === f.max ? `„${f.label}“ braucht genau ${f.min} Einträge.` : `„${f.label}“: ${f.min} bis ${f.max} Einträge.`);
       }

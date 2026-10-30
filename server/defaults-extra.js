@@ -34,6 +34,9 @@ const WHEEL = [
   { n: 16, key: 'reset', good: false, icon: '0️⃣', name: 'Reset', text: 'Eure Spielpunkte in diesem Spiel fallen auf 0.' },
 ];
 
+// Standardwerte der Glücksrad-Felder mit Zahl.
+const JOKER_DEFAULT_VALUES = { doppel: 2, streak: 2, raeuber: 2, minus2: 2, minus1: 1, raub: 2 };
+
 const DATASET_NAMES = DATASETS.map((d) => d.name);
 
 const EXTRA_TYPES = {
@@ -164,6 +167,12 @@ const EXTRA_TYPES = {
     schema: [
       { key: 'rounds', label: 'Runden', type: 'list', min: 12, max: 12, itemLabel: (i) => `Runde ${i + 1}`,
         fields: [text('category', 'Kategorie (wird groß vorgestellt)', 80), area('question', 'Frage', 300), optionsField, correctField] },
+      // Die 16 Felder des Glücksrads: Name, Symbol, Text und Wert änderbar – die Wirkung jedes Feldes bleibt gleich.
+      { key: 'jokers', label: 'Joker und Felder des Glücksrads (Name, Symbol, Text und Wert änderbar – die Wirkung bleibt)', type: 'list', min: 16, max: 16, fixedOrder: true, noPreview: true,
+        itemLabel: (i) => `${WHEEL[i].good ? 'Guter Joker' : 'Fieses Feld'} ${WHEEL[i].n} – Wirkung: ${WHEEL[i].name}`,
+        defaultItems: WHEEL.map((w) => ({ name: w.name, icon: w.icon, text: w.text, value: JOKER_DEFAULT_VALUES[w.key] ?? null })),
+        fields: [text('name', 'Name', 40), text('icon', 'Symbol (Emoji)', 8), area('text', 'Text für Teams und Beamer', 200, { rows: 2 }),
+          num('value', 'Wert (nur bei Doppelpunkt, Streak-Start, Punkteräuber, Punktabzug, Punktraub)', 0, 50)] },
     ],
     example: {
       rounds: [
@@ -180,6 +189,7 @@ const EXTRA_TYPES = {
         ['Kunst', 'Wer malte die „Mona Lisa“?', ['Michelangelo', 'Raffael', 'Leonardo da Vinci', 'Botticelli'], 'C'],
         ['Allerlei', 'Wie viele Felder hat ein Schachbrett?', ['36', '49', '64', '81'], 'C'],
       ].map(([category, question, o, correct]) => ({ category, ...abcd(question, o, correct) })),
+      jokers: WHEEL.map((w) => ({ name: w.name, icon: w.icon, text: w.text, value: JOKER_DEFAULT_VALUES[w.key] ?? null })),
     },
   },
 

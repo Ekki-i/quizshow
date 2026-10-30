@@ -289,3 +289,24 @@ test('Musikquiz: Clip läuft mit „Aufgabe starten“, pausiert beim Buzzern; P
   act(db, mod(), 'judge', { correct: true });
   assert.equal(pts(db, ids[0]), 5);
 });
+
+test('Brain or Dreh’n: Joker im Editor änderbar (Name, Symbol, Text, Wert), ältere Inhalte bekommen Standard-Joker', () => {
+  const { db } = setup(2);
+  const brain = require('../server/play-brain');
+  const g = use(db, 'brain');
+  assert.equal(g.content.jokers.length, 16);
+  const content = structuredClone(g.content);
+  delete content.jokers; // alter Stand ohne Joker-Liste
+  const lib = db.library.find((e) => e.type === 'brain');
+  game.applyAction(db, mod(), 'library.update', { libraryId: lib.id, content });
+  assert.equal(db.library.find((e) => e.type === 'brain').content.jokers.length, 16);
+  const own = structuredClone(content);
+  own.jokers = structuredClone(db.library.find((e) => e.type === 'brain').content.jokers);
+  own.jokers[1] = { name: 'Großer Abzug', icon: '💥', text: 'Ihr verliert 5 Spielpunkte.', value: 5 };
+  const w = brain.wheelOf({ type: 'brain', content: own });
+  assert.equal(w[1].key, 'minus2'); // Wirkung bleibt
+  assert.equal(w[1].name, 'Großer Abzug');
+  assert.equal(w[1].value, 5);
+  assert.equal(brain.wheelOf({ type: 'brain', content: {} })[0].name, 'Doppelpunkt');
+  assert.equal(require('../server/scoring').pv({ type: 'nerd', content: { scoring: { maxPenalty: 5 } } }, 'maxPenalty'), 5);
+});
