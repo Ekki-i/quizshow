@@ -221,3 +221,21 @@ test('Host du das Zeug dafür: alle müssen einreichen, eigene Option gesperrt, 
   act(db, mod(), 'reveal');
   assert.deepEqual(ids.map((id) => pts(db, id)), [3, 2, 0, 1]);
 });
+
+test('Wer nix werd, werd Nerd: Notizen nur in der Gebotsphase, danach privat und nur lesbar', () => {
+  const { db, ids } = setup(2);
+  game.applyAction(db, mod(), 'show.activate', { gameId: db.project.games.find((g) => g.type === 'nerd').id });
+  db.live.beamer = { view: 'game', data: {} };
+  const ink = 'data:image/png;base64,iVBORw0KGgo=';
+  act(db, mod(), 'open', { catIndex: 0 });
+  act(db, team(ids[0]), 'notes', { ink });
+  assert.equal(tv(db, ids[0]).notesInk, null); // während der Gebote nicht in der Sicht
+  act(db, team(ids[0]), 'bid', { bid: 3 });
+  act(db, team(ids[0]), 'notes', { ink }); // nach eigenem Gebot noch änderbar
+  act(db, team(ids[1]), 'bid', { bid: 2 });
+  act(db, mod(), 'revealBids');
+  assert.equal(tv(db, ids[0]).notesInk, ink);
+  assert.equal(tv(db, ids[1]).notesInk, null); // fremde Notizen nie sichtbar
+  assert.equal(JSON.stringify(game.beamerView(db)).includes(ink), false);
+  assert.throws(() => act(db, team(ids[0]), 'notes', { ink }), /Gebotsphase/);
+});

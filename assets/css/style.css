@@ -1741,3 +1741,4 @@ details.item.drop-here { outline: 2px dashed var(--accent-2, #ffc23d); outline-o
 .gier-balance { display: grid; gap: 6px; }
 .gier-balance .hp { grid-template-columns: 1fr auto auto auto; }
 .gier-balance .hp-num { font-size: 1.8rem; color: var(--accent-2, #ffc23d); }
+.notes-view .ink-answer { max-height: 30vh; width: auto; max-width: 100%; margin: 0 auto; }

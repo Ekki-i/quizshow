@@ -347,10 +347,26 @@ function jauch(g, ui) {
 
 // ---------- 8 · Wer nix werd, werd Nerd ----------
 
+// Notizfeld für den Apple Pencil (nur das eigene Team sieht es). Wird nach jedem
+// Strich kurz verzögert auf dem Server gesichert und erscheint nach der Gebotsphase
+// als Bild (nicht mehr beschreibbar) als Hilfe beim Antworten.
+let nerdNotes = { key: null, el: null };
+function nerdNotesPad(g, ui) {
+  const key = `nerd.notes.${g.catIndex}`;
+  if (nerdNotes.key === key) return nerdNotes.el;
+  let t = null;
+  const pad = inkPad({ draftKey: key, label: 'Eure Notizen (nur ihr seht sie)', button: '', ask, toast, noSubmit: true, small: true,
+    onChange: () => { clearTimeout(t); t = setTimeout(() => run(ui.conn, 'play.notes', { ink: pad.inkApi.hasInk() ? pad.inkApi.png() : null }), 700); } });
+  pad.classList.add('notes-pad');
+  pad.querySelector('canvas')?.classList.add('notes-canvas');
+  nerdNotes = { key, el: pad };
+  return pad;
+}
+
 function nerd(g, ui) {
   const out = [h('p', { class: 'muted' }, `${g.finale ? '★ Große Finalkategorie' : `Kategorie ${g.catIndex + 1} von ${g.count}`}`), h('p', { class: 'question' }, g.category), g.possible ? h('p', { class: 'muted' }, `Maximal ${g.possible} richtige Antworten möglich`) : null];
   if (g.phase === 'bidding') {
-    if (!g.canBid) return [...out, shield(stateBox('', '🔒', `Euer Gebot: ${g.ownBid} – wartet, bis alle Gebote aufgedeckt werden.`))];
+    if (!g.canBid) return [...out, shield(stateBox('', '🔒', `Euer Gebot: ${g.ownBid} – wartet, bis alle Gebote aufgedeckt werden.`)), nerdNotesPad(g, ui)];
     const input = h('input', { id: 'bid', type: 'number', min: '1', max: String(g.maxBid), inputmode: 'numeric', class: 'bid-input', 'aria-label': 'Gebot' });
     out.push(h('p', {}, 'Wie viele richtige Antworten traut ihr euch zu? Das Gebot bleibt geheim, bis alle aufgedeckt werden.'));
     out.push(h('form', {
@@ -362,8 +378,11 @@ function nerd(g, ui) {
         run(ui.conn, 'play.bid', { bid }); // sofort absenden, ohne Rückfrage
       },
     }, input, h('button', { class: 'btn pink huge', type: 'submit' }, 'Gebot abgeben')));
+    out.push(nerdNotesPad(g, ui));
     return out;
   }
+  // Nach der Gebotsphase: Notizen als Hilfe, nur noch zum Ansehen.
+  if (g.notesInk) out.push(h('div', { class: 'card notes-view' }, h('p', { class: 'muted', style: { margin: '0 0 6px' } }, 'Eure Notizen (nicht mehr änderbar)'), h('img', { class: 'ink-answer', src: g.notesInk, alt: 'Eure Notizen' })));
   if (g.bids) out.push(h('ul', { class: 'list' }, g.bids.map((b) => h('li', {}, h('span', { class: 'dot', style: { background: ui.teamColor(b.teamId) } }), h('span', { class: 'grow' }, ui.teamName(b.teamId)), h('b', {}, b.bid)))));
   if (g.phase === 'choose') out.push(stateBox('', '⚖', 'Gleichstand – die Moderation entscheidet, wer beginnt.'));
   const a = g.attempt;
