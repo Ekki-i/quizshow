@@ -27,9 +27,11 @@ const SECRET = ['detektiv', 'tausch']; // Auswahl bleibt geheim
 // Editor änderbar; die Wirkung (Mechanik) jedes Feldes bleibt gleich.
 const JOKER_VALUES = { doppel: 2, streak: 2, raeuber: 2, minus2: 2, minus1: 1, raub: 2 };
 function wheelOf(game) {
-  const own = (game && game.content && Array.isArray(game.content.jokers)) ? game.content.jokers : [];
-  return WHEEL.map((w, i) => {
-    const o = own[i] || {};
+  const c = (game && game.content) || {};
+  return WHEEL.map((w) => {
+    const side = c[w.good ? 'good' : 'bad'];
+    const pos = WHEEL.filter((x) => x.good === w.good).indexOf(w);
+    const o = (side && Array.isArray(side.jokers) && side.jokers[pos]) || (Array.isArray(c.jokers) && c.jokers[WHEEL.indexOf(w)]) || {};
     const val = typeof o.value === 'number' && Number.isFinite(o.value) ? o.value : JOKER_VALUES[w.key];
     return { ...w, name: (o.name || '').trim() || w.name, icon: (o.icon || '').trim() || w.icon, text: (o.text || '').trim() || w.text, value: val ?? null };
   });
@@ -45,7 +47,7 @@ function slotKeys(game) {
     const k = Array.isArray(arr) && arr[i] ? arr[i].joker : null;
     return keys.includes(k) ? k : keys[i];
   });
-  return { good: pick(c.goodSlots, GOOD_KEYS), bad: pick(c.badSlots, BAD_KEYS) };
+  return { good: pick(c.good ? c.good.slots : c.goodSlots, GOOD_KEYS), bad: pick(c.bad ? c.bad.slots : c.badSlots, BAD_KEYS) };
 }
 // Fehlermeldung, wenn ein Joker doppelt aufs Rad gelegt wurde (sonst null).
 function slotProblem(game) {

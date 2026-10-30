@@ -1250,9 +1250,10 @@ function geoPicker(item, save, idBase) {
 
 // Beschriftung einer Auswahl-Option. Mit optionSource kommt sie aus einer Liste
 // desselben Spiels (z. B. umbenannte Joker aus der Joker-Datenbank).
+const atPath = (obj, path) => (path || []).reduce((o, k) => (o == null ? o : o[k]), obj);
 function optionLabel(f, j) {
   const src = f.optionSource;
-  const item = src && previewTarget?.d?.content?.[src.list]?.[src.index[j]];
+  const item = src && atPath(previewTarget?.d?.content, src.path)?.[j];
   if (item && (item.name || '').trim()) return `${(item.icon || '').trim()} ${item.name.trim()}`.trim();
   return f.optionLabels ? f.optionLabels[j] : f.options[j];
 }
@@ -1275,13 +1276,16 @@ function formField(f, holder, k, save, rerender, id) {
     case 'number':
       return h('div', { class: 'field' }, h('label', { for: id }, f.label), h('input', { id, type: 'number', min: String(f.min), max: String(f.max), step: String(f.step || 1), value: holder[k] ?? '', placeholder: f.placeholder ?? '', oninput: (ev) => set(ev.target.value === '' ? null : Number(ev.target.value)) }));
     case 'select': {
-      const sel = h('select', { id, onchange: (ev) => { set(ev.target.value); if (f.optionLabels) rerender(); } }, f.options.map((o, j) => h('option', { value: o }, optionLabel(f, j))));
+      // unique: in den anderen Einträgen derselben Liste schon gewählte Optionen sind gesperrt.
+      const others = f.optionSource?.unique ? (atPath(previewTarget?.d?.content, f.optionSource.unique) || []).filter((x) => x !== holder).map((x) => x && x[f.key]) : [];
+      const sel = h('select', { id, onchange: (ev) => { set(ev.target.value); if (f.optionLabels) rerender(); } },
+        f.options.map((o, j) => h('option', { value: o, disabled: others.includes(o) && o !== holder[k] }, `${optionLabel(f, j)}${others.includes(o) ? ' (schon auf dem Rad)' : ''}`)));
       sel.value = holder[k] ?? f.options[0];
       return h('div', { class: 'field' }, h('label', { for: id }, f.label), sel);
     }
     case 'object':
       holder[k] = holder[k] || {};
-      return h('fieldset', { class: 'group' }, h('legend', {}, f.label), h('div', { class: 'field-grid' }, formFields(f.fields, holder[k], save, rerender, id)));
+      return h('fieldset', { class: `group${f.sideClass ? ` ${f.sideClass}` : ''}` }, h('legend', {}, f.label), h('div', { class: f.stack ? 'field-stack' : 'field-grid' }, formFields(f.fields, holder[k], save, rerender, id)));
     case 'list': {
       const arr = (holder[k] = holder[k] && holder[k].length ? holder[k] : structuredClone(f.defaultItems || []));
       const canChange = f.min !== f.max;
