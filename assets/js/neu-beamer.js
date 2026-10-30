@@ -17,19 +17,34 @@ const img = (m, cls) => { const el = h('img', { class: cls, alt: '' }); if (m) m
 const fmtNum = (n) => (n === null || n === undefined ? '–' : Number(n).toLocaleString('de-DE'));
 const row = (...c) => h('div', { class: 'row', style: { justifyContent: 'center', gap: '1vw', marginTop: '2vh', flexWrap: 'wrap' } }, ...c);
 
+// Statusleiste: alle Teams als graue Kästen, wer abgegeben hat, leuchtet in Teamfarbe.
+function teamStatus(ids, done, teamOf, label = 'abgegeben') {
+  if (!ids || !ids.length) return null;
+  return h('div', { class: 'nb-status' }, ids.map((id, i) => {
+    const t = teamOf(id);
+    const ok = done.includes(id);
+    return h('div', { class: `nb-st${ok ? ' done' : ''}`, '--team': t.color, style: { animationDelay: `${0.1 * i}s` } },
+      h('span', { class: 'nm' }, t.name), h('b', { class: 'ic' }, ok ? '✓' : '…'), h('small', {}, ok ? label : 'überlegt noch'));
+  }));
+}
+
 // ---------- Blamieren oder Sortieren ----------
 function sortieren(v, teamOf) {
   if (v.waiting) return waitTitle('Blamieren oder Sortieren', 'Fünf Karten in die richtige Reihenfolge bringen – jeder richtige Platz zählt.');
-  const card = (c, extra = '', label = null) => h('div', { class: `nb-sort-card ${extra}` }, label, c.image ? img(c.image, 'nb-sort-img') : null, c.label ? h('span', { class: 'nm' }, c.label) : null, c.info ? h('span', { class: 'info' }, c.info) : null);
+  const card = (c, i, extra = '', label = null) => h('div', { class: `nb-sort-card ${extra}`, style: { animationDelay: `${(extra.includes('solved') ? 0.45 : 0.12) * i}s` } },
+    label, c.image ? img(c.image, 'nb-sort-img') : null, c.label ? h('span', { class: 'nm' }, c.label) : null, c.info ? h('span', { class: 'info' }, c.info) : null);
   if (!v.evaluated) {
-    return [banner(v.category, 'compact slim'), h('div', { class: 'nb-sort-row' }, v.cards.map((c) => card(c))),
-      sub(`${v.submittedCount} von ${v.teamCount} Teams haben sortiert`, { marginTop: '3vh' })];
+    return [banner(v.category, 'compact slim'),
+      h('div', { class: 'nb-sort-row open' }, v.cards.map((c, i) => card(c, i, 'enter', h('b', { class: 'qm' }, '?')))),
+      teamStatus(v.teamIds, v.submitted || [], teamOf, 'sortiert') || sub(`${v.submittedCount} von ${v.teamCount} Teams haben sortiert`, { marginTop: '3vh' })];
   }
+  const base = 0.45 * v.solution.length + 0.4;
   return [banner(v.category, 'compact slim'),
-    h('div', { class: 'nb-sort-row solved' }, v.solution.map((c, i) => card(c, 'solved', h('b', { class: 'pos' }, String(i + 1))))),
-    h('div', { class: 'nb-sort-results' }, v.results.sort((a, b) => b.points - a.points).map((r) => h('div', { class: 'nb-sort-res' },
-      chip(teamOf(r.teamId)), h('span', { class: 'marks' }, r.order.map((k, pos) => h('i', { class: k === pos ? 'ok' : 'bad' }, k === pos ? '✓' : '✗'))),
-      h('b', { class: 'p' }, `+${r.points}`))))];
+    h('div', { class: 'nb-sort-row solved' }, v.solution.map((c, i) => card(c, i, 'solved', h('b', { class: 'pos' }, String(i + 1))))),
+    h('div', { class: 'nb-sort-results' }, v.results.sort((a, b) => b.points - a.points).map((r, n) => h('div', { class: `nb-sort-res${r.points === 5 ? ' perfect' : ''}`, '--team': teamOf(r.teamId).color, style: { animationDelay: `${base + 0.15 * n}s` } },
+      h('span', { class: 'nm' }, teamOf(r.teamId).name),
+      h('span', { class: 'marks' }, r.order.map((k, pos) => h('i', { class: k === pos ? 'ok' : 'bad', style: { animationDelay: `${base + 0.15 * n + 0.08 * pos}s` } }, k === pos ? '✓' : '✗'))),
+      h('b', { class: 'p' }, plus(r.points)))))];
 }
 
 // ---------- Riskier die Gier ----------
@@ -94,25 +109,39 @@ function gier(v, teamOf) {
 function top100(v, teamOf) {
   if (v.waiting) return waitTitle('Quizzen, wo man steht', 'Top-100-Listen: je weiter hinten euer Eintrag steht, desto mehr Punkte.');
   const src = [v.source && `Quelle: ${v.source}`, v.period, v.asOf].filter(Boolean).join(' · ');
-  const out = [banner(v.category, 'compact slim'), src ? sub(src, { fontSize: '2vh', opacity: 0.8 }) : null,
-    h('div', { class: 'nb-t100-scale' }, [['1–20', 1], ['21–40', 2], ['41–60', 3], ['61–80', 4], ['81–100', 5]].map(([r, d], i) => [r, v.scale ? v.scale[i] : d]).map(([r, p]) => h('span', {}, h('small', {}, `Rang ${r}`), h('b', {}, pts(p)))))];
-  if (!v.evaluated) { out.push(sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '3vh' })); return out; }
-  out.push(h('div', { class: 'nb-t100-res' }, v.results.map((r) => h('div', { class: `nb-t100-row${r.rank ? '' : ' miss'}`, '--team': teamOf(r.teamId).color },
-    h('span', { class: 'nm' }, teamOf(r.teamId).name), h('span', { class: 'ans' }, `„${r.text}“`),
-    h('span', { class: 'rank' }, r.rank ? `Rang ${r.rank}` : 'nicht in der Top 100'), h('b', { class: 'p' }, `+${r.points}`)))));
+  // Punkteleiter: je weiter hinten in der Liste, desto höher die Stufe.
+  const scale = [['1–20', 1], ['21–40', 2], ['41–60', 3], ['61–80', 4], ['81–100', 5]].map(([r, d], i) => [r, v.scale ? v.scale[i] : d]);
+  const ladder = h('div', { class: `nb-t100-ladder${v.evaluated ? ' small' : ''}` }, scale.map(([r, p], i) => h('div', { class: 'step', '--h': `${50 + i * 12.5}%`, style: { animationDelay: `${0.12 * i}s` } },
+    h('b', {}, plus(p)), h('small', {}, `Rang ${r}`))));
+  const out = [banner(v.category, 'compact slim'), src ? sub(src, { fontSize: '2vh', opacity: 0.8 }) : null, ladder];
+  if (!v.evaluated) { out.push(teamStatus(v.teamIds, v.submitted || [], teamOf) || sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '3vh' })); return out; }
+  out.push(h('div', { class: 'nb-t100-res' }, v.results.map((r, n) => h('div', { class: `nb-t100-row${r.rank ? '' : ' miss'}`, '--team': teamOf(r.teamId).color, style: { animationDelay: `${0.35 * n}s` } },
+    h('span', { class: 'nm' }, teamOf(r.teamId).name),
+    h('span', { class: 'ans' }, h('span', {}, `„${r.text}“`), r.entry && r.entry.toLowerCase() !== String(r.text).toLowerCase() ? h('small', {}, `= ${r.entry}`) : null),
+    // Position in der Liste als Balken von Rang 1 bis 100
+    h('span', { class: 'trk' }, r.rank ? h('i', { '--x': `${r.rank}%`, style: { animationDelay: `${0.35 * n + 0.2}s` } }) : null),
+    h('span', { class: 'rank' }, r.rank ? `Rang ${r.rank}` : 'nicht in der Liste'), h('b', { class: 'p' }, plus(r.points))))));
   return out;
 }
 
 // ---------- Ich bin ein Star, lüg mich nicht an ----------
 function star(v, teamOf) {
   if (v.waiting) return waitTitle('Ich bin ein Star, lüg mich nicht an', 'Acht Begriffe – einer davon ist gelogen.');
-  const ring = h('div', { class: 'nb-star' },
+  const pos = (i) => { const a = (i / 8) * 2 * Math.PI - Math.PI / 2; return [50 + 40 * Math.cos(a), 50 + 40 * Math.sin(a)]; }; // im Uhrzeigersinn ab oben
+  const spokes = h('div', { class: 'nb-star-spokes' });
+  spokes.innerHTML = `<svg viewBox="0 0 155 100" preserveAspectRatio="none">${v.terms.map((_, i) => { const [x, y] = pos(i); return `<line x1="77.5" y1="50" x2="${x * 1.55}" y2="${y}" class="${v.resolved && i === v.wrong ? 'hot' : ''}"/>`; }).join('')}</svg>`;
+  const ring = h('div', { class: `nb-star${v.resolved ? ' resolved' : ''}` }, spokes,
     h('div', { class: 'nb-star-center' }, v.centerImage ? img(v.centerImage, 'nb-star-img') : null, h('b', {}, v.center)),
     v.terms.map((t, i) => {
-      const a = (i / 8) * 2 * Math.PI - Math.PI / 2; // im Uhrzeigersinn ab oben
-      return h('div', { class: `nb-star-term${v.resolved ? (i === v.wrong ? ' wrong' : ' right') : ''}`, style: { left: `${50 + 40 * Math.cos(a)}%`, top: `${50 + 40 * Math.sin(a)}%` } }, t);
+      const [x, y] = pos(i);
+      return h('div', { class: `nb-star-term${v.resolved ? (i === v.wrong ? ' wrong' : ' right') : ''}`, style: { left: `${x}%`, top: `${y}%`, animationDelay: `${0.08 * i}s` } },
+        h('small', { class: 'n' }, String(i + 1)), h('span', {}, t), v.resolved && i === v.wrong ? h('em', { class: 'stamp' }, 'GELOGEN!') : null);
     }));
-  const order = v.buzzOrder.length ? row(...v.buzzOrder.map((b, k) => chip(teamOf(b.teamId), b.correct === false ? 'wrong' : '', ` ${k + 1}.${b.correct === undefined ? '' : b.correct ? ' ✓' : ' ✗'}`))) : null;
+  const order = v.buzzOrder.length ? h('div', { class: 'nb-buzzline' }, h('span', { class: 'lbl' }, '🔔 Buzzer'), v.buzzOrder.map((b, k) => {
+    const t = teamOf(b.teamId);
+    return h('div', { class: `nb-bz${b.correct === true ? ' ok' : b.correct === false ? ' bad' : ''}${v.winner === b.teamId ? ' win' : ''}`, '--team': t.color },
+      h('b', { class: 'k' }, `${k + 1}.`), h('span', {}, t.name), b.pick !== undefined ? h('small', {}, `tippt ${b.pick + 1} ${b.correct ? '✓' : '✗'}`) : null);
+  })) : (!v.resolved ? sub('Welcher Begriff ist gelogen? Wählen und buzzern!', { marginTop: '1vh' }) : null);
   return [ring, order, v.resolved ? h('div', { class: 'solution', style: { marginTop: '1.5vh' } }, v.winner ? `${teamOf(v.winner).name} ${plus(pv(v, 'correct'))}` : 'Kein Team lag richtig') : null];
 }
 
@@ -120,14 +149,21 @@ function star(v, teamOf) {
 function timeline(v, teamOf) {
   if (v.waiting) return waitTitle('Remember the Timeline', 'Reihum einordnen – ein Fehler kostet alle Punkte dieses Durchgangs.');
   if (v.notStarted) return [banner(v.category, 'compact slim'), sub('Gleich wird das Startteam ausgelost …', { marginTop: '4vh' })];
-  const line = h('div', { class: 'nb-tl-line' }, v.line.map((e) => h('div', { class: `nb-tl-item${e.ref ? ' ref' : ''}${e.last ? (v.last.ok ? ' last ok' : ' last bad') : ''}` },
-    h('b', {}, e.value), h('span', {}, e.label))));
-  const teams = h('div', { class: 'nb-tl-teams' }, v.teams.map((t) => chip(teamOf(t.teamId), `${t.teamId === v.turn ? 'answering' : ''} ${t.state !== 'active' ? 'wrong-soft' : ''}`,
-    h('b', {}, ` ${t.points}`), t.state === 'out' ? ' ✗' : t.state === 'quit' ? ' ⏏' : '')));
+  // Zeitachse: Karten über der Linie, Jahr/Wert als Marke auf der Linie.
+  const n = v.line.length;
+  const axis = h('div', { class: `nb-tl-axis${n > 8 ? ' dense' : ''}` }, h('div', { class: 'bar' }), v.line.map((e) => h('div', { class: `nb-tl-col${e.ref ? ' ref' : ''}${e.last ? (v.last.ok ? ' last ok' : ' last bad') : ''}` },
+    h('div', { class: 'tlc' }, h('span', {}, e.label)), h('i', { class: 'dot' }), h('b', { class: 'val' }, e.value))));
+  const teams = h('div', { class: 'nb-tl-teams' }, v.teams.map((t) => {
+    const tm = teamOf(t.teamId);
+    return h('div', { class: `nb-tl-team ${t.state}${t.teamId === v.turn && !v.done ? ' turn' : ''}`, '--team': tm.color },
+      h('span', { class: 'nm' }, tm.name), h('b', {}, String(t.points)), h('small', {}, t.state === 'out' ? 'raus ✗' : t.state === 'quit' ? 'ausgestiegen' : t.teamId === v.turn && !v.done ? 'am Zug' : ''));
+  }));
   const info = v.done ? h('div', { class: 'solution', style: { marginTop: '1vh' } }, 'Durchgang beendet – Punkte gutgeschrieben')
-    : v.last ? sub(`${teamOf(v.last.teamId).name}: „${v.last.label}“ ${v.last.ok ? '✓ richtig' : '✗ falsch – Punkte weg'}`, { marginTop: '1vh' })
-      : sub(`${teamOf(v.turn).name} beginnt (ausgelost)`, { marginTop: '1vh' });
-  return [banner(v.category, 'compact slim'), line, h('div', { class: 'nb-tl-pool' }, `Noch ${v.pool.length} Begriffe`), info, teams];
+    : h('div', { class: 'nb-tl-info' },
+      v.last ? h('div', { class: `nb-tl-last ${v.last.ok ? 'ok' : 'bad'}`, '--team': teamOf(v.last.teamId).color }, `${teamOf(v.last.teamId).name}: „${v.last.label}“ `, h('b', {}, v.last.ok ? '✓ richtig' : '✗ falsch – Punkte weg')) : null,
+      v.turn ? h('div', { class: 'nb-tl-turn', '--team': teamOf(v.turn).color }, h('small', {}, v.last ? 'Am Zug' : 'Ausgelost – es beginnt'), h('b', {}, teamOf(v.turn).name)) : null,
+      h('div', { class: 'nb-tl-pool' }, h('b', {}, String(v.pool.length)), h('small', {}, v.pool.length === 1 ? 'Begriff übrig' : 'Begriffe übrig')));
+  return [banner(v.category, 'compact slim'), axis, info, teams];
 }
 
 // ---------- Guck mal, wer da spricht ----------

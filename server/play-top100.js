@@ -137,6 +137,8 @@ module.exports = {
       scale: [1, 2, 3, 4, 5].map((n) => pv(game, `group${n}`)),
       submittedCount: Object.keys(r.answers).length,
       teamCount: db.project.teams.length,
+      teamIds: db.project.teams.map((t) => t.id),
+      submitted: Object.keys(r.answers),
       evaluated: r.evaluated,
       results: r.evaluated ? Object.entries(r.answers).map(([teamId, a]) => ({ teamId, text: a.text, rank: a.rank, entry: a.rank ? list[a.rank - 1].name : null, points: pointsFor(a.rank, game) }))
         .sort((x, y) => (y.rank || 0) - (x.rank || 0)) : [],
