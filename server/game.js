@@ -45,7 +45,7 @@ const PLAY = {
 };
 
 const STATE_VERSION = 2;
-const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'stageTitle', 'finaleTitle', 'finale', 'blank'];
+const BEAMER_VIEWS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'ranking', 'coin', 'pause', 'stageTitle', 'hosts', 'finaleTitle', 'finale', 'blank'];
 const MAX_PROCESSED = 5000;
 
 // Kurze Zugangscodes: vierstellige Zahl (1000–9999), in der Show eindeutig –
@@ -115,6 +115,7 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
   if (games[0]?.type === 'leichte5') games[0].locked = true; // „Die leichten 5“ als festes Eröffnungsspiel
   return {
     id: newId('proj'),
+    hostsStepAdded: true,
     name,
     date: '',
     subtitle: 'Die Live-Show mit acht Spielen',
@@ -171,6 +172,8 @@ function migrate(db) {
       if (!db.library.some((e) => e.type === type)) db.library.push(libraryEntry(type, Date.now()));
       db.libraryTypesAdded.push(type);
     }
+    // Neue Folie „Moderation am Pult“ nach den Gewinnstufen 2 und 3 – einmalig auch in eigene Abläufe.
+    for (const pr of [db.project, ...db.shows.map((x) => x.project)]) addHostsSteps(pr);
     for (const sh of db.shows) {
       if (!sh.project.finale) sh.project.finale = clone(FINALE.EXAMPLE);
       if (sh.live.finale === undefined) sh.live.finale = null;
@@ -184,6 +187,18 @@ function migrate(db) {
   fresh.log = db.log || [];
   if (db.auth) fresh.auth = db.auth;
   return fresh;
+}
+
+function addHostsSteps(pr) {
+  if (pr.hostsStepAdded) return;
+  pr.hostsStepAdded = true;
+  if (!Array.isArray(pr.rundown) || !pr.rundown.length) return;
+  for (let i = pr.rundown.length - 1; i >= 0; i -= 1) {
+    const st = pr.rundown[i];
+    if (st.kind === 'stageTitle' && st.stage > 1 && !(pr.rundown[i + 1] && pr.rundown[i + 1].kind === 'hosts')) {
+      pr.rundown.splice(i + 1, 0, { id: newId('step'), kind: 'hosts', stage: st.stage });
+    }
+  }
 }
 
 // ---------- Hilfsfunktionen ----------
@@ -355,7 +370,7 @@ function requireEditable(db) {
 // Jeder Schritt ist eine „Folie“: Beamer-Ansicht plus nötige Spielaktion.
 // Ohne eigenen Ablauf gilt der Standardablauf aus den Spielen der Show.
 
-const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'stageTitle', 'finaleTitle', 'finale', 'end'];
+const RUN_KINDS = ['start', 'video', 'intro', 'pyramid', 'title', 'game', 'coin', 'pause', 'ranking', 'stageTitle', 'hosts', 'finaleTitle', 'finale', 'end'];
 const RUN_NEEDS_POS = ['title', 'game', 'coin'];
 const RUN_MAX = 120;
 
@@ -365,6 +380,8 @@ function defaultRundown(project) {
     const pos = i + 1;
     // Zu Beginn jeder Gewinnstufe (Spiel 1, 5 und 7) eine eigene Spieltitel-Folie.
     if (STAGE_START[pos]) steps.push({ kind: 'stageTitle', stage: STAGE_START[pos] });
+    // Nach der Pause: nach der Gewinnstufen-Folie die Moderation am Pult (Überleitung, Erklärungen).
+    if (STAGE_START[pos] > 1) steps.push({ kind: 'hosts', stage: STAGE_START[pos] });
     steps.push({ kind: 'title', pos }, { kind: 'game', pos });
     // Nach Spiel 4, 6 und 8 erst eine Pause, dann die Münzvergabe (mehr Spannung).
     if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'pause' }, { kind: 'coin', pos });
@@ -392,6 +409,7 @@ function stepLabel(db, st) {
     ranking: 'Zwischenstand / Rangliste',
     finaleTitle: `Finale – Spieltitel${db.project.finaleIntro ? ' ♪' : ''}`,
     stageTitle: `Gewinnstufe ${st.stage} – Spieltitel${stageOf(db, st.stage).intro ? ' ♪' : ''}`,
+    hosts: `Moderation am Pult${st.stage ? ` (Gewinnstufe ${st.stage})` : ''}`,
     finale: 'Finale gegen die Moderation',
     end: 'Abschluss',
   }[st.kind];
@@ -420,6 +438,11 @@ function cleanRundown(db, steps) {
     } else if (RUN_NEEDS_POS.includes(st.kind)) fail('Für diesen Schritt fehlt das Spiel.');
     if (st.kind === 'stageTitle') {
       const n = st.stage === undefined || st.stage === null ? 1 : Number(st.stage);
+      if (!STAGES.includes(n)) fail('Gewinnstufe muss 1, 2 oder 3 sein.');
+      out.stage = n;
+    }
+    if (st.kind === 'hosts' && st.stage !== undefined && st.stage !== null && st.stage !== '') {
+      const n = Number(st.stage);
       if (!STAGES.includes(n)) fail('Gewinnstufe muss 1, 2 oder 3 sein.');
       out.stage = n;
     }
@@ -459,6 +482,8 @@ function runStep(db, ctx, index) {
   } else if (st.kind === 'stageTitle') {
     db.live.beamer = { view: 'stageTitle', data: { stage: st.stage || 1 } };
     effect(db, 'title');
+  } else if (st.kind === 'hosts') {
+    db.live.beamer = { view: 'hosts', data: { stage: st.stage || null } };
   } else if (st.kind === 'finale') {
     if (db.live.activeGame) moderatorActions['show.activate'](db, ctx, { gameId: null });
     if (!db.live.finale) FINALE.start(db, ctx, null);
@@ -1235,7 +1260,7 @@ function gameHeader(db) {
   return g ? { type: g.type, title: g.title, position: position(db, g), intro: g.intro ? { id: g.intro.id, type: g.intro.type } : null, color: g.color || null } : null;
 }
 
-const TEAM_WAIT_VIEWS = ['pause', 'coin', 'stageTitle', 'finaleTitle'];
+const TEAM_WAIT_VIEWS = ['pause', 'coin', 'stageTitle', 'hosts', 'finaleTitle'];
 
 function teamView(db, teamId, now = Date.now()) {
   const team = findTeam(db, teamId);
@@ -1351,6 +1376,7 @@ function beamerView(db) {
     const st = stageOf(db, n);
     view.stage = { n, color: st.color || null, intro: st.intro ? { id: st.intro.id, type: st.intro.type } : null };
   }
+  if (b.view === 'hosts') view.hosts = { stage: (b.data && b.data.stage) || null };
   if (b.view === 'finaleTitle') view.finaleIntro = pr.finaleIntro ? { id: pr.finaleIntro.id, type: pr.finaleIntro.type } : null;
   if (b.view === 'pyramid' || b.view === 'intro') {
     view.games = pr.games.map((g, i) => ({ title: g.title, position: i + 1 }));

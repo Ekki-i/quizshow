@@ -612,6 +612,10 @@ test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze 
   game.applyAction(db, mod(), 'run.next', {});
   assert.equal(db.live.beamer.view, 'stageTitle'); // Gewinnstufe 2 wird angekündigt
   game.applyAction(db, mod(), 'run.next', {});
+  assert.equal(db.live.beamer.view, 'hosts'); // Moderation am Pult leitet über
+  assert.equal(game.beamerView(db).hosts.stage, 2);
+  assert.equal(game.teamView(db, ids[0]).waitKind, 'wait');
+  game.applyAction(db, mod(), 'run.next', {});
   assert.equal(db.live.beamer.view, 'title');
   assert.equal(db.live.activeGame, db.project.games[4].id);
   // eigener Ablauf mit zusätzlicher Pause; ungültige Schritte werden abgelehnt
@@ -858,6 +862,19 @@ test('Spieltitel für Gewinnstufen und Finale: im Ablauf, Lied + Cover, automati
   assert.ok(kinds.indexOf('stageTitle1') === kinds.indexOf('title1') - 1);
   assert.ok(kinds.indexOf('stageTitle2') === kinds.indexOf('coin4') + 1);
   assert.ok(kinds.indexOf('stageTitle3') === kinds.indexOf('coin6') + 1);
+  // Nach den Gewinnstufen 2 und 3 (nach der Pause) die Moderation am Pult, vor dem nächsten Spiel.
+  assert.ok(kinds.indexOf('hosts2') === kinds.indexOf('stageTitle2') + 1 && kinds.indexOf('title5') === kinds.indexOf('hosts2') + 1);
+  assert.ok(kinds.indexOf('hosts3') === kinds.indexOf('stageTitle3') + 1 && kinds.indexOf('title7') === kinds.indexOf('hosts3') + 1);
+  assert.equal(kinds.indexOf('hosts1'), -1);
+  // Eigener Ablauf aus der Zeit vor dieser Folie: wird einmalig ergänzt.
+  const old = structuredClone(db);
+  old.project.rundown = steps.filter((x) => x.kind !== 'hosts').map(({ id, kind, pos, stage }) => ({ id, kind, pos, stage }));
+  delete old.project.hostsStepAdded;
+  game.migrate(old);
+  assert.equal(old.project.rundown.filter((x) => x.kind === 'hosts').length, 2);
+  old.project.rundown = old.project.rundown.filter((x) => x.kind !== 'hosts');
+  game.migrate(old); // gelöscht bleibt gelöscht
+  assert.equal(old.project.rundown.filter((x) => x.kind === 'hosts').length, 0);
   assert.ok(kinds.indexOf('finaleTitle') === kinds.indexOf('finale') - 1);
   game.applyAction(db, mod(), 'stage.set', { stage: 2, intro: { id: 'media_bbbbbbbbbbbb22', type: 'audio/mpeg', name: 'Stufe.mp3' } });
   assert.throws(() => game.applyAction(db, mod(), 'stage.set', { stage: 4, intro: null }), /Gewinnstufe/);

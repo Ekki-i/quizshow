@@ -251,7 +251,7 @@
         onLock: () => snd && buzzer(),
       });
 
-      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.pauseCoinPos, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage]);
+      const key = JSON.stringify([s.view, s.gameView, s.ranking, s.coin, s.show, s.teams, s.game, s.games, s.pauseSongs, s.pauseCoinPos, s.introVideo, s.coins, s.finale, s.finaleIntro, s.stage, s.hosts]);
       const replayTitle = fresh && (s.effect.kind === 'title' || s.effect.kind === 'video');
       if (key === lastKey && !replayTitle) return;
       lastKey = key;
@@ -262,7 +262,7 @@
       // Pausenmusik nur in der Pause; beim Verlassen ausblenden.
       if (s.view !== 'pause') stopPause();
       if (!['title', 'finaleTitle', 'stageTitle'].includes(s.view)) stopGameIntro();
-      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, stageTitle, finaleTitle, finale, blank: () => [] };
+      const views = { start, video, intro, pyramid, title, game, ranking, coin, pause, stageTitle, hosts, finaleTitle, finale, blank: () => [] };
       if (s.view !== 'finale') prevFin = null;
       stage.replaceChildren(...(views[s.view] || start)(s, replayTitle));
     }
@@ -538,6 +538,27 @@
       const out = screenTitle('GEWINNSTUFE', String(st.n), 'ft-stagecol');
       if (st.color) out[0].style.setProperty('--stage', st.color);
       return out;
+    }
+
+    // Moderation am Pult: kleine Pause nach der Gewinnstufen-Folie – beide Moderatoren
+    // stehen am Pult, auf dem Bildschirm die neue Gewinnstufe, darauf die restlichen Münzen.
+    function hosts(s) {
+      const W = 938, H = 530, scr = [389, 34, 547, 157];
+      const pct = (v, total) => `${(v / total) * 100}%`;
+      const n = s.hosts && s.hosts.stage;
+      const left = Math.max(0, 3 - (s.coins || []).length);
+      const names = [s.show.host, s.show.coHost].filter(Boolean).join(' & ');
+      return [
+        h('div', { class: 'scene scene-pult full hosts-scene' },
+          ...pultLayers(s.show, 'both'),
+          h('div', { class: 'overlay', style: { left: pct(scr[0], W), top: pct(scr[1], H), width: pct(scr[2] - scr[0] + 1, W), height: pct(scr[3] - scr[1] + 1, H) } },
+            n ? [h('small', {}, 'Gewinnstufe'), h('b', {}, String(n))] : [h('small', {}, s.show.name)]),
+          PULT_COINS.slice(0, left).map(([cx, cy]) => h('img', {
+            class: 'pult-coin', src: 'assets/img/muenze.webp', alt: '', 'aria-hidden': 'true',
+            style: { left: pct(cx - 16.5, W), top: pct(cy - 14.5, H), width: pct(33, W) },
+          }))),
+        names ? h('div', { class: 'hosts-lower' }, h('b', {}, names), n ? h('span', {}, `Gewinnstufe ${n}`) : null) : null,
+      ].filter(Boolean);
     }
 
     function title(s) {

@@ -172,8 +172,8 @@ function buildFlow() {
 
 // ---------- Showablauf wie eine Präsentation ----------
 
-const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', stageTitle: '🎬', finaleTitle: '🎬', finale: '★', end: '🏁' };
-const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', stageTitle: 'Gewinnstufe – Spieltitel', finaleTitle: 'Finale – Spieltitel', finale: 'Finale gegen die Moderation', end: 'Abschluss' };
+const RUN_ICON = { start: '★', video: '🎞', intro: '👥', pyramid: '▲', title: '🎬', game: '🎮', coin: '🪙', pause: '☕', ranking: '🏆', stageTitle: '🎬', hosts: '🎙', finaleTitle: '🎬', finale: '★', end: '🏁' };
+const RUN_KIND_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', title: 'Spieltitel', game: 'Spiel spielen', coin: 'Münzvergabe', pause: 'Pause', ranking: 'Zwischenstand / Rangliste', stageTitle: 'Gewinnstufe – Spieltitel', hosts: 'Moderation am Pult', finaleTitle: 'Finale – Spieltitel', finale: 'Finale gegen die Moderation', end: 'Abschluss' };
 
 // Symbol eines Schritts; die Münzvergabe zeigt die Münze der Show.
 const runIcon = (kind) => (kind === 'coin' ? coinImg('run-coin') : RUN_ICON[kind]);
@@ -474,7 +474,7 @@ function buildRundownEditor() {
   const afterSel = h('select', { 'aria-label': 'Einfügen nach' },
     h('option', { value: '0' }, 'ganz am Anfang'),
     steps.map((st, i) => h('option', { value: String(i + 1), selected: i === steps.length - 1 }, `nach ${i + 1}. ${S.rundown[i].text}`)));
-  const updatePos = () => { posSel.hidden = !['title', 'game', 'coin', 'pyramid'].includes(kindSel.value); stageSel.hidden = kindSel.value !== 'stageTitle'; };
+  const updatePos = () => { posSel.hidden = !['title', 'game', 'coin', 'pyramid'].includes(kindSel.value); stageSel.hidden = !['stageTitle', 'hosts'].includes(kindSel.value); };
   kindSel.onchange = updatePos;
   kindSel.value = 'pause';
   updatePos();
@@ -500,7 +500,7 @@ function buildRundownEditor() {
         const st = { kind: kindSel.value };
         if (!posSel.hidden) st.pos = Number(posSel.value);
         if (st.kind === 'pyramid' && st.pos === undefined) delete st.pos;
-        if (st.kind === 'stageTitle') st.stage = Number(stageSel.value);
+        if (st.kind === 'stageTitle' || st.kind === 'hosts') st.stage = Number(stageSel.value);
         insertAt(Number(afterSel.value), st);
       } }, '+ Schritt einfügen'),
       S.rundownCustom ? h('button', { class: 'btn ghost', onclick: () => confirmAct('Eigene Änderungen am Ablauf verwerfen und den Standardablauf wiederherstellen?', 'rundown.reset') }, 'Standardablauf wiederherstellen') : null));
@@ -536,7 +536,7 @@ function timerBar() {
 }
 
 // Beamer: Umschalten übernimmt der Showablauf – hier nur, was gerade läuft.
-const BEAMER_VIEW_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', pause: 'Pause', title: 'Spieltitel', game: 'Spiel', ranking: 'Rangliste', coin: 'Münzvergabe', blank: 'Schwarz' };
+const BEAMER_VIEW_LABEL = { start: 'Startbild', video: 'Intro-Video', intro: 'Vorstellung der Teams', pyramid: 'Übersicht Kategorien', pause: 'Pause', title: 'Spieltitel', game: 'Spiel', ranking: 'Rangliste', coin: 'Münzvergabe', stageTitle: 'Gewinnstufe', hosts: 'Moderation am Pult', finaleTitle: 'Finale – Spieltitel', finale: 'Finale', blank: 'Schwarz' };
 function buildBeamerControls() {
   const current = S.live.beamer.view;
   const status = h('p', { class: 'muted' }, 'Zeigt jetzt: ', h('b', {}, BEAMER_VIEW_LABEL[current] || current),
