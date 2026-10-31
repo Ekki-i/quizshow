@@ -113,6 +113,60 @@ function top100(ui, g, st) {
   return out;
 }
 
+// ---------- 30 Seconds to Spaß ----------
+// Große Knöpfe „Richtig“/„Falsch“ (auch Tasten J/N bzw. 1/2): ein Tipp wertet die
+// Frage und zeigt sofort die nächste – das Team verliert keine Zeit.
+let sekKeys = null;
+function sekunden(ui, g, st) {
+  const d = st.index ?? -1;
+  const r = (st.rounds || {})[d];
+  const out = [tabs(['Durchgang 1', 'Durchgang 2'], d, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.done)];
+  if (d < 0 || !r) return [...out, muted('Durchgang öffnen: Das Startteam wird ausgelost, dann reihum. Das Team startet mit dem Buzzer, du wertest jede Antwort mit einem Tipp, das Team stoppt selbst nach gefühlt 30 Sekunden.')];
+  const id = r.done ? null : r.order[r.turn];
+  const t = id ? r.turns[id] || { phase: 'ready', marks: [] } : null;
+  const tol = Number(d === 0 ? g.content.tol1 : g.content.tol2) || (d === 0 ? 4 : 2);
+  const seconds = Number(g.content.seconds) || 30;
+  out.push(h('ol', { class: 'list' }, r.order.map((x, i) => {
+    const tt = r.turns[x];
+    return h('li', {}, ui.dot(ui.teamColor(x)), h('span', { class: 'grow' }, h('b', {}, ui.teamName(x)), i === r.turn && !r.done ? ' ← dran' : ''),
+      tt && tt.phase === 'stopped' ? badge(tt.ok ? 'ok' : 'bad', `${tt.late ? 'nicht gestoppt' : `${tt.elapsed.toFixed(1).replace('.', ',')} s`} · ${tt.correct} richtig · ${plus(tt.points)}`) : tt && tt.phase === 'running' ? badge('warn', 'läuft') : null);
+  })));
+  if (r.done) { sekKeys = null; return [...out, row(badge('ok', `Durchgang ${d + 1} beendet`))]; }
+  const p = r.order.indexOf(id);
+  const blocks = g.content.rounds[d].blocks || [];
+  const qOf = (q) => { const b = blocks[q]; const items = b ? (b.items || []).filter((it) => String(it.question || '').trim()) : []; return items.length ? { topic: b.topic, ...items[p % items.length] } : null; };
+  if (t.phase === 'ready') {
+    sekKeys = null;
+    out.push(h('p', { class: 'notice' }, `🔔 ${ui.teamName(id)} startet mit dem Buzzer. Ziel ${seconds} s, Toleranz ± ${String(tol).replace('.', ',')} s.`),
+      row(btn('ghost', 'Für das Team starten (iPad ausgefallen)', () => ui.act('play.buzzFor'))));
+    return out;
+  }
+  if (t.phase === 'running') {
+    const q = qOf(t.marks.length);
+    const right = t.marks.filter(Boolean).length;
+    const mark = (ok) => ui.act('play.mark', { correct: ok });
+    sekKeys = (ev) => {
+      if (/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+      if (['j', 'J', '1'].includes(ev.key)) { ev.preventDefault(); mark(true); }
+      else if (['n', 'N', '2'].includes(ev.key)) { ev.preventDefault(); mark(false); }
+    };
+    out.push(h('div', { class: 'sek-live' },
+      h('div', { class: 'sek-q' }, q ? [h('small', {}, `Frage ${t.marks.length + 1}${q.topic ? ` · ${q.topic}` : ''}`), h('b', {}, q.question), h('span', { class: 'ans' }, `Antwort: ${q.answer || '–'}`)]
+        : h('b', {}, 'Keine Fragen mehr in diesem Durchgang – das Team muss nur noch stoppen.')),
+      h('div', { class: 'sek-btns' },
+        h('button', { class: 'sek-btn ok', disabled: !q, onpointerdown: (ev) => { ev.preventDefault(); mark(true); } }, '✓', h('small', {}, 'Richtig (J)')),
+        h('button', { class: 'sek-btn bad', disabled: !q, onpointerdown: (ev) => { ev.preventDefault(); mark(false); } }, '✗', h('small', {}, 'Falsch / weiter (N)'))),
+      h('div', { class: 'row' }, h('span', {}, `${right} richtig von ${t.marks.length}`),
+        btn('small ghost', '↶ letzte Wertung zurück', () => ui.act('play.unmark'), !t.marks.length),
+        btn('small ghost', 'Für das Team stoppen (iPad ausgefallen)', () => ui.confirmAct('Wirklich für das Team stoppen? Die Zeit zählt ab jetzt.', 'play.buzzFor')))));
+    return out;
+  }
+  sekKeys = null;
+  out.push(row(btn('pink', r.turn + 1 >= r.order.length ? 'Durchgang beenden' : `Weiter: ${ui.teamName(r.order[r.turn + 1])} ist dran`, () => ui.act('play.next'))));
+  return out;
+}
+document.addEventListener('keydown', (ev) => { if (sekKeys && !ev.altKey && !ev.ctrlKey && !ev.metaKey) sekKeys(ev); });
+
 // ---------- Wir sind ein Telepa-Team ----------
 const alleinList = (text) => String(text || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 500)
   .map((l, i) => { const v = l.split('/').map((x) => x.trim()).filter(Boolean); return { key: i + 1, name: v[0] || l }; });
@@ -243,4 +297,4 @@ function hostdu(ui, g, st) {
   return out;
 }
 
-export const MOD_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein };
+export const MOD_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein, sekunden };

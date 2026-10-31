@@ -32,6 +32,7 @@ const PLAY = {
   gier: require('./play-gier'),
   top100: require('./play-top100'),
   allein: require('./play-allein'),
+  sekunden: require('./play-sekunden'),
   star: require('./play-star'),
   timeline: require('./play-timeline'),
   chat: require('./play-chat'),

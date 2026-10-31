@@ -194,6 +194,29 @@ function top100(g, ui) {
   return out;
 }
 
+// ---------- 30 Seconds to Spaß ----------
+function sekunden(g, ui) {
+  const out = [muted(`Durchgang ${g.index + 1} von ${g.count} · Zielzeit ${g.seconds} Sekunden · Toleranz ± ${String(g.tol).replace('.', ',')} Sekunden`)];
+  const sec = (x) => `${x.toFixed(1).replace('.', ',')} s`;
+  if (g.result) {
+    out.push(g.result.late ? stateBox('bad', '⏱', `Nicht gestoppt – ${g.result.correct} richtig, aber 0 Punkte`)
+      : g.result.ok ? stateBox('ok', '★', `Gestoppt nach ${sec(g.result.elapsed)} – im Zeitfenster! ${g.result.correct} richtig = ${plus(g.result.points)}`)
+        : stateBox('bad', '⏱', `Gestoppt nach ${sec(g.result.elapsed)} – außerhalb des Zeitfensters. ${g.result.correct} richtig, aber 0 Punkte`));
+    return out;
+  }
+  if (g.myTurn) {
+    const running = g.phase === 'running';
+    out.push(question(running ? 'Antwortet laut! Stoppt nach genau ' + g.seconds + ' Sekunden.' : 'Ihr seid dran!'),
+      muted(running ? 'Es läuft keine sichtbare Uhr – zählt im Kopf mit. Drückt den Buzzer, wenn ihr glaubt, dass die Zeit um ist.' : 'Drückt den Buzzer, sobald ihr bereit seid – dann läuft die Zeit und die erste Frage kommt.'),
+      h('button', { class: `buzzer sek-buzzer${running ? ' stop' : ''}`, 'aria-label': running ? 'Stopp' : 'Start', onclick: (ev) => { ev.currentTarget.disabled = true; run(ui.conn, 'play.buzz'); } }, running ? 'STOPP' : 'START'),
+      running && g.answered ? muted(`${g.answered} ${g.answered === 1 ? 'Frage' : 'Fragen'} beantwortet`) : null);
+    return out;
+  }
+  if (g.done) return [...out, stateBox('', '■', 'Durchgang beendet')];
+  out.push(stateBox('', g.running ? '🎤' : '⏳', g.turnTeam ? `${ui.teamName(g.turnTeam)} ${g.running ? 'spielt gerade' : 'ist als Nächstes dran'}` : 'Gleich geht’s los'));
+  return out;
+}
+
 // ---------- Wir sind ein Telepa-Team ----------
 const alleinDraft = {};
 function allein(g, ui) {
@@ -331,4 +354,4 @@ function hostdu(g, ui) {
   return out;
 }
 
-export const TEAM_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein };
+export const TEAM_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein, sekunden };

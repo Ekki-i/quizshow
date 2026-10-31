@@ -134,6 +134,44 @@ function top100(v, teamOf) {
   return [...head, board];
 }
 
+// ---------- 30 Seconds to Spaß ----------
+function sekunden(v, teamOf) {
+  if (v.waiting) return waitTitle('30 Seconds to Spaß', `${v.seconds || 30} Sekunden – ohne Uhr. Wer zu früh oder zu spät stoppt, verliert alles.`);
+  const tolTxt = `± ${String(v.tol).replace('.', ',')} s`;
+  const strip = h('div', { class: 'sek-order' }, v.order.map((o) => {
+    const t = teamOf(o.teamId);
+    return h('div', { class: `sek-o ${o.state}${o.teamId === v.turn ? ' turn' : ''}${o.ok === false ? ' fail' : ''}`, '--team': t.color },
+      h('span', { class: 'nm' }, t.name), h('b', {}, o.points === null ? (o.teamId === v.turn ? '▶' : '·') : plus(o.points)));
+  }));
+  const head = h('div', { class: 'sek-head' }, h('span', {}, `Durchgang ${v.index + 1}`), h('b', {}, `Ziel ${v.seconds} s`), h('span', {}, `Toleranz ${tolTxt}`));
+  if (v.done) return [head, h('div', { class: 'solution', style: { marginTop: '3vh' } }, `Durchgang ${v.index + 1} beendet`), strip];
+  const t = teamOf(v.turn);
+  if (v.phase === 'ready') {
+    return [head, h('div', { class: 'sek-ready', '--team': t.color }, h('small', {}, 'Jetzt dran'), h('b', {}, t.name), h('span', {}, 'startet mit dem Buzzer …')), strip];
+  }
+  const marks = h('div', { class: 'sek-marks' }, v.marks.map((m, i) => h('i', { class: m ? 'ok' : 'bad', style: { animationDelay: '0s' } }, m ? '✓' : '✗')), h('b', {}, `${v.marks.filter(Boolean).length}`));
+  if (v.phase === 'running') {
+    return [head, h('div', { class: 'sek-run', '--team': t.color }, h('span', { class: 'who' }, t.name), h('span', { class: 'clock' }, '⏱ ?? s')),
+      v.question ? h('div', { class: 'sek-qbox', key: v.question.n }, h('small', {}, `Frage ${v.question.n}${v.question.topic ? ` · ${v.question.topic}` : ''}`), h('b', {}, v.question.text))
+        : h('div', { class: 'sek-qbox' }, h('b', {}, 'Keine Fragen mehr – jetzt stoppen!')),
+      marks, strip];
+  }
+  // Gestoppt: Zeit enthüllen, Fenster zeigen, Punkte.
+  const res = v.result;
+  const span = Math.max(v.tol * 3, 8);
+  const pos = (x) => `${Math.max(0, Math.min(100, ((x - (v.seconds - span)) / (2 * span)) * 100))}%`;
+  const scale = h('div', { class: 'sek-scale' },
+    h('div', { class: 'win', style: { left: pos(v.seconds - v.tol), width: `calc(${pos(v.seconds + v.tol)} - ${pos(v.seconds - v.tol)})` } }),
+    h('div', { class: 'tgt', style: { left: pos(v.seconds) } }, h('span', {}, `${v.seconds} s`)),
+    res.late ? null : h('div', { class: `pin ${res.ok ? 'ok' : 'bad'}`, '--x': pos(res.elapsed) }, h('span', {}, `${res.elapsed.toFixed(1).replace('.', ',')} s`)));
+  return [head,
+    h('div', { class: `sek-res ${res.ok ? 'ok' : 'bad'}`, '--team': t.color },
+      h('span', { class: 'who' }, t.name),
+      h('b', { class: 'big' }, res.late ? 'NICHT GESTOPPT' : `${res.elapsed.toFixed(1).replace('.', ',')} s`),
+      h('span', { class: 'verdict' }, res.ok ? `Im Zeitfenster! ${res.correct} richtig = ${plus(res.points)}` : `${res.late ? '' : 'Außerhalb des Zeitfensters – '}${res.correct} richtig, aber 0 Punkte`)),
+    scale, marks, strip];
+}
+
 // ---------- Wir sind ein Telepa-Team ----------
 // Auflösung in drei Spalten: „Allein richtig“ (Punkte), „Doppelt“ (gleiche Antworten
 // gruppiert, durchgestrichen) und „Falsch“.
@@ -239,4 +277,4 @@ function hostdu(v, teamOf) {
   return out;
 }
 
-export const BEAMER_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein };
+export const BEAMER_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein, sekunden };

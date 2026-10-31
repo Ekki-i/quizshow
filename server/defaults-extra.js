@@ -360,6 +360,52 @@ const EXTRA_TYPES = {
     example: { rounds: [{ category: '', source: '', period: '', asOf: '', entries: '' }] },
   },
 
+  sekunden: {
+    title: '30 Seconds to Spaß',
+    playable: true,
+    summary: 'Reihum 30 Sekunden Allgemeinwissen, mündlich. Das Team startet und stoppt selbst per Buzzer – ohne sichtbare Uhr. Nur wer nah genug an 30 Sekunden stoppt (Durchgang 1 ± 4 s, Durchgang 2 ± 2 s), behält die Punkte.',
+    schema: [
+      num('seconds', 'Zielzeit in Sekunden (Standard 30)', 5, 120),
+      num('tol1', 'Toleranz Durchgang 1 in Sekunden (± , Standard 4)', 0, 30, 0.5),
+      num('tol2', 'Toleranz Durchgang 2 in Sekunden (± , Standard 2)', 0, 30, 0.5),
+      { key: 'rounds', label: 'Durchgänge', type: 'list', min: 2, max: 2, fixedOrder: true, noPreview: true, itemLabel: (i) => `Durchgang ${i + 1}`,
+        fields: [
+          { key: 'blocks', label: 'Frageblöcke – je Block gleichartige, gleich schwere Fragen, eine pro Team-Platz (Platz 1 = Team, das im Durchgang zuerst dran ist)', type: 'list', min: 1, max: 60, itemLabel: (i) => `Block ${i + 1}`, addLabel: 'Block hinzufügen',
+            fields: [
+              text('topic', 'Thema / Art der Frage (nur für dich und den Beamer)', 80),
+              { key: 'items', label: 'Fragen je Team-Platz', type: 'list', min: 1, max: 6, fixedOrder: true, itemLabel: (i) => `Team-Platz ${i + 1}`, addLabel: 'Frage hinzufügen',
+                fields: [text('question', 'Frage', 200), text('answer', 'Antwort (nur für die Moderation)', 120)] },
+            ] },
+        ] },
+    ],
+    example: { seconds: 30, tol1: 4, tol2: 2, rounds: [
+      { blocks: [
+        { topic: 'Hauptstädte', items: [{ question: 'Hauptstadt von Frankreich?', answer: 'Paris' }, { question: 'Hauptstadt von Italien?', answer: 'Rom' }, { question: 'Hauptstadt von Spanien?', answer: 'Madrid' }, { question: 'Hauptstadt von Portugal?', answer: 'Lissabon' }, { question: 'Hauptstadt von Österreich?', answer: 'Wien' }, { question: 'Hauptstadt von Polen?', answer: 'Warschau' }] },
+        { topic: 'Kopfrechnen', items: [{ question: '7 mal 8?', answer: '56' }, { question: '6 mal 9?', answer: '54' }, { question: '8 mal 8?', answer: '64' }, { question: '7 mal 7?', answer: '49' }, { question: '12 mal 5?', answer: '60' }, { question: '9 mal 9?', answer: '81' }] },
+        { topic: 'Tierkinder', items: [{ question: 'Wie heißt das Junge vom Pferd?', answer: 'Fohlen' }, { question: 'Wie heißt das Junge vom Schaf?', answer: 'Lamm' }, { question: 'Wie heißt das Junge von der Ziege?', answer: 'Zicklein' }, { question: 'Wie heißt das Junge von der Kuh?', answer: 'Kalb' }, { question: 'Wie heißt das Junge vom Hund?', answer: 'Welpe' }, { question: 'Wie heißt das Junge vom Reh?', answer: 'Kitz' }] },
+        { topic: 'Farben mischen', items: [{ question: 'Blau und Gelb ergibt?', answer: 'Grün' }, { question: 'Rot und Gelb ergibt?', answer: 'Orange' }, { question: 'Rot und Blau ergibt?', answer: 'Lila / Violett' }, { question: 'Schwarz und Weiß ergibt?', answer: 'Grau' }, { question: 'Rot und Weiß ergibt?', answer: 'Rosa' }, { question: 'Blau und Weiß ergibt?', answer: 'Hellblau' }] },
+        { topic: 'Beine und Arme', items: [{ question: 'Wie viele Beine hat eine Spinne?', answer: '8' }, { question: 'Wie viele Beine hat eine Ameise?', answer: '6' }, { question: 'Wie viele Beine hat ein Pferd?', answer: '4' }, { question: 'Wie viele Beine hat ein Strauß?', answer: '2' }, { question: 'Wie viele Arme hat ein Oktopus?', answer: '8' }, { question: 'Wie viele Arme hat ein Seestern meistens?', answer: '5' }] },
+        { topic: 'Kontinente', items: [{ question: 'Auf welchem Kontinent liegt Ägypten?', answer: 'Afrika' }, { question: 'Auf welchem Kontinent liegt Brasilien?', answer: 'Südamerika' }, { question: 'Auf welchem Kontinent liegt Japan?', answer: 'Asien' }, { question: 'Auf welchem Kontinent liegt Kanada?', answer: 'Nordamerika' }, { question: 'Auf welchem Kontinent liegt Norwegen?', answer: 'Europa' }, { question: 'Auf welchem Kontinent liegt Kenia?', answer: 'Afrika' }] },
+        { topic: 'Monate', items: [{ question: 'Welcher Monat kommt nach Juni?', answer: 'Juli' }, { question: 'Welcher Monat kommt nach September?', answer: 'Oktober' }, { question: 'Welcher Monat kommt vor März?', answer: 'Februar' }, { question: 'Welcher Monat kommt vor Dezember?', answer: 'November' }, { question: 'Welcher Monat kommt nach April?', answer: 'Mai' }, { question: 'Welcher Monat kommt vor August?', answer: 'Juli' }] },
+        { topic: 'Gegenteile', items: [{ question: 'Gegenteil von heiß?', answer: 'kalt' }, { question: 'Gegenteil von groß?', answer: 'klein' }, { question: 'Gegenteil von hell?', answer: 'dunkel' }, { question: 'Gegenteil von schnell?', answer: 'langsam' }, { question: 'Gegenteil von laut?', answer: 'leise' }, { question: 'Gegenteil von alt?', answer: 'jung / neu' }] },
+        { topic: 'Landeshauptstädte', items: [{ question: 'Landeshauptstadt von Bayern?', answer: 'München' }, { question: 'Landeshauptstadt von Sachsen?', answer: 'Dresden' }, { question: 'Landeshauptstadt von Hessen?', answer: 'Wiesbaden' }, { question: 'Landeshauptstadt von Nordrhein-Westfalen?', answer: 'Düsseldorf' }, { question: 'Landeshauptstadt von Niedersachsen?', answer: 'Hannover' }, { question: 'Landeshauptstadt von Baden-Württemberg?', answer: 'Stuttgart' }] },
+        { topic: 'Chemische Zeichen', items: [{ question: 'Chemisches Zeichen für Gold?', answer: 'Au' }, { question: 'Chemisches Zeichen für Silber?', answer: 'Ag' }, { question: 'Chemisches Zeichen für Eisen?', answer: 'Fe' }, { question: 'Chemisches Zeichen für Kupfer?', answer: 'Cu' }, { question: 'Chemisches Zeichen für Blei?', answer: 'Pb' }, { question: 'Chemisches Zeichen für Zinn?', answer: 'Sn' }] },
+      ] },
+      { blocks: [
+        { topic: 'Hauptstädte', items: [{ question: 'Hauptstadt der Niederlande?', answer: 'Amsterdam' }, { question: 'Hauptstadt von Belgien?', answer: 'Brüssel' }, { question: 'Hauptstadt von Schweden?', answer: 'Stockholm' }, { question: 'Hauptstadt von Norwegen?', answer: 'Oslo' }, { question: 'Hauptstadt von Dänemark?', answer: 'Kopenhagen' }, { question: 'Hauptstadt von Finnland?', answer: 'Helsinki' }] },
+        { topic: 'Kopfrechnen', items: [{ question: '6 mal 7?', answer: '42' }, { question: '8 mal 9?', answer: '72' }, { question: '6 mal 8?', answer: '48' }, { question: '7 mal 9?', answer: '63' }, { question: '4 mal 13?', answer: '52' }, { question: '3 mal 15?', answer: '45' }] },
+        { topic: 'Tierlaute', items: [{ question: 'Wie macht der Hund?', answer: 'bellen / wau' }, { question: 'Wie macht die Katze?', answer: 'miauen / miau' }, { question: 'Wie macht die Kuh?', answer: 'muhen / muh' }, { question: 'Wie macht das Pferd?', answer: 'wiehern' }, { question: 'Wie macht das Schaf?', answer: 'blöken / mäh' }, { question: 'Wie macht der Esel?', answer: 'iah / schreien' }] },
+        { topic: 'Planeten', items: [{ question: 'Welcher Planet ist der 1. von der Sonne aus?', answer: 'Merkur' }, { question: 'Welcher Planet ist der 2. von der Sonne aus?', answer: 'Venus' }, { question: 'Welcher Planet ist der 3. von der Sonne aus?', answer: 'Erde' }, { question: 'Welcher Planet ist der 4. von der Sonne aus?', answer: 'Mars' }, { question: 'Welcher Planet ist der 5. von der Sonne aus?', answer: 'Jupiter' }, { question: 'Welcher Planet ist der 6. von der Sonne aus?', answer: 'Saturn' }] },
+        { topic: 'Spieler auf dem Feld', items: [{ question: 'Wie viele Spieler hat ein Fußballteam auf dem Feld?', answer: '11' }, { question: 'Wie viele Spieler hat ein Basketballteam auf dem Feld?', answer: '5' }, { question: 'Wie viele Spieler hat ein Handballteam auf dem Feld (mit Torwart)?', answer: '7' }, { question: 'Wie viele Spieler hat ein Volleyballteam auf dem Feld?', answer: '6' }, { question: 'Wie viele Spieler hat ein Eishockeyteam auf dem Eis (mit Torwart)?', answer: '6' }, { question: 'Wie viele Spieler hat ein Wasserballteam im Wasser (mit Torwart)?', answer: '7' }] },
+        { topic: 'Währungen', items: [{ question: 'Währung von Japan?', answer: 'Yen' }, { question: 'Währung der USA?', answer: 'Dollar' }, { question: 'Währung von Großbritannien?', answer: 'Pfund' }, { question: 'Währung der Schweiz?', answer: 'Franken' }, { question: 'Währung von China?', answer: 'Yuan / Renminbi' }, { question: 'Währung von Indien?', answer: 'Rupie' }] },
+        { topic: 'Alphabet', items: [{ question: 'Welcher Buchstabe kommt nach K?', answer: 'L' }, { question: 'Welcher Buchstabe kommt nach P?', answer: 'Q' }, { question: 'Welcher Buchstabe kommt vor G?', answer: 'F' }, { question: 'Welcher Buchstabe kommt vor T?', answer: 'S' }, { question: 'Welcher Buchstabe kommt nach W?', answer: 'X' }, { question: 'Welcher Buchstabe kommt vor N?', answer: 'M' }] },
+        { topic: 'Gegenteile', items: [{ question: 'Gegenteil von Tag?', answer: 'Nacht' }, { question: 'Gegenteil von oben?', answer: 'unten' }, { question: 'Gegenteil von voll?', answer: 'leer' }, { question: 'Gegenteil von nass?', answer: 'trocken' }, { question: 'Gegenteil von früh?', answer: 'spät' }, { question: 'Gegenteil von weich?', answer: 'hart' }] },
+        { topic: 'Englisch', items: [{ question: 'Was heißt Hund auf Englisch?', answer: 'dog' }, { question: 'Was heißt Katze auf Englisch?', answer: 'cat' }, { question: 'Was heißt Haus auf Englisch?', answer: 'house' }, { question: 'Was heißt Baum auf Englisch?', answer: 'tree' }, { question: 'Was heißt Apfel auf Englisch?', answer: 'apple' }, { question: 'Was heißt Vogel auf Englisch?', answer: 'bird' }] },
+        { topic: 'Einheiten', items: [{ question: 'Wie viele Zentimeter hat ein Meter?', answer: '100' }, { question: 'Wie viele Gramm hat ein Kilogramm?', answer: '1000' }, { question: 'Wie viele Meter hat ein Kilometer?', answer: '1000' }, { question: 'Wie viele Minuten hat eine Stunde?', answer: '60' }, { question: 'Wie viele Stunden hat ein Tag?', answer: '24' }, { question: 'Wie viele Tage hat eine Woche?', answer: '7' }] },
+      ] },
+    ] },
+  },
+
   allein: {
     title: 'Wir sind ein Telepa-Team',
     playable: true,
@@ -467,6 +513,6 @@ const EXTRA_TYPES = {
 };
 
 // Reihenfolge in der Spiele-Datenbank.
-const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain', 'sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu', 'allein'];
+const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain', 'sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu', 'allein', 'sekunden'];
 
 module.exports = { EXTRA_TYPES, EXTRA_ORDER, WHEEL, WHEEL_SLOTS, migrateBrainContent };
