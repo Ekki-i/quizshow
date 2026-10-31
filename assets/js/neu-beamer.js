@@ -111,17 +111,27 @@ function top100(v, teamOf) {
   const src = [v.source && `Quelle: ${v.source}`, v.period, v.asOf].filter(Boolean).join(' · ');
   // Punkteleiter: je weiter hinten in der Liste, desto höher die Stufe.
   const scale = [['1–20', 1], ['21–40', 2], ['41–60', 3], ['61–80', 4], ['81–100', 5]].map(([r, d], i) => [r, v.scale ? v.scale[i] : d]);
-  const ladder = h('div', { class: `nb-t100-ladder${v.evaluated ? ' small' : ''}` }, scale.map(([r, p], i) => h('div', { class: 'step', '--h': `${50 + i * 12.5}%`, style: { animationDelay: `${0.12 * i}s` } },
-    h('b', {}, plus(p)), h('small', {}, `Rang ${r}`))));
-  const out = [banner(v.category, 'compact slim'), src ? sub(src, { fontSize: '2vh', opacity: 0.8 }) : null, ladder];
-  if (!v.evaluated) { out.push(teamStatus(v.teamIds, v.submitted || [], teamOf) || sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '3vh' })); return out; }
-  out.push(h('div', { class: 'nb-t100-res' }, v.results.map((r, n) => h('div', { class: `nb-t100-row${r.rank ? '' : ' miss'}`, '--team': teamOf(r.teamId).color, style: { animationDelay: `${0.35 * n}s` } },
-    h('span', { class: 'nm' }, teamOf(r.teamId).name),
-    h('span', { class: 'ans' }, h('span', {}, `„${r.text}“`), r.entry && r.entry.toLowerCase() !== String(r.text).toLowerCase() ? h('small', {}, `= ${r.entry}`) : null),
-    // Position in der Liste als Balken von Rang 1 bis 100
-    h('span', { class: 'trk' }, r.rank ? h('i', { '--x': `${r.rank}%`, style: { animationDelay: `${0.35 * n + 0.2}s` } }) : null),
-    h('span', { class: 'rank' }, r.rank ? `Rang ${r.rank}` : 'nicht in der Liste'), h('b', { class: 'p' }, plus(r.points))))));
-  return out;
+  const head = [banner(v.category, 'compact slim'), src ? sub(src, { fontSize: '2vh', opacity: 0.8 }) : null];
+  if (!v.evaluated) {
+    const ladder = h('div', { class: 'nb-t100-ladder' }, scale.map(([r, p], i) => h('div', { class: 'step', '--h': `${50 + i * 12.5}%`, style: { animationDelay: `${0.12 * i}s` } },
+      h('b', {}, plus(p)), h('small', {}, `Rang ${r}`))));
+    return [...head, ladder, teamStatus(v.teamIds, v.submitted || [], teamOf) || sub(`${v.submittedCount} von ${v.teamCount} Teams haben abgegeben`, { marginTop: '3vh' })];
+  }
+  // Auflösung: jede Antwort steht unter der Stufe, in die ihr Rang fällt; eigene Spalte für „nicht in der Liste“.
+  const cols = [...scale.map(([r, p], i) => ({ head: h('div', { class: 'step', '--h': `${50 + i * 12.5}%` }, h('b', {}, plus(p)), h('small', {}, `Rang ${r}`)), items: [] })),
+    { head: h('div', { class: 'step miss', '--h': '50%' }, h('b', {}, '✗'), h('small', {}, 'nicht in der Liste')), items: [] }];
+  for (const r of v.results) cols[r.rank ? Math.min(4, Math.ceil(r.rank / 20) - 1) : 5].items.push(r);
+  let n = 0;
+  const board = h('div', { class: 'nb-t100-board' }, cols.map((c, ci) => h('div', { class: `col${ci === 5 ? ' miss' : ''}` },
+    h('div', { class: 'top' }, c.head),
+    h('div', { class: 'ans-list' }, c.items.sort((x, y) => (x.rank || 0) - (y.rank || 0)).map((r) => {
+      const t = teamOf(r.teamId);
+      return h('div', { class: 'acard', '--team': t.color, style: { animationDelay: `${0.25 * n++ + 0.3}s` } },
+        h('span', { class: 'nm' }, t.name), h('b', { class: 'tx' }, r.entry || r.text),
+        r.entry && r.entry.toLowerCase() !== String(r.text).toLowerCase() ? h('small', { class: 'orig' }, `„${r.text}“`) : null,
+        h('span', { class: 'rk' }, r.rank ? `Rang ${r.rank}` : `„${r.text}“`), h('b', { class: 'p' }, plus(r.points)));
+    })))));
+  return [...head, board];
 }
 
 // ---------- Ich bin ein Star, lüg mich nicht an ----------
@@ -149,11 +159,15 @@ function star(v, teamOf) {
 function timeline(v, teamOf) {
   if (v.waiting) return waitTitle('Remember the Timeline', 'Reihum einordnen – ein Fehler kostet alle Punkte dieses Durchgangs.');
   if (v.notStarted) return [banner(v.category, 'compact slim'), sub('Gleich wird das Startteam ausgelost …', { marginTop: '4vh' })];
-  // Zeitachse: Karten über der Linie, Jahr/Wert als Marke auf der Linie.
+  // Zeitstrahl im Mittelpunkt: links früher, rechts später; Karten abwechselnd über und unter der Linie.
   const n = v.line.length;
-  const axis = h('div', { class: `nb-tl-axis${n > 8 ? ' dense' : ''}` }, h('div', { class: 'bar' }), v.line.map((e) => h('div', { class: `nb-tl-col${e.ref ? ' ref' : ''}${e.last ? (v.last.ok ? ' last ok' : ' last bad') : ''}` },
-    h('div', { class: 'tlc' }, h('span', {}, e.label)), h('i', { class: 'dot' }), h('b', { class: 'val' }, e.value))));
-  const teams = h('div', { class: 'nb-tl-teams' }, v.teams.map((t) => {
+  const axis = h('div', { class: `nb-tl2${n > 8 ? ' dense' : ''}` },
+    h('span', { class: 'end l' }, '◀ FRÜHER'), h('span', { class: 'end r' }, 'SPÄTER ▶'),
+    h('div', { class: 'rail' }),
+    h('div', { class: 'stops' }, v.line.map((e, i) => h('div', {
+      class: `stop ${i % 2 ? 'down' : 'up'}${e.ref ? ' ref' : ''}${e.last ? (v.last.ok ? ' last ok' : ' last bad') : ''}`, style: { animationDelay: `${0.08 * i}s` } },
+      h('div', { class: 'lbl' }, e.label), h('i', { class: 'stem' }), h('b', { class: 'yr' }, e.value)))));
+  const teams = h('div', { class: 'nb-tl-teams small' }, v.teams.map((t) => {
     const tm = teamOf(t.teamId);
     return h('div', { class: `nb-tl-team ${t.state}${t.teamId === v.turn && !v.done ? ' turn' : ''}`, '--team': tm.color },
       h('span', { class: 'nm' }, tm.name), h('b', {}, String(t.points)), h('small', {}, t.state === 'out' ? 'raus ✗' : t.state === 'quit' ? 'ausgestiegen' : t.teamId === v.turn && !v.done ? 'am Zug' : ''));
