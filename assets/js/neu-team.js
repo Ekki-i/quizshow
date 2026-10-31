@@ -40,6 +40,7 @@ function draggable(el, key, onDrop, onTap) {
       ghost.dataset.dx = String(ev.clientX - r.left);
       ghost.dataset.dy = String(ev.clientY - r.top);
       document.body.append(ghost);
+      document.body.classList.add('dragging-any');
       el.classList.add('dragging');
     }
     if (ghost) {
@@ -56,6 +57,7 @@ function draggable(el, key, onDrop, onTap) {
     if (ghost) {
       ghost.remove();
       ghost = null;
+      document.body.classList.remove('dragging-any');
       el.classList.remove('dragging');
       for (const t of document.querySelectorAll('[data-drop].over')) t.classList.remove('over');
       const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-drop]');
@@ -226,15 +228,28 @@ function timeline(g, ui) {
   if (g.last) out.push(stateBox(g.last.ok ? 'ok' : 'bad', g.last.ok ? '✓' : '✗', `${g.last.teamId === ui.team.id ? 'Ihr habt' : `${ui.teamName(g.last.teamId)} hat`} „${g.last.label}“ ${g.last.ok ? 'richtig eingeordnet' : 'falsch eingeordnet'}`));
   const sel = g.myTurn ? tlSel[g.index] ?? null : null;
   const place = async (k, pos) => { if (await run(ui.conn, 'play.place', { item: Number(k), pos: Number(pos) })) delete tlSel[g.index]; };
-  const line = h('ol', { class: 'tl-line' });
+  // Senkrechter Zeitstrahl: oben früher, unten später. Ist ein Begriff gewählt, steht zwischen
+  // je zwei Einträgen ein großes Feld „zwischen A und B“ – davor/danach ist klar beschriftet.
+  const line = h('ol', { class: `tl-line${g.myTurn ? ' turn' : ''}${sel !== null ? ' picking' : ''}` });
+  const selLabel = sel !== null ? (g.pool.find((p) => p.k === sel) || {}).label : 'Begriff';
+  const gapText = (i) => {
+    const before = g.line[i - 1], after = g.line[i];
+    if (!before) return h('span', {}, h('b', {}, `„${selLabel}“`), ` früher als ${after.label} (${after.value})`);
+    if (!after) return h('span', {}, h('b', {}, `„${selLabel}“`), ` später als ${before.label} (${before.value})`);
+    return h('span', {}, h('b', {}, `„${selLabel}“`), ` zwischen ${before.value} und ${after.value}`);
+  };
+  const gap = (i) => h('li', { class: `tl-gap${sel !== null ? ' ready' : ''}`, 'data-drop': String(i), onclick: () => { if (sel !== null) place(sel, i); } },
+    [h('i', { class: 'plus' }, '＋'), gapText(i)]);
+  line.append(h('li', { class: 'tl-end' }, '▲ FRÜHER'));
   g.line.forEach((e, i) => {
-    if (g.myTurn) line.append(h('li', { class: `tl-gap${sel !== null ? ' ready' : ''}`, 'data-drop': String(i), onclick: () => { if (sel !== null) place(sel, i); } }, sel !== null ? '＋ hier einordnen' : ''));
-    line.append(h('li', { class: `tl-item${e.ref ? ' ref' : ''}` }, h('b', {}, e.label), h('span', {}, e.value)));
+    if (g.myTurn) line.append(gap(i));
+    line.append(h('li', { class: `tl-item${e.ref ? ' ref' : ''}` }, h('span', { class: 'yr' }, e.value), h('b', {}, e.label)));
   });
-  if (g.myTurn) line.append(h('li', { class: `tl-gap${sel !== null ? ' ready' : ''}`, 'data-drop': String(g.line.length), onclick: () => { if (sel !== null) place(sel, g.line.length); } }, sel !== null ? '＋ hier einordnen' : ''));
+  if (g.myTurn) line.append(gap(g.line.length));
+  line.append(h('li', { class: 'tl-end' }, '▼ SPÄTER'));
   if (g.done) return [...out, stateBox('ok', '■', `Durchgang beendet – ${pts(g.points)} gutgeschrieben`), line];
   if (g.myTurn) {
-    out.push(stateBox('ok', '👉', 'Ihr seid dran! Begriff wählen und auf die Zeitachse ziehen oder antippen.'));
+    out.push(stateBox('ok', '👉', sel === null ? 'Ihr seid dran! 1. Begriff antippen  2. Stelle auf dem Zeitstrahl antippen (oder Begriff hinziehen).' : 'Jetzt die passende Stelle auf dem Zeitstrahl antippen – oben früher, unten später.'));
     const pool = h('div', { class: 'tl-pool' }, g.pool.map((p) => {
       const el = h('div', { class: `tl-card${sel === p.k ? ' sel' : ''}` }, p.label);
       draggable(el, p.k, place, (k) => { tlSel[g.index] = tlSel[g.index] === k ? null : k; redraw(); });
