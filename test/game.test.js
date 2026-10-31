@@ -582,7 +582,7 @@ test('Avatare: nur gültige Bilder, nur auf dem Beamer bei Intro und Münze, ent
 test('Showablauf: Standardfolge, Weiter/Zurück lösen Spiel, Beamer und Münze aus', () => {
   const { db, ids } = setup(2);
   const steps = game.moderatorView(db).rundown;
-  assert.deepEqual(steps.slice(0, 7).map((s) => s.kind), ['start', 'video', 'intro', 'pyramid', 'stageTitle', 'title', 'game']);
+  assert.deepEqual(steps.slice(0, 8).map((s) => s.kind), ['start', 'video', 'intro', 'pyramid', 'stageTitle', 'hosts', 'title', 'game']);
   assert.equal(steps.filter((s) => s.kind === 'pyramid').length, 1);
   assert.ok(steps.some((s) => s.kind === 'coin' && s.pos === 4));
   assert.ok(steps.some((s) => s.kind === 'pause'));
@@ -859,19 +859,28 @@ test('Spieltitel für Gewinnstufen und Finale: im Ablauf, Lied + Cover, automati
   const beamer = { role: 'beamer', actor: 'beamer', now: clock++ };
   const steps = game.moderatorView(db).rundown;
   const kinds = steps.map((s) => s.kind + (s.stage || s.pos || ''));
-  assert.ok(kinds.indexOf('stageTitle1') === kinds.indexOf('title1') - 1);
+  assert.ok(kinds.indexOf('stageTitle1') === kinds.indexOf('title1') - 2);
   assert.ok(kinds.indexOf('stageTitle2') === kinds.indexOf('coin4') + 1);
   assert.ok(kinds.indexOf('stageTitle3') === kinds.indexOf('coin6') + 1);
   // Nach den Gewinnstufen 2 und 3 (nach der Pause) die Moderation am Pult, vor dem nächsten Spiel.
   assert.ok(kinds.indexOf('hosts2') === kinds.indexOf('stageTitle2') + 1 && kinds.indexOf('title5') === kinds.indexOf('hosts2') + 1);
   assert.ok(kinds.indexOf('hosts3') === kinds.indexOf('stageTitle3') + 1 && kinds.indexOf('title7') === kinds.indexOf('hosts3') + 1);
-  assert.equal(kinds.indexOf('hosts1'), -1);
+  // Auch nach Gewinnstufe 1, also vor dem ersten Spiel.
+  assert.ok(kinds.indexOf('hosts1') === kinds.indexOf('stageTitle1') + 1 && kinds.indexOf('title1') === kinds.indexOf('hosts1') + 1);
   // Eigener Ablauf aus der Zeit vor dieser Folie: wird einmalig ergänzt.
   const old = structuredClone(db);
   old.project.rundown = steps.filter((x) => x.kind !== 'hosts').map(({ id, kind, pos, stage }) => ({ id, kind, pos, stage }));
   delete old.project.hostsStepAdded;
+  delete old.project.hostsStage1Added;
   game.migrate(old);
-  assert.equal(old.project.rundown.filter((x) => x.kind === 'hosts').length, 2);
+  assert.equal(old.project.rundown.filter((x) => x.kind === 'hosts').length, 3);
+  // Stand mit Folie nur nach Stufe 2 und 3: Stufe 1 kommt einmalig dazu.
+  old.project.rundown = old.project.rundown.filter((x) => !(x.kind === 'hosts' && x.stage === 1));
+  delete old.project.hostsStage1Added;
+  game.migrate(old);
+  const ks = old.project.rundown.map((x) => x.kind + (x.stage || x.pos || ''));
+  assert.equal(ks.indexOf('hosts1'), ks.indexOf('stageTitle1') + 1);
+  assert.equal(old.project.rundown.filter((x) => x.kind === 'hosts').length, 3);
   old.project.rundown = old.project.rundown.filter((x) => x.kind !== 'hosts');
   game.migrate(old); // gelöscht bleibt gelöscht
   assert.equal(old.project.rundown.filter((x) => x.kind === 'hosts').length, 0);

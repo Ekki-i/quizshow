@@ -116,6 +116,7 @@ function newProject(library, name = 'Wer stiehlt uns die Show') {
   return {
     id: newId('proj'),
     hostsStepAdded: true,
+    hostsStage1Added: true,
     name,
     date: '',
     subtitle: 'Die Live-Show mit acht Spielen',
@@ -189,16 +190,23 @@ function migrate(db) {
   return fresh;
 }
 
+// Folie „Moderation am Pult“ einmalig in eigene Abläufe einfügen – zuerst nach den
+// Gewinnstufen 2 und 3, später auch nach Gewinnstufe 1 (vor dem ersten Spiel).
+// Jede Ergänzung passiert nur einmal: Wer die Folie danach löscht, behält das so.
 function addHostsSteps(pr) {
-  if (pr.hostsStepAdded) return;
-  pr.hostsStepAdded = true;
-  if (!Array.isArray(pr.rundown) || !pr.rundown.length) return;
-  for (let i = pr.rundown.length - 1; i >= 0; i -= 1) {
-    const st = pr.rundown[i];
-    if (st.kind === 'stageTitle' && st.stage > 1 && !(pr.rundown[i + 1] && pr.rundown[i + 1].kind === 'hosts')) {
-      pr.rundown.splice(i + 1, 0, { id: newId('step'), kind: 'hosts', stage: st.stage });
+  const add = (flag, want) => {
+    if (pr[flag]) return;
+    pr[flag] = true;
+    if (!Array.isArray(pr.rundown) || !pr.rundown.length) return;
+    for (let i = pr.rundown.length - 1; i >= 0; i -= 1) {
+      const st = pr.rundown[i];
+      if (st.kind === 'stageTitle' && want(st.stage || 1) && !(pr.rundown[i + 1] && pr.rundown[i + 1].kind === 'hosts')) {
+        pr.rundown.splice(i + 1, 0, { id: newId('step'), kind: 'hosts', stage: st.stage || 1 });
+      }
     }
-  }
+  };
+  add('hostsStepAdded', (n) => n > 1);
+  add('hostsStage1Added', (n) => n === 1);
 }
 
 // ---------- Hilfsfunktionen ----------
@@ -380,8 +388,8 @@ function defaultRundown(project) {
     const pos = i + 1;
     // Zu Beginn jeder Gewinnstufe (Spiel 1, 5 und 7) eine eigene Spieltitel-Folie.
     if (STAGE_START[pos]) steps.push({ kind: 'stageTitle', stage: STAGE_START[pos] });
-    // Nach der Pause: nach der Gewinnstufen-Folie die Moderation am Pult (Überleitung, Erklärungen).
-    if (STAGE_START[pos] > 1) steps.push({ kind: 'hosts', stage: STAGE_START[pos] });
+    // Nach jeder Gewinnstufen-Folie die Moderation am Pult (Überleitung, Erklärungen) – auch vor dem ersten Spiel.
+    if (STAGE_START[pos]) steps.push({ kind: 'hosts', stage: STAGE_START[pos] });
     steps.push({ kind: 'title', pos }, { kind: 'game', pos });
     // Nach Spiel 4, 6 und 8 erst eine Pause, dann die Münzvergabe (mehr Spannung).
     if (COIN_POSITIONS.includes(pos)) steps.push({ kind: 'pause' }, { kind: 'coin', pos });
