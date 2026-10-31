@@ -572,7 +572,7 @@ test('Brain or Dreh’n: neue negative Joker und Punktabzug 1 geht an ein andere
   void t0; void wrong;
 });
 
-test('Allein, allein: Punkte nur für richtige Antworten, die kein anderes Team genannt hat', () => {
+test('Wir sind ein Telepa-Team: Punkte nur für richtige Antworten, die kein anderes Team genannt hat', () => {
   const { db, ids } = setup(5);
   const [A, B, C, D, E] = ids;
   use(db, 'allein');
@@ -606,7 +606,7 @@ test('Allein, allein: Punkte nur für richtige Antworten, die kein anderes Team 
   assert.ok(bv(db).list.find((e) => e.name === 'Eisbär').named === 1);
 });
 
-test('Allein, allein: Beamer bekommt den Namen des Eintrags', () => {
+test('Wir sind ein Telepa-Team: Beamer bekommt den Namen des Eintrags', () => {
   const { db, ids } = setup(2);
   use(db, 'allein');
   act(db, mod(), 'open', { index: 1 });

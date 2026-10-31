@@ -134,11 +134,11 @@ function top100(v, teamOf) {
   return [...head, board];
 }
 
-// ---------- Allein, allein ----------
+// ---------- Wir sind ein Telepa-Team ----------
 // Auflösung in drei Spalten: „Allein richtig“ (Punkte), „Doppelt“ (gleiche Antworten
 // gruppiert, durchgestrichen) und „Falsch“.
 function allein(v, teamOf) {
-  if (v.waiting) return waitTitle('Allein, allein', 'Nennt eine richtige Antwort – aber nur, wenn sonst keiner drauf kommt!');
+  if (v.waiting) return waitTitle('Wir sind ein Telepa-Team', 'Nennt eine richtige Antwort – aber nur, wenn sonst keiner drauf kommt!');
   const head = [banner(v.category, 'compact slim'), h('div', { class: 'nb-al-count' }, h('b', {}, String(v.total)), h('span', {}, 'richtige Antworten gibt es'))];
   if (!v.evaluated) return [...head, teamStatus(v.teamIds, v.submitted || [], teamOf)];
   let n = 0;

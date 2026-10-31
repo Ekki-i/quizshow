@@ -194,7 +194,7 @@ function top100(g, ui) {
   return out;
 }
 
-// ---------- Allein, allein ----------
+// ---------- Wir sind ein Telepa-Team ----------
 const alleinDraft = {};
 function allein(g, ui) {
   const out = [muted(`Kategorie ${g.index + 1} von ${g.count}`), question(g.category),
