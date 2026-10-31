@@ -35,7 +35,7 @@ const pts = (db, id) => totals(db)[id] || 0;
 
 test('Neue Module stehen nur in der Datenbank, nicht automatisch in der Show', () => {
   const db = game.createState();
-  for (const t of ['sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu']) {
+  for (const t of ['sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu', 'allein']) {
     assert.ok(db.library.some((e) => e.type === t), t);
     assert.ok(!db.project.games.some((g) => g.type === t), t);
   }
@@ -570,4 +570,48 @@ test('Brain or Dreh’n: neue negative Joker und Punktabzug 1 geht an ein andere
   act(db, mod(), 'openWheel'); // dritte Runde: Sperre vorbei
   act(db, team(A), 'wheelBuzz');
   void t0; void wrong;
+});
+
+test('Allein, allein: Punkte nur für richtige Antworten, die kein anderes Team genannt hat', () => {
+  const { db, ids } = setup(5);
+  const [A, B, C, D, E] = ids;
+  use(db, 'allein');
+  act(db, mod(), 'open', { index: 1 }); // Bärenarten
+  assert.equal(tv(db, A).total, 8);
+  act(db, team(A), 'submit', { text: 'Eisbär' });
+  act(db, team(B), 'submit', { text: 'Polarbär' }); // Variante → gleicher Eintrag wie A
+  act(db, team(C), 'submit', { text: 'Brillenbaer' }); // Tippfehler, allein
+  act(db, team(D), 'submit', { text: 'Teddybär' }); // falsch
+  assert.throws(() => act(db, team(A), 'submit', { text: 'Lippenbär' }), /schon/);
+  assert.throws(() => act(db, mod(), 'evaluate'), /nicht alle/);
+  act(db, mod(), 'close');
+  act(db, mod(), 'evaluate');
+  assert.equal(pts(db, A), 0);
+  assert.equal(pts(db, B), 0);
+  assert.equal(pts(db, C), 1);
+  assert.equal(pts(db, D), 0);
+  assert.equal(pts(db, E), 0);
+  assert.equal(tv(db, A).status, 'double');
+  assert.equal(tv(db, A).shared, 2);
+  assert.equal(tv(db, C).status, 'alone');
+  const v = bv(db);
+  assert.equal(v.results.filter((r) => r.status === 'double').length, 2);
+  assert.equal(v.list, null);
+  // Korrektur: B war eigentlich „Malaienbär“ → jetzt sind A und B beide allein.
+  act(db, mod(), 'setEntry', { teamId: B, entry: 5 });
+  assert.equal(pts(db, A), 1);
+  assert.equal(pts(db, B), 1);
+  act(db, mod(), 'showList', { show: true });
+  assert.equal(bv(db).list.length, 8);
+  assert.ok(bv(db).list.find((e) => e.name === 'Eisbär').named === 1);
+});
+
+test('Allein, allein: Beamer bekommt den Namen des Eintrags', () => {
+  const { db, ids } = setup(2);
+  use(db, 'allein');
+  act(db, mod(), 'open', { index: 1 });
+  act(db, team(ids[0]), 'submit', { text: 'Polarbär' });
+  act(db, team(ids[1]), 'submit', { text: 'Lippenbär' });
+  act(db, mod(), 'evaluate');
+  assert.equal(bv(db).results.find((r) => r.teamId === ids[0]).entry, 'Eisbär');
 });

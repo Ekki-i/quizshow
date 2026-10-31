@@ -134,6 +134,36 @@ function top100(v, teamOf) {
   return [...head, board];
 }
 
+// ---------- Allein, allein ----------
+// Auflösung in drei Spalten: „Allein richtig“ (Punkte), „Doppelt“ (gleiche Antworten
+// gruppiert, durchgestrichen) und „Falsch“.
+function allein(v, teamOf) {
+  if (v.waiting) return waitTitle('Allein, allein', 'Nennt eine richtige Antwort – aber nur, wenn sonst keiner drauf kommt!');
+  const head = [banner(v.category, 'compact slim'), h('div', { class: 'nb-al-count' }, h('b', {}, String(v.total)), h('span', {}, 'richtige Antworten gibt es'))];
+  if (!v.evaluated) return [...head, teamStatus(v.teamIds, v.submitted || [], teamOf)];
+  let n = 0;
+  const card = (r) => {
+    const t = teamOf(r.teamId);
+    return h('div', { class: `acard ${r.status}`, '--team': t.color, style: { animationDelay: `${0.25 * n++ + 0.3}s` } },
+      h('span', { class: 'nm' }, t.name), h('b', { class: 'tx' }, r.entry || r.text),
+      r.entry && r.entry.toLowerCase() !== String(r.text).toLowerCase() ? h('small', { class: 'orig' }, `„${r.text}“`) : null,
+      h('b', { class: 'p' }, plus(r.points)));
+  };
+  const alone = v.results.filter((r) => r.status === 'alone');
+  const groups = {};
+  for (const r of v.results.filter((x) => x.status === 'double')) (groups[r.key] = groups[r.key] || []).push(r);
+  const wrong = v.results.filter((r) => r.status === 'wrong');
+  const col = (cls, icon, title, body) => h('div', { class: `nb-al-col ${cls}` }, h('div', { class: 'hd' }, h('b', {}, icon), h('span', {}, title)), h('div', { class: 'bd' }, body));
+  const board = h('div', { class: 'nb-al-board' },
+    col('alone', '★', 'Allein richtig', alone.length ? alone.map(card) : h('p', { class: 'none' }, 'niemand')),
+    col('double', '👥', 'Doppelt – 0 Punkte', Object.values(groups).length ? Object.values(groups).map((g) => h('div', { class: 'grp' }, h('div', { class: 'gl' }, `${g[0].entry} · ${g.length}×`), g.map(card))) : h('p', { class: 'none' }, 'keine')),
+    col('wrong', '✗', 'Falsch', wrong.length ? wrong.map(card) : h('p', { class: 'none' }, 'keine')));
+  const out = [...head, board];
+  // Lösungsliste: alle richtigen Antworten, genannte hervorgehoben.
+  if (v.list) out.splice(1, 1, h('div', { class: 'nb-al-list' }, v.list.map((e, i) => h('span', { class: e.named ? (e.named > 1 ? 'dbl' : 'hit') : '', style: { animationDelay: `${0.05 * i}s` } }, e.name))));
+  return out;
+}
+
 // ---------- Ich bin ein Star, lüg mich nicht an ----------
 function star(v, teamOf) {
   if (v.waiting) return waitTitle('Ich bin ein Star, lüg mich nicht an', 'Acht Begriffe – einer davon ist gelogen.');
@@ -209,4 +239,4 @@ function hostdu(v, teamOf) {
   return out;
 }
 
-export const BEAMER_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu };
+export const BEAMER_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein };

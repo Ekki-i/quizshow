@@ -44,6 +44,7 @@ function checkFields(fields, obj, where, out, media) {
 function special(type, content, where, out) {
   const each = (list, label, fn) => (list || []).forEach((x, i) => { const err = fn(x); if (err) out.push({ level: 'fehlt', where: `${where} · ${label} ${i + 1}`, text: err }); });
   if (type === 'brain') { const err = require('./play-brain').slotProblem({ type, content }); if (err) out.push({ level: 'fehlt', where: `${where} · Glücksrad`, text: err }); }
+  if (type === 'allein') each(content.rounds, 'Kategorie', (rd) => (require('./play-allein').parseList(rd.entries).length < 2 ? 'Liste der richtigen Antworten fehlt' : null));
   if (type === 'star') each(content.puzzles, 'Rätsel', require('./play-star').validate);
   if (type === 'timeline') each(content.rounds, 'Durchgang', require('./play-timeline').validate);
   if (type === 'chat') each(content.chats, 'Chat', require('./play-chat').validate);

@@ -194,6 +194,29 @@ function top100(g, ui) {
   return out;
 }
 
+// ---------- Allein, allein ----------
+const alleinDraft = {};
+function allein(g, ui) {
+  const out = [muted(`Kategorie ${g.index + 1} von ${g.count}`), question(g.category),
+    muted(`Es gibt ${g.total} richtige Antworten. Nennt eine, auf die sonst niemand kommt: Nur wer als einziges Team eine richtige Antwort nennt, bekommt ${plus(pv(g, 'correct'))}. Doppelte Antworten gehen leer aus.`)];
+  if (g.evaluated) {
+    if (!g.submitted) return [...out, stateBox('bad', '–', 'Keine Abgabe – 0 Punkte')];
+    out.push(g.status === 'alone' ? stateBox('ok', '★', `„${g.text}“ – richtig und nur ihr! ${plus(g.points)}`)
+      : g.status === 'double' ? stateBox('bad', '👥', `„${g.text}“ ist richtig – aber ${g.shared - 1 === 1 ? 'ein anderes Team hatte' : `${g.shared - 1} andere Teams hatten`} das auch. 0 Punkte`)
+        : stateBox('bad', '✗', `„${g.text}“ ist nicht richtig – 0 Punkte`));
+    return out;
+  }
+  if (g.submitted) return [...out, stateBox('', '🔒', `Abgegeben: „${g.text}“ – gesperrt`)];
+  if (!g.open) return [...out, stateBox('', '🔒', 'Abgabe geschlossen')];
+  const input = h('input', { class: 'big-input', value: alleinDraft[g.index] || '', maxlength: '120', placeholder: 'Eure Antwort', autocomplete: 'off', oninput: (ev) => { alleinDraft[g.index] = ev.target.value; } });
+  out.push(h('form', { onsubmit: async (ev) => {
+    ev.preventDefault();
+    if (!input.value.trim()) return;
+    if (await run(ui.conn, 'play.submit', { text: input.value })) delete alleinDraft[g.index];
+  } }, input, h('button', { class: 'btn pink huge', style: { width: '100%', marginTop: '12px' } }, 'Absenden (verbindlich)')));
+  return out;
+}
+
 // ---------- Ich bin ein Star, lüg mich nicht an ----------
 const starPick = {};
 function star(g, ui) {
@@ -308,4 +331,4 @@ function hostdu(g, ui) {
   return out;
 }
 
-export const TEAM_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu };
+export const TEAM_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein };

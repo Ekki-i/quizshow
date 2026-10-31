@@ -113,6 +113,47 @@ function top100(ui, g, st) {
   return out;
 }
 
+// ---------- Allein, allein ----------
+const alleinList = (text) => String(text || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 500)
+  .map((l, i) => { const v = l.split('/').map((x) => x.trim()).filter(Boolean); return { key: i + 1, name: v[0] || l }; });
+function allein(ui, g, st) {
+  const i = st.index ?? -1;
+  const r = (st.rounds || {})[i];
+  const out = [tabs(g.content.rounds.map((rd, k) => rd.category ? rd.category.slice(0, 24) : `Kategorie ${k + 1}`), i, (k) => ui.act('play.open', { index: k }), (k) => st.rounds?.[k]?.evaluated)];
+  if (i < 0 || !r) return [...out, muted(`Kategorie öffnen: jedes Team nennt eine Antwort. Nur richtige Antworten, die kein anderes Team genannt hat, bringen ${plus(pvc(g, 'correct'))}.`)];
+  const rd = g.content.rounds[i];
+  const list = alleinList(rd.entries);
+  out.push(h('p', {}, h('b', {}, rd.category), h('span', { class: 'muted' }, ` · ${list.length} richtige Antworten`)));
+  // Wie oft wurde jeder Eintrag genannt? (für „doppelt“)
+  const count = {};
+  for (const a of Object.values(r.answers)) if (a.entry) count[a.entry] = (count[a.entry] || 0) + 1;
+  const entrySel = (id, a) => {
+    const sel = h('select', { onchange: (ev) => ui.act('play.setEntry', { teamId: id, entry: ev.target.value === '' ? null : Number(ev.target.value) }) },
+      h('option', { value: '' }, '– falsch / nicht in der Liste –'), list.map((e) => h('option', { value: String(e.key) }, e.name)));
+    sel.value = a.entry ? String(a.entry) : '';
+    return sel;
+  };
+  out.push(h('ul', { class: 'list' }, teamIds(ui).map((id) => {
+    const a = r.answers[id];
+    if (!a) return teamLi(ui, id, h('span', { class: 'muted' }, ' – noch keine Abgabe'));
+    const sug = a.status === 'pending' && a.suggest ? list[a.suggest - 1] : null;
+    return teamLi(ui, id, [' – „', h('b', {}, a.text), '“ '],
+      a.status === 'pending' ? badge('warn', sug ? `unsicher: ${sug.name}?` : 'unsicher')
+        : !a.entry ? badge('bad', 'falsch · 0') : count[a.entry] > 1 ? badge('warn', `${list[a.entry - 1].name} · doppelt (${count[a.entry]}×) · 0`) : badge('ok', `${list[a.entry - 1].name} · allein · ${plus(pvc(g, 'correct'))}`),
+      a.status === 'manual' ? badge('', 'manuell') : null,
+      sug ? btn('small ok', '✓ Vorschlag übernehmen', () => ui.act('play.setEntry', { teamId: id, entry: sug.key })) : null,
+      sug ? btn('small ghost', '✗ falsch', () => ui.act('play.setEntry', { teamId: id, entry: null })) : null,
+      entrySel(id, a));
+  })));
+  const all = teamIds(ui).every((id) => r.answers[id]);
+  if (!r.evaluated) out.push(row(
+    !r.closed && !all ? btn('ghost', 'Abgabe schließen', () => ui.confirmAct('Abgabe schließen? Teams ohne Antwort bekommen 0 Punkte.', 'play.close')) : null,
+    btn('pink', 'Auswerten und Punkte vergeben', () => ui.act('play.evaluate'), !all && !r.closed)));
+  else out.push(row(badge('ok', 'Ausgewertet – Korrekturen über die Auswahl oben wirken sofort'),
+    btn(r.showList ? 'ghost' : 'pink', r.showList ? 'Lösungsliste ausblenden' : 'Alle richtigen Antworten auf dem Beamer zeigen', () => ui.act('play.showList', { show: !r.showList }))));
+  return out;
+}
+
 // ---------- Ich bin ein Star, lüg mich nicht an ----------
 function star(ui, g, st) {
   const i = st.index ?? -1;
@@ -202,4 +243,4 @@ function hostdu(ui, g, st) {
   return out;
 }
 
-export const MOD_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu };
+export const MOD_NEU = { sortieren, gier, top100, star, timeline, chat, hostdu, allein };
