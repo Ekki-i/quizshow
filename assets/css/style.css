@@ -1983,3 +1983,59 @@ details.item.drop-here { outline: 2px dashed var(--accent-2, #ffc23d); outline-o
 .beamer .nb-al-list span { padding: 0.6vh 1vw; background: var(--box); color: rgba(255, 255, 255, 0.75); font-weight: 700; font-size: 2vh; animation: pop 0.35s ease-out both; }
 .beamer .nb-al-list span.hit { background: #1d3a27; color: #fff; box-shadow: inset 0 -0.4vh 0 var(--ok); }
 .beamer .nb-al-list span.dbl { background: #3a2a14; color: #fff; box-shadow: inset 0 -0.4vh 0 #ff8a1f; }
+
+/* ===== 30 Seconds to Spaß ===== */
+.sek-buzzer { display: block; margin: 18px auto; }
+.sek-buzzer.stop { background: radial-gradient(circle at 40% 35%, #ff6b6b, #c41d2b); }
+.sek-live { display: grid; gap: 12px; margin-top: 10px; }
+.sek-q { padding: 14px 18px; border-radius: 12px; background: #1f1f28; border-left: 6px solid var(--accent, #ff2d8a); display: grid; gap: 4px; }
+.sek-q small { opacity: 0.7; }
+.sek-q b { font-size: 1.6rem; line-height: 1.2; }
+.sek-q .ans { color: var(--accent-2, #ffc23d); font-weight: 800; font-size: 1.25rem; }
+.sek-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.sek-btn { min-height: 150px; border: 0; border-radius: 16px; font-size: 4rem; font-weight: 900; color: #fff; display: grid; place-items: center; gap: 0; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.sek-btn small { font-size: 1rem; font-weight: 700; }
+.sek-btn.ok { background: #1e9e52; }
+.sek-btn.bad { background: #c23744; }
+.sek-btn:active { transform: scale(0.98); filter: brightness(1.15); }
+.sek-btn:disabled { opacity: 0.35; }
+.beamer .sek-head { display: flex; justify-content: center; align-items: center; gap: 2vw; color: #fff; font-size: 2.4vh; }
+.beamer .sek-head span, .beamer .sek-head b { padding: 0.8vh 1.4vw; background: var(--box); box-shadow: 0 0.6vh 1.6vh rgba(0, 0, 0, 0.45); }
+.beamer .sek-head b { color: var(--accent-2); font-size: 2.8vh; }
+.beamer .sek-ready { display: flex; flex-direction: column; align-items: center; gap: 1vh; width: min(70vw, 120vh); margin: 5vh auto 0; padding: 4vh 2vw; background: var(--box); color: #fff; box-shadow: inset 0 1vh 0 var(--team), 0 0 5vh color-mix(in srgb, var(--team) 40%, transparent); animation: pop 0.5s ease-out both; }
+.beamer .sek-ready small { font-size: 2.2vh; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
+.beamer .sek-ready b { font-size: 8vh; text-transform: uppercase; line-height: 1; }
+.beamer .sek-ready span { font-size: 2.8vh; opacity: 0.85; }
+.beamer .sek-run { display: flex; justify-content: center; gap: 1.6vw; margin-top: 2.4vh; }
+.beamer .sek-run .who { padding: 1vh 1.6vw; background: var(--box); color: #fff; font-weight: 900; font-size: 3.4vh; text-transform: uppercase; box-shadow: inset 0.8vh 0 0 var(--team), 0 0 3vh color-mix(in srgb, var(--team) 45%, transparent); }
+.beamer .sek-run .clock { padding: 1vh 1.6vw; background: var(--box); color: rgba(255, 255, 255, 0.7); font-weight: 900; font-size: 3.4vh; animation: sekPulse 1s ease-in-out infinite; }
+@keyframes sekPulse { 50% { color: var(--accent-2); } }
+.beamer .sek-qbox { display: flex; flex-direction: column; align-items: center; gap: 1vh; width: min(84vw, 150vh); margin: 3vh auto 0; padding: 4vh 3vw; background: var(--box); color: #fff; text-align: center; box-shadow: inset 0 0.8vh 0 var(--accent), 0 1.2vh 3vh rgba(0, 0, 0, 0.55); animation: pop 0.25s ease-out both; }
+.beamer .sek-qbox small { font-size: 2.2vh; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.08em; }
+.beamer .sek-qbox b { font-size: clamp(1.4rem, 5.5vh, 4rem); line-height: 1.15; }
+.beamer .sek-marks { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 0.5vw; margin-top: 2.4vh; }
+.beamer .sek-marks i { font-style: normal; display: grid; place-items: center; width: 4.4vh; height: 4.4vh; font-weight: 900; font-size: 2.6vh; animation: pop 0.25s ease-out both; }
+.beamer .sek-marks i.ok { background: var(--ok); color: #062b14; }
+.beamer .sek-marks i.bad { background: var(--bad); color: #fff; }
+.beamer .sek-marks b { margin-left: 1vw; font-size: 4.4vh; color: var(--accent-2); }
+.beamer .sek-res { display: flex; flex-direction: column; align-items: center; gap: 0.8vh; width: min(70vw, 120vh); margin: 2.6vh auto 0; padding: 2.6vh 2vw; background: var(--box); color: #fff; box-shadow: inset 0 1vh 0 var(--team), 0 1.2vh 3vh rgba(0, 0, 0, 0.55); }
+.beamer .sek-res .who { font-weight: 900; font-size: 2.8vh; text-transform: uppercase; }
+.beamer .sek-res .big { font-size: 11vh; line-height: 1; font-variant-numeric: tabular-nums; animation: pop 0.7s cubic-bezier(.2,1.5,.4,1) both; }
+.beamer .sek-res.ok .big { color: var(--ok); }
+.beamer .sek-res.bad .big { color: var(--bad); }
+.beamer .sek-res .verdict { font-size: 3vh; font-weight: 800; }
+.beamer .sek-scale { position: relative; width: min(70vw, 120vh); height: 3vh; margin: 5vh auto 1vh; background: #2b2b2e; box-shadow: 0 0.6vh 1.6vh rgba(0, 0, 0, 0.5); }
+.beamer .sek-scale .win { position: absolute; top: 0; bottom: 0; background: rgba(43, 217, 107, 0.45); box-shadow: inset 0 0 0 0.3vh var(--ok); }
+.beamer .sek-scale .tgt { position: absolute; top: -1vh; bottom: -1vh; width: 0.4vh; translate: -50% 0; background: #fff; }
+.beamer .sek-scale .tgt span { position: absolute; top: -3.4vh; left: 50%; translate: -50% 0; color: #fff; font-weight: 800; font-size: 2vh; white-space: nowrap; }
+.beamer .sek-scale .pin { position: absolute; left: var(--x); top: 50%; width: 3.4vh; height: 3.4vh; translate: -50% -50%; rotate: 45deg; animation: sekPin 1.2s ease-out both; }
+.beamer .sek-scale .pin span { position: absolute; top: 3.6vh; left: 50%; rotate: -45deg; translate: -50% 0; transform-origin: center; color: #fff; font-weight: 900; font-size: 2.2vh; white-space: nowrap; }
+.beamer .sek-scale .pin.ok { background: var(--ok); }
+.beamer .sek-scale .pin.bad { background: var(--bad); }
+@keyframes sekPin { from { left: 0; } }
+.beamer .sek-order { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.7vw; margin-top: 2.6vh; }
+.beamer .sek-o { display: flex; align-items: center; gap: 0.8vw; padding: 0.8vh 1.1vw 0.8vh 1.3vw; background: var(--box); color: #fff; box-shadow: inset 0.5vh 0 0 var(--team), 0 0.6vh 1.6vh rgba(0, 0, 0, 0.45); }
+.beamer .sek-o .nm { font-weight: 800; font-size: 2.1vh; text-transform: uppercase; }
+.beamer .sek-o b { font-size: 2.6vh; color: var(--accent-2); }
+.beamer .sek-o.turn { box-shadow: inset 0.5vh 0 0 var(--team), 0 0 0 0.3vh var(--team), 0 0 2.6vh color-mix(in srgb, var(--team) 50%, transparent); }
+.beamer .sek-o.fail b { color: var(--bad); }

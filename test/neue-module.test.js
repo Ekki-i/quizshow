@@ -35,7 +35,7 @@ const pts = (db, id) => totals(db)[id] || 0;
 
 test('Neue Module stehen nur in der Datenbank, nicht automatisch in der Show', () => {
   const db = game.createState();
-  for (const t of ['sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu', 'allein']) {
+  for (const t of ['sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu', 'allein', 'sekunden']) {
     assert.ok(db.library.some((e) => e.type === t), t);
     assert.ok(!db.project.games.some((g) => g.type === t), t);
   }
@@ -614,4 +614,55 @@ test('Wir sind ein Telepa-Team: Beamer bekommt den Namen des Eintrags', () => {
   act(db, team(ids[1]), 'submit', { text: 'Lippenbär' });
   act(db, mod(), 'evaluate');
   assert.equal(bv(db).results.find((r) => r.teamId === ids[0]).entry, 'Eisbär');
+});
+
+test('30 Seconds to Spaß: reihum, gleiche Blöcke, Stopp im Zeitfenster behält die Punkte', () => {
+  const { db, ids } = setup(3);
+  const B = 9_000_000;
+  const g = use(db, 'sekunden');
+  const core = require('../server/core');
+  const real = core.randomInt;
+  core.randomInt = () => 1; // Team 2 beginnt
+  try { act(db, mod(), 'open', { index: 0 }); } finally { core.randomInt = real; }
+  const st = db.live.games[g.id];
+  assert.deepEqual(st.rounds[0].order, [ids[1], ids[2], ids[0]]);
+  assert.throws(() => act(db, team(ids[0]), 'buzz'), /nicht dran/);
+  assert.throws(() => act(db, mod(), 'mark', { correct: true }), /kein Zug/);
+  act(db, team(ids[1], B + 1000), 'buzz'); // Start
+  // Team auf Platz 1 bekommt aus jedem Block die erste Frage.
+  assert.equal(bv(db).question.text, g.content.rounds[0].blocks[0].items[0].question);
+  assert.equal(JSON.stringify(bv(db)).includes(g.content.rounds[0].blocks[0].items[0].answer), false); // keine Lösung auf dem Beamer
+  act(db, mod(), 'mark', { correct: true });
+  act(db, mod(), 'mark', { correct: false });
+  act(db, mod(), 'mark', { correct: true });
+  act(db, mod(), 'mark', { correct: true });
+  act(db, mod(), 'unmark'); // Vertipper
+  assert.equal(bv(db).question.text, g.content.rounds[0].blocks[3].items[0].question);
+  assert.equal(tv(db, ids[1]).answered, 3);
+  act(db, team(ids[1], B + 1000 + 33500), 'buzz'); // 33,5 s – innerhalb ± 4
+  assert.equal(pts(db, ids[1]), 2);
+  assert.equal(tv(db, ids[1]).result.ok, true);
+  assert.throws(() => act(db, team(ids[1]), 'buzz'), /nicht dran|vorbei/);
+  act(db, mod(), 'next');
+  act(db, team(ids[2], B + 5000), 'buzz');
+  assert.equal(bv(db).question.text, g.content.rounds[0].blocks[0].items[1].question); // Platz 2
+  act(db, mod(), 'mark', { correct: true });
+  act(db, team(ids[2], B + 5000 + 25000), 'buzz'); // 25 s – zu früh
+  assert.equal(pts(db, ids[2]), 0);
+  act(db, mod(), 'next');
+  act(db, team(ids[0], B + 9000), 'buzz');
+  act(db, mod(), 'mark', { correct: true });
+  // Nicht gestoppt: nach Ablauf der Sicherheitsfrist automatisch 0.
+  assert.equal(game.tick(db, B + 9000 + 60000), true);
+  assert.equal(tv(db, ids[0]).result.late, true);
+  assert.equal(pts(db, ids[0]), 0);
+  act(db, mod(), 'next');
+  assert.equal(st.rounds[0].done, true);
+  // Durchgang 2: gleiche Startreihenfolge, Toleranz ± 2.
+  act(db, mod(), 'open', { index: 1 });
+  assert.deepEqual(st.rounds[1].order, st.rounds[0].order);
+  act(db, team(ids[1], B + 100000), 'buzz');
+  act(db, mod(), 'mark', { correct: true });
+  act(db, team(ids[1], B + 100000 + 32500), 'buzz'); // 32,5 s – außerhalb ± 2
+  assert.equal(pts(db, ids[1]), 2);
 });
