@@ -1958,3 +1958,28 @@ details.item.drop-here { outline: 2px dashed var(--accent-2, #ffc23d); outline-o
 .dragging-any .tl-line.turn .tl-gap .plus { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-2, #ffc23d); color: #111; font-style: normal; font-weight: 900; }
 .tl-line .tl-gap.over { background: rgba(255, 194, 61, 0.3) !important; border-style: solid !important; }
 .tl-card.sel { background: #4a3d16; border-top-color: var(--accent-2, #ffc23d); }
+
+/* ===== Allein, allein ===== */
+.beamer .nb-al-count { display: flex; align-items: baseline; justify-content: center; gap: 1vw; margin-top: 1.6vh; color: #fff; }
+.beamer .nb-al-count b { font-size: 6vh; color: var(--accent-2); font-weight: 900; }
+.beamer .nb-al-count span { font-size: 2.6vh; font-weight: 700; }
+.beamer .nb-al-board { display: grid; grid-template-columns: 1.15fr 1.15fr 0.9fr; gap: 1.2vw; width: min(94vw, 170vh); margin: 2vh auto 0; align-items: start; }
+.beamer .nb-al-col .hd { display: flex; align-items: center; gap: 0.8vw; padding: 1vh 1vw; background: var(--box); color: #fff; font-weight: 800; font-size: 2.6vh; text-transform: uppercase; box-shadow: 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-al-col .hd b { font-size: 3.2vh; }
+.beamer .nb-al-col.alone .hd { box-shadow: inset 0 -0.6vh 0 var(--ok), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-al-col.alone .hd b { color: var(--accent-2); }
+.beamer .nb-al-col.double .hd { box-shadow: inset 0 -0.6vh 0 #ff8a1f, 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-al-col.wrong .hd { box-shadow: inset 0 -0.6vh 0 var(--bad), 0 0.8vh 2vh rgba(0, 0, 0, 0.5); }
+.beamer .nb-al-col .bd { display: grid; gap: 0.8vh; margin-top: 1vh; }
+.beamer .nb-al-col.alone .bd, .beamer .nb-al-col.double .grp { grid-template-columns: repeat(auto-fill, minmax(min(13vw, 100%), 1fr)); }
+.beamer .nb-al-col .grp { display: grid; gap: 0.6vh; padding: 0.6vh; background: rgba(255, 138, 31, 0.08); border: 0.25vh dashed rgba(255, 138, 31, 0.6); }
+.beamer .nb-al-col .grp .gl { grid-column: 1 / -1; color: #ffb36b; font-weight: 800; font-size: 1.9vh; padding: 0 0.3vw; }
+.beamer .nb-al-col .none { color: rgba(255, 255, 255, 0.5); font-size: 2.2vh; text-align: center; margin: 1vh 0; }
+.beamer .acard.alone { box-shadow: inset 0.6vh 0 0 var(--team), 0 0 2.6vh rgba(43, 217, 107, 0.45); }
+.beamer .acard.double .tx { text-decoration: line-through; text-decoration-color: #ff8a1f; text-decoration-thickness: 0.3vh; }
+.beamer .acard.double .p, .beamer .acard.wrong .p { color: rgba(255, 255, 255, 0.5); }
+.beamer .acard.wrong { opacity: 0.8; }
+.beamer .nb-al-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6vw; width: min(94vw, 170vh); margin: 1.6vh auto 0; }
+.beamer .nb-al-list span { padding: 0.6vh 1vw; background: var(--box); color: rgba(255, 255, 255, 0.75); font-weight: 700; font-size: 2vh; animation: pop 0.35s ease-out both; }
+.beamer .nb-al-list span.hit { background: #1d3a27; color: #fff; box-shadow: inset 0 -0.4vh 0 var(--ok); }
+.beamer .nb-al-list span.dbl { background: #3a2a14; color: #fff; box-shadow: inset 0 -0.4vh 0 #ff8a1f; }

@@ -360,6 +360,26 @@ const EXTRA_TYPES = {
     example: { rounds: [{ category: '', source: '', period: '', asOf: '', entries: '' }] },
   },
 
+  allein: {
+    title: 'Allein, allein',
+    playable: true,
+    summary: 'Klar abgegrenzte Kategorie mit begrenzt vielen richtigen Antworten. Jedes Team nennt eine. Punkte nur für richtige Antworten, die kein anderes Team genannt hat.',
+    schema: [
+      { key: 'rounds', label: 'Kategorien', type: 'list', min: 1, max: 12, itemLabel: (i) => `Kategorie ${i + 1}`, addLabel: 'Kategorie hinzufügen',
+        fields: [
+          text('category', 'Kategorie (z. B. „Bärenarten“, „Länder mit B“, „Bisherige Bundeskanzler“)', 160),
+          area('entries', 'Alle richtigen Antworten: eine pro Zeile. Varianten und Abkürzungen mit „/“ trennen (z. B. „Großer Panda / Pandabär“)', 20000, { rows: 10 }),
+        ] },
+    ],
+    example: {
+      rounds: [
+        { category: 'Bisherige Bundeskanzler der Bundesrepublik', entries: ['Konrad Adenauer / Adenauer', 'Ludwig Erhard / Erhard', 'Kurt Georg Kiesinger / Kiesinger', 'Willy Brandt / Brandt', 'Helmut Schmidt / Schmidt', 'Helmut Kohl / Kohl', 'Gerhard Schröder / Schröder', 'Angela Merkel / Merkel', 'Olaf Scholz / Scholz', 'Friedrich Merz / Merz'].join('\n') },
+        { category: 'Bärenarten', entries: ['Braunbär / Grizzly / Grizzlybär / Kodiakbär', 'Eisbär / Polarbär', 'Amerikanischer Schwarzbär / Baribal / Schwarzbär', 'Asiatischer Schwarzbär / Kragenbär / Mondbär', 'Malaienbär / Sonnenbär', 'Lippenbär', 'Brillenbär', 'Großer Panda / Pandabär / Panda'].join('\n') },
+        { category: 'Länder, die mit B anfangen', entries: ['Bahamas', 'Bahrain', 'Bangladesch / Bangladesh', 'Barbados', 'Belarus / Weißrussland', 'Belgien', 'Belize', 'Benin', 'Bhutan', 'Bolivien', 'Bosnien und Herzegowina / Bosnien-Herzegowina / Bosnien', 'Botswana', 'Brasilien', 'Brunei', 'Bulgarien', 'Burkina Faso', 'Burundi'].join('\n') },
+      ],
+    },
+  },
+
   star: {
     title: 'Ich bin ein Star, lüg mich nicht an',
     playable: true,
@@ -447,6 +467,6 @@ const EXTRA_TYPES = {
 };
 
 // Reihenfolge in der Spiele-Datenbank.
-const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain', 'sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu'];
+const EXTRA_ORDER = ['dumm3', 'filmab', 'weissnicht', 'weissnicht2', 'konsequenz', 'songsong', 'dgf', 'zocken', 'fragen', 'zuweit', 'brain', 'sortieren', 'gier', 'top100', 'star', 'timeline', 'chat', 'hostdu', 'allein'];
 
 module.exports = { EXTRA_TYPES, EXTRA_ORDER, WHEEL, WHEEL_SLOTS, migrateBrainContent };
