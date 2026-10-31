@@ -113,7 +113,7 @@ function top100(ui, g, st) {
   return out;
 }
 
-// ---------- Allein, allein ----------
+// ---------- Wir sind ein Telepa-Team ----------
 const alleinList = (text) => String(text || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 500)
   .map((l, i) => { const v = l.split('/').map((x) => x.trim()).filter(Boolean); return { key: i + 1, name: v[0] || l }; });
 function allein(ui, g, st) {

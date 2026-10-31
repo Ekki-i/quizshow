@@ -1,6 +1,6 @@
 'use strict';
 
-// Spiel „Allein, allein“: Eine klar abgegrenzte Kategorie mit einer begrenzten
+// Spiel „Wir sind ein Telepa-Team“: Eine klar abgegrenzte Kategorie mit einer begrenzten
 // Zahl richtiger Antworten (z. B. „Bärenarten“, „Länder mit B“, „Bisherige
 // Bundeskanzler“). Jedes Team gibt genau eine Antwort ab. Punkte gibt es nur für
 // eine richtige Antwort, die kein anderes Team genannt hat – nennen zwei oder
@@ -71,11 +71,11 @@ module.exports = {
       st.index = i;
       const r = round(st, i);
       if (!r.evaluated) r.open = true;
-      log(db, ctx, 'ablauf', `Allein, allein: Kategorie ${i + 1} offen`);
+      log(db, ctx, 'ablauf', `Wir sind ein Telepa-Team: Kategorie ${i + 1} offen`);
     },
     close(db, ctx, game, st) {
       current(st).closed = true;
-      log(db, ctx, 'ablauf', `Allein, allein: Abgabe von Kategorie ${st.index + 1} geschlossen`);
+      log(db, ctx, 'ablauf', `Wir sind ein Telepa-Team: Abgabe von Kategorie ${st.index + 1} geschlossen`);
     },
     // Treffer setzen/korrigieren: { teamId, entry: Nummer in der Liste | null (falsch) }
     setEntry(db, ctx, game, st, p) {
@@ -88,7 +88,7 @@ module.exports = {
       a.entry = e;
       a.status = 'manual';
       a.suggest = null;
-      log(db, ctx, 'bewertung', `Allein, allein: ${teamName(db, p.teamId)} → ${e ? list[e - 1].name : 'falsch'} (manuell)`);
+      log(db, ctx, 'bewertung', `Wir sind ein Telepa-Team: ${teamName(db, p.teamId)} → ${e ? list[e - 1].name : 'falsch'} (manuell)`);
       // Nach der Auswertung: Punkte aller Teams neu berechnen (Doppelte können sich ändern).
       if (r.evaluated) {
         for (const [teamId, x] of Object.entries(results(r, game))) bookTarget(db, ctx, `allein:${game.id}:${st.index}:${teamId}`, teamId, x.points, `${game.title}, Kategorie ${st.index + 1} (Korrektur)`);
@@ -107,7 +107,7 @@ module.exports = {
       for (const [teamId, x] of Object.entries(results(r, game))) {
         bookTarget(db, ctx, `allein:${game.id}:${st.index}:${teamId}`, teamId, x.points, `${game.title}, Kategorie ${st.index + 1}`);
       }
-      log(db, ctx, 'ablauf', `Allein, allein: Kategorie ${st.index + 1} ausgewertet`);
+      log(db, ctx, 'ablauf', `Wir sind ein Telepa-Team: Kategorie ${st.index + 1} ausgewertet`);
       effect(db, 'reveal');
     },
     // Alle richtigen Antworten auf dem Beamer zeigen (genannte hervorgehoben).

@@ -164,6 +164,8 @@ function migrate(db) {
       if (e.type === 'dgf' && e.title === 'DankeGleichFalsch') e.title = 'Danke, gleichfalsch!';
       // „Keine Kon-Sequenz“ heißt jetzt „Hits me baby, one more time“ (Wunsch von Fabian).
       if (e.type === 'konsequenz' && e.title === 'Keine Kon-Sequenz') e.title = 'Hits me baby, one more time';
+      // „Allein, allein“ heißt jetzt „Wir sind ein Telepa-Team“ (Wunsch von Fabian).
+      if (e.type === 'allein' && ['Allein, allein', 'Wir sind ein Telepathie-Team'].includes(e.title)) e.title = 'Wir sind ein Telepa-Team';
       // Brain or Dreh'n: Joker getrennt nach positiv/negativ (6 + 6 aufs Rad).
       if (e.type === 'brain') migrateBrainContent(e.content);
     }

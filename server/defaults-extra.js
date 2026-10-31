@@ -361,7 +361,7 @@ const EXTRA_TYPES = {
   },
 
   allein: {
-    title: 'Allein, allein',
+    title: 'Wir sind ein Telepa-Team',
     playable: true,
     summary: 'Klar abgegrenzte Kategorie mit begrenzt vielen richtigen Antworten. Jedes Team nennt eine. Punkte nur für richtige Antworten, die kein anderes Team genannt hat.',
     schema: [
